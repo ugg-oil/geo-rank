@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Prompt {
+  id         String     @id @default(cuid())
+  category   String
+  promptText String     @map("prompt_text")
+  version    Int        @default(1)
+  active     Boolean    @default(true)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  responses  Response[]
+
+  @@map("prompts")
+}
+
+model Response {
+  id                String             @id @default(cuid())
+  week              String
+  category          String
+  engine            String
+  modelSlug         String?            @map("model_slug")
+  promptId          String             @map("prompt_id")
+  rawText           String?            @map("raw_text")
+  status            String             @default("ok")
+  tokenCost         Float?             @map("token_cost")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  prompt            Prompt             @relation(fields: [promptId], references: [id])
+  extractedMentions ExtractedMention[]
+
+  @@map("responses")
+}
+
+model ExtractedMention {
+  id         String   @id @default(cuid())
+  responseId String   @map("response_id")
+  rawBrand   String   @map("raw_brand")
+  position   Int
+  response   Response @relation(fields: [responseId], references: [id])
+
+  @@map("extracted_mentions")
+}
+
+model Brand {
+  id               String             @id @default(cuid())
+  canonicalName    String             @unique @map("canonical_name")
+  entityType       String             @default("unknown") @map("entity_type")
+  entityTypeSource String             @default("rule") @map("entity_type_source")
+  parentBrandId    String?            @map("parent_brand_id")
+  rankingEnabled   Boolean            @default(true) @map("ranking_enabled")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  aliases          BrandAlias[]
+  resolvedMentions ResolvedMention[]
+  snapshots        Snapshot[]
+  parentBrand      Brand?             @relation("BrandHierarchy", fields: [parentBrandId], references: [id])
+  childBrands      Brand[]            @relation("BrandHierarchy")
+
+  @@map("brands")
+}
+
+model BrandAlias {
+  id        String   @id @default(cuid())
+  brandId   String   @map("brand_id")
+  alias     String   @unique
+  source    String   @default("manual")
+  createdAt DateTime @default(now()) @map("created_at")
+  brand     Brand    @relation(fields: [brandId], references: [id])
+
+  @@map("brand_aliases")
+}
+
+model BrandReviewQueue {
+  id              String  @id @default(cuid())
+  rawBrand        String  @map("raw_brand")
+  count           Int     @default(1)
+  sampleResponseId String? @map("sample_response_id")
+  possibleBrandId String? @map("possible_brand_id")
+  status          String  @default("pending")
+  week            String
+
+  @@map("brand_review_queue")
+}
+
+model IgnoredTerm {
+  id        String   @id @default(cuid())
+  term      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ignored_terms")
+}
+
+model ResolvedMention {
+  id         String @id @default(cuid())
+  responseId String @map("response_id")
+  brandId    String @map("brand_id")
+  position   Int
+  matchType  String @map("match_type")
+  rawBrand   String @map("raw_brand")
+  brand      Brand  @relation(fields: [brandId], references: [id])
+
+  @@map("resolved_mentions")
+}
+
+model Snapshot {
+  id             String  @id @default(cuid())
+  week           String
+  category       String
+  engine         String?
+  brandId        String  @map("brand_id")
+  score          Float
+  appearanceRate Float   @map("appearance_rate")
+  avgRank        Float   @map("avg_rank")
+  modelCoverage  Float?  @map("model_coverage")
+  rank           Int
+  brand          Brand   @relation(fields: [brandId], references: [id])
+
+  @@index([week, category, engine])
+  @@map("snapshots")
+}

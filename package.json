@@ -1,0 +1,46 @@
+{
+  "name": "geo-rank",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "seed": "npx tsx src/scripts/seed-prompts.ts",
+    "pipeline": "npx tsx src/scripts/run-pipeline.ts",
+    "review:export": "npx tsx src/scripts/review-export.ts",
+    "review:import": "npx tsx src/scripts/review-import.ts",
+    "review:auto": "npx tsx src/scripts/review-auto.ts",
+    "reprocess": "npx tsx src/scripts/reprocess-week.ts",
+    "publish": "npx tsx src/scripts/publish-leaderboards.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@vercel/blob": "^2.6.1",
+    "dotenv": "^17.4.2",
+    "next": "16.2.12",
+    "openai": "^7.1.0",
+    "pg": "^8.22.0",
+    "prisma": "^7.9.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20.19.43",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.12",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.1",
+    "typescript": "^5"
+  }
+}
