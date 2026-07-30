@@ -1,4 +1,5 @@
 import { put } from "@vercel/blob";
+import { canPublishToBlob, blobPutOptions } from "@/lib/blob-publish";
 import { prisma } from "@/lib/db";
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
 import { ENGINES } from "@/lib/constants";
@@ -45,20 +46,22 @@ async function buildCategory(category: string, week: string): Promise<CategoryBo
 }
 
 export async function publishLeaderboards(week: string) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("Missing BLOB_READ_WRITE_TOKEN; cannot publish leaderboard snapshots.");
+  if (!canPublishToBlob()) {
+    throw new Error(
+      "Missing Blob credentials. Set BLOB_READ_WRITE_TOKEN locally, or connect Blob to this Vercel project (BLOB_STORE_ID + OIDC)."
+    );
   }
 
+  const jsonPut = blobPutOptions("application/json; charset=utf-8");
   const published: Record<string, string> = {};
   for (const category of Object.keys(CATEGORY_TO_SLUG)) {
     const data = await buildCategory(category, week);
     const slug = CATEGORY_TO_SLUG[category];
-    const blob = await put(`leaderboards/${week}/${slug}.json`, JSON.stringify(data), {
-      access: "public",
-      addRandomSuffix: false,
-      contentType: "application/json; charset=utf-8",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
+    const blob = await put(
+      `leaderboards/${week}/${slug}.json`,
+      JSON.stringify(data),
+      jsonPut
+    );
     published[slug] = blob.url;
   }
 
@@ -69,21 +72,15 @@ export async function publishLeaderboards(week: string) {
     publishedAt,
     boards: published,
   });
-  const manifest = await put(`leaderboards/${week}/manifest.json`, manifestBody, {
-      access: "public",
-      addRandomSuffix: false,
-      contentType: "application/json; charset=utf-8",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
+  const manifest = await put(`leaderboards/${week}/manifest.json`, manifestBody, jsonPut);
   // latest 指向“当前周”。它失败时不阻断“本周 manifest”可用，避免整站回退到数据库。
   let latestManifestUrl: string | null = null;
   try {
-    const latestManifest = await put("leaderboards/latest/manifest.json", manifestBody, {
-      access: "public",
-      addRandomSuffix: false,
-      contentType: "application/json; charset=utf-8",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
+    const latestManifest = await put(
+      "leaderboards/latest/manifest.json",
+      manifestBody,
+      jsonPut
+    );
     latestManifestUrl = latestManifest.url;
   } catch (error) {
     console.error("[Publish] Failed to publish latest manifest:", error);

@@ -29,8 +29,8 @@ model Response {
   status            String             @default("ok")
   tokenCost         Float?             @map("token_cost")
   createdAt         DateTime           @default(now()) @map("created_at")
-  prompt            Prompt             @relation(fields: [promptId], references: [id])
   extractedMentions ExtractedMention[]
+  prompt            Prompt             @relation(fields: [promptId], references: [id])
 
   @@map("responses")
 }
@@ -46,18 +46,18 @@ model ExtractedMention {
 }
 
 model Brand {
-  id               String             @id @default(cuid())
-  canonicalName    String             @unique @map("canonical_name")
-  entityType       String             @default("unknown") @map("entity_type")
-  entityTypeSource String             @default("rule") @map("entity_type_source")
-  parentBrandId    String?            @map("parent_brand_id")
-  rankingEnabled   Boolean            @default(true) @map("ranking_enabled")
-  createdAt        DateTime           @default(now()) @map("created_at")
+  id               String            @id @default(cuid())
+  canonicalName    String            @unique @map("canonical_name")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  entityType       String            @default("unknown") @map("entity_type")
+  parentBrandId    String?           @map("parent_brand_id")
+  rankingEnabled   Boolean           @default(true) @map("ranking_enabled")
+  entityTypeSource String            @default("rule") @map("entity_type_source")
   aliases          BrandAlias[]
+  parentBrand      Brand?            @relation("BrandHierarchy", fields: [parentBrandId], references: [id])
+  childBrands      Brand[]           @relation("BrandHierarchy")
   resolvedMentions ResolvedMention[]
   snapshots        Snapshot[]
-  parentBrand      Brand?             @relation("BrandHierarchy", fields: [parentBrandId], references: [id])
-  childBrands      Brand[]            @relation("BrandHierarchy")
 
   @@map("brands")
 }
@@ -74,13 +74,13 @@ model BrandAlias {
 }
 
 model BrandReviewQueue {
-  id              String  @id @default(cuid())
-  rawBrand        String  @map("raw_brand")
-  count           Int     @default(1)
+  id               String  @id @default(cuid())
+  rawBrand         String  @map("raw_brand")
+  count            Int     @default(1)
   sampleResponseId String? @map("sample_response_id")
-  possibleBrandId String? @map("possible_brand_id")
-  status          String  @default("pending")
-  week            String
+  possibleBrandId  String? @map("possible_brand_id")
+  status           String  @default("pending")
+  week             String
 
   @@map("brand_review_queue")
 }
@@ -123,19 +123,19 @@ model Snapshot {
 }
 
 model PipelineRun {
-  id               String    @id @default(cuid())
-  week             String
-  status           String    @default("running")
-  currentStep      String?   @map("current_step")
-  startedAt        DateTime  @default(now()) @map("started_at")
-  finishedAt       DateTime? @map("finished_at")
-  collectedCount   Int?      @map("collected_count")
-  extractedCount   Int?      @map("extracted_count")
-  resolvedCount    Int?      @map("resolved_count")
-  classifiedCount  Int?      @map("classified_count")
-  snapshotCount    Int?      @map("snapshot_count")
-  manifestUrl      String?   @map("manifest_url")
-  errorMessage     String?   @map("error_message")
+  id              String    @id @default(cuid())
+  week            String
+  status          String    @default("running")
+  currentStep     String?   @map("current_step")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  collectedCount  Int?      @map("collected_count")
+  extractedCount  Int?      @map("extracted_count")
+  resolvedCount   Int?      @map("resolved_count")
+  classifiedCount Int?      @map("classified_count")
+  snapshotCount   Int?      @map("snapshot_count")
+  manifestUrl     String?   @map("manifest_url")
+  errorMessage    String?   @map("error_message")
 
   @@index([week, startedAt])
   @@map("pipeline_runs")

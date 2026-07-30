@@ -3,6 +3,7 @@ import { extractWeek } from "./extract";
 import { normalizeWeek } from "./normalize";
 import { classifyAllBrands } from "./classify-entities";
 import { scoreAll } from "./score";
+import { canPublishToBlob } from "@/lib/blob-publish";
 import { publishLeaderboards } from "./publish";
 import { getCurrentWeek } from "@/lib/week";
 import { prisma } from "@/lib/db";
@@ -57,12 +58,14 @@ export async function runFullPipeline(week?: string) {
     console.log(`[5/6] Scoring complete (${snapshotCount} snapshots)`);
 
     let manifestUrl: string | null = null;
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (canPublishToBlob()) {
       console.log("[6/6] Publishing leaderboard snapshots...");
       manifestUrl = await publishLeaderboards(w);
       console.log("[6/6] Publishing complete");
     } else {
-      console.warn("[6/6] BLOB_READ_WRITE_TOKEN missing; skipped publishing snapshots");
+      console.warn(
+        "[6/6] Blob credentials missing; skipped publishing snapshots (need BLOB_READ_WRITE_TOKEN or Vercel Blob connection)"
+      );
     }
 
     await prisma.pipelineRun.update({
