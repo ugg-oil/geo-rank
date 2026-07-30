@@ -136,6 +136,34 @@ leaderboards/
 
 每个品类 JSON 同时包含 Overall、ChatGPT、Gemini、Grok 四份榜单及上周排名信息。前端首次进入品类时读取一个发布文件，Tab 切换只在客户端完成。
 
+### 4.10 Pipeline 运行记录
+
+每次 pipeline 执行都会在 `pipeline_runs` 创建一条记录。即使同一周重复执行，也保留独立运行记录，便于区分 Cron、手动重跑和失败重试。
+
+| 字段 | 说明 |
+|------|------|
+| `week` | 目标周次 |
+| `status` | `running` / `success` / `failed` |
+| `current_step` | 当前步骤：collecting、extracting、normalizing、classifying、scoring、publishing |
+| `started_at` / `finished_at` | 开始与结束时间 |
+| `*_count` | 各步骤处理数量 |
+| `snapshot_count` | 该周生成的快照数量 |
+| `manifest_url` | 发布成功后的榜单 manifest 地址 |
+| `error_message` | 失败时的错误信息 |
+
+检查最近运行结果：
+
+```sql
+SELECT id, week, status, current_step, started_at, finished_at,
+       collected_count, extracted_count, resolved_count,
+       snapshot_count, manifest_url, error_message
+FROM pipeline_runs
+ORDER BY started_at DESC
+LIMIT 10;
+```
+
+判断本周是否成功，应同时确认：`pipeline_runs.status = 'success'`、`snapshot_count > 0`，以及 `manifest_url` 已写入（生产环境）。
+
 ## 5. 采集（Collector）
 对每个 `category × engine × prompt_id`：
 1. 通过 **OpenRouter** 统一调用：ChatGPT (`openai/gpt-4o`)、Gemini (`google/gemini-2.5-flash`)、Grok (`x-ai/grok-4.5`)

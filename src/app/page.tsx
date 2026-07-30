@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_URL, stringifyJsonLd } from "@/lib/seo";
 
 const STATS = [
   { value: "3", label: "AI Engines" },
@@ -15,36 +17,84 @@ const ENGINES = [
 
 const CATEGORY_CARDS = [
   {
-    name: "AI Tools",
+    name: "AI Tools Visibility Rankings",
     slug: "ai-tools",
-    description: "Conversational AI, copilots, and productivity assistants",
+    description:
+      "Weekly AI visibility ranking of assistants, copilots, and productivity tools recommended by leading AI engines.",
     count: "Top 20",
   },
   {
-    name: "SaaS Software",
+    name: "SaaS AI Visibility Rankings",
     slug: "saas-software",
-    description: "Business software and cloud applications",
+    description:
+      "Weekly AI visibility ranking of SaaS products and business software most frequently recommended in AI answers.",
     count: "Top 20",
   },
   {
-    name: "AI Image / Video",
+    name: "AI Image / Video Visibility Rankings",
     slug: "ai-image-video-tools",
-    description: "Generative media, editing, and creative AI platforms",
+    description:
+      "Weekly AI visibility ranking of generative image and video tools across ChatGPT, Gemini, and Grok.",
     count: "Top 20",
   },
   {
-    name: "Developer Tools",
+    name: "Developer Tools AI Visibility Rankings",
     slug: "developer-tools",
-    description: "IDEs, APIs, deployment, and engineering workflows",
+    description:
+      "Weekly AI visibility ranking of developer tools, IDEs, and coding platforms recommended by major AI engines.",
     count: "Top 20",
   },
   {
-    name: "Marketing Tools",
+    name: "Marketing Tools AI Visibility Rankings",
     slug: "marketing-tools",
-    description: "Analytics, automation, and growth platforms",
+    description:
+      "Weekly AI visibility ranking of marketing and growth platforms recommended in generative AI responses.",
     count: "Top 20",
   },
 ];
+
+const CATEGORY_SHORTCUTS = [
+  { label: "AI Tools", slug: "ai-tools" },
+  { label: "SaaS", slug: "saas-software" },
+  { label: "AI Image / Video", slug: "ai-image-video-tools" },
+  { label: "Developer", slug: "developer-tools" },
+  { label: "Marketing", slug: "marketing-tools" },
+];
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "AI Visibility Rankings for Products | GEO Radar",
+  },
+  description:
+    "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok across major software categories.",
+  keywords: [
+    "AI visibility",
+    "AI visibility rankings",
+    "AI product rankings",
+    "GEO rankings",
+    "ChatGPT product recommendations",
+    "Gemini product recommendations",
+    "Grok product recommendations",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "AI Visibility Rankings for Products | GEO Radar",
+    description:
+      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok across major software categories.",
+    url: "/",
+    type: "website",
+    images: [{ url: "/og-image.png", alt: "GEO Radar" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Visibility Rankings for Products | GEO Radar",
+    description:
+      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok across major software categories.",
+    images: ["/og-image.png"],
+  },
+};
 
 function ArrowIcon() {
   return (
@@ -68,29 +118,108 @@ function ArrowIcon() {
 }
 
 export default function Home() {
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "GEO Radar",
+    url: SITE_URL,
+    description:
+      "Weekly AI visibility rankings across ChatGPT, Gemini, and Grok based on GEO methodology.",
+  };
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "GEO Radar",
+    url: SITE_URL,
+    logo: `${SITE_URL}/icon.svg`,
+  };
+
   return (
     <main className="relative overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: stringifyJsonLd(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: stringifyJsonLd(organizationJsonLd) }}
+      />
       {/* Hero */}
-      <section className="relative mx-auto max-w-6xl px-6 pt-20 pb-16 sm:pt-28 sm:pb-20">
+      <section className="relative mx-auto max-w-6xl px-6 pt-16 pb-12 sm:pt-24 sm:pb-16">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
+          <div>
         <div className="animate-fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-xs text-[var(--text-secondary)]">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--yellow)] opacity-60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--yellow)]" />
           </span>
-          Weekly rankings · Updated every Monday
+          Weekly AI visibility rankings · Updated every Monday
         </div>
 
         <h1 className="animate-fade-up-delay-1 max-w-3xl text-4xl font-semibold tracking-tight text-[var(--text)] sm:text-6xl sm:leading-[1.08]">
-          Which products
+          AI Visibility Rankings
           <br />
-          show up in AI answers?
+          for products in AI answers
         </h1>
 
         <p className="animate-fade-up-delay-2 mt-6 max-w-xl text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
-          SEO decides where you rank in search results.
+          Track which products are recommended by ChatGPT, Gemini, and Grok.
           <br />
-          GEO decides whether AI recommends you.
+          GEO Radar turns AI answers into weekly visibility rankings.
         </p>
+
+        <div className="animate-fade-up-delay-3 mt-8 flex flex-wrap items-center gap-3">
+          <Link href="#rankings" className="btn-primary px-5 py-2.5">
+            Explore AI visibility rankings
+            <ArrowIcon />
+          </Link>
+          <Link
+            href="/methodology"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--text)]"
+          >
+            Why GEO matters
+          </Link>
+        </div>
+
+        <div className="animate-fade-up-delay-3 mt-8 flex flex-wrap gap-2">
+          {CATEGORY_SHORTCUTS.map((category) => (
+            <Link
+              key={category.slug}
+              href={`/category/${category.slug}`}
+              className="rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--text)]"
+            >
+              {category.label}
+            </Link>
+          ))}
+        </div>
+          </div>
+
+          <div className="animate-fade-up-delay-2 hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 lg:block">
+            <div className="mb-8 flex items-center justify-between">
+              <span className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                Why AI visibility now
+              </span>
+              <span className="h-2 w-2 rounded-full bg-[var(--yellow)] shadow-[0_0_14px_var(--yellow)]" />
+            </div>
+            <p className="text-xl font-medium leading-snug tracking-tight text-[var(--text)]">
+              AI answers are becoming the new recommendation layer between people and products.
+            </p>
+            <div className="mt-8 space-y-4 border-t border-[var(--border)] pt-5">
+              <div className="flex gap-3">
+                <span className="font-mono text-xs text-[var(--text-muted)]">01</span>
+                <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                  Search shows a list. Generative AI makes a shortlist.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="font-mono text-xs text-[var(--text-muted)]">02</span>
+                <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                  AI visibility tracks which products earn a place in those answers.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Stats bar */}
         <div className="animate-fade-up-delay-3 mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--border)] sm:grid-cols-4">
@@ -129,14 +258,14 @@ export default function Home() {
       </section>
 
       {/* Categories */}
-      <section className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+      <section id="rankings" className="scroll-mt-20 mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <div className="mb-10 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              Category Rankings
+              AI Visibility Rankings by Category
             </h2>
             <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-              Dynamically discovered brands, scored and ranked weekly
+              Weekly product visibility rankings across ChatGPT, Gemini, and Grok by category
             </p>
           </div>
           <Link
@@ -176,7 +305,7 @@ export default function Home() {
       <section className="border-t border-[var(--border)] bg-[var(--bg-elevated)]">
         <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
           <h2 className="mb-12 text-center text-xl font-semibold tracking-tight sm:text-2xl">
-            From AI response to ranked leaderboard
+            From AI response to visibility leaderboard
           </h2>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             {[
@@ -193,7 +322,7 @@ export default function Home() {
               {
                 step: "03",
                 title: "Score & Publish",
-                desc: "Weighted GEO score ranks Top 20 with week-over-week movement",
+                desc: "Weighted AI visibility score ranks Top 20 with week-over-week movement",
               },
             ].map((item) => (
               <div key={item.step} className="relative">

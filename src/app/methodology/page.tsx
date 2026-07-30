@@ -1,14 +1,30 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "AI Visibility Methodology",
+  description:
+    "How GEO Radar measures AI visibility and scores weekly product rankings across ChatGPT, Gemini, and Grok.",
+  keywords: [
+    "AI visibility methodology",
+    "GEO methodology",
+    "generative engine optimization",
+    "AI product ranking methodology",
+  ],
+  alternates: {
+    canonical: "/methodology",
+  },
+};
 
 const SECTIONS = [
   {
-    title: "What is GEO?",
+    title: "What is AI Visibility / GEO?",
     content: (
       <p>
-        GEO (Generative Engine Optimization) measures how often and how prominently
-        AI engines recommend specific products and brands. Unlike SEO which tracks search
-        result rankings, GEO tracks whether AI recommends you when users ask for product
-        suggestions.
+        AI visibility measures how often and how prominently AI engines recommend
+        specific products and brands. GEO (Generative Engine Optimization) is the
+        methodology for improving and tracking that visibility, just as SEO tracks
+        search result rankings.
       </p>
     ),
   },
@@ -34,7 +50,7 @@ const SECTIONS = [
     title: "Scoring Formula",
     content: (
       <>
-        <p className="mb-4">Each brand receives a GEO Score from 0 to 100:</p>
+        <p className="mb-4">Each brand receives an AI visibility score from 0 to 100:</p>
         <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 font-mono text-sm text-[var(--text-secondary)]">
           Score = 0.50 × Appearance Rate + 0.40 × Avg Rank Score + 0.10 × Model Coverage
         </div>
@@ -110,9 +126,11 @@ export default function MethodologyPage() {
         Back to home
       </Link>
 
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Methodology</h1>
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        AI Visibility Methodology
+      </h1>
       <p className="mt-2 text-sm text-[var(--text-muted)]">
-        How GEO Radar collects, scores, and publishes weekly rankings
+        How GEO Radar collects, scores, and publishes weekly AI visibility rankings
       </p>
 
       <div className="mt-12 space-y-10">

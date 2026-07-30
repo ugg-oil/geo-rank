@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
   const week = getCurrentWeek();
 
   try {
-    await runFullPipeline(week);
-    return NextResponse.json({ ok: true, week });
+    const result = await runFullPipeline(week);
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

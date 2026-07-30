@@ -33,6 +33,22 @@
 
 ### 3. 三个关键检查点（必须做）
 
+#### 检查 0：Pipeline 运行记录
+
+每次 Cron 或手动 pipeline 都会在 `pipeline_runs` 写入记录。上线后每周确认最新记录：
+
+```sql
+SELECT week, status, current_step, started_at, finished_at,
+       snapshot_count, manifest_url, error_message
+FROM pipeline_runs
+ORDER BY started_at DESC
+LIMIT 3;
+```
+
+成功标准：目标周次为本周、`status = success`、`finished_at` 不为空、`snapshot_count > 0`，生产环境同时应有 `manifest_url`。
+
+如果 `status = failed`，先查看 `error_message` 和 `current_step`，不要直接重复运行而不记录原因。
+
 #### 检查 A：页面确实读取到 Blob（而不是回退数据库）
 
 1. 打开任意品类页，例如：
@@ -76,4 +92,3 @@
 2. 如果 pipeline 发布失败：
    - 先修复 `BLOB_READ_WRITE_TOKEN` 和发布脚本执行错误
    - 保证至少 `leaderboards/{week}/manifest.json` 成功发布
-

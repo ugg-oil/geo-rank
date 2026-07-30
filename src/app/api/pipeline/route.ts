@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
   const week = body.week ?? getCurrentWeek();
 
   try {
-    await runFullPipeline(week);
-    return NextResponse.json({ ok: true, week });
+    const result = await runFullPipeline(week);
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     return NextResponse.json(
       { error: String(err) },

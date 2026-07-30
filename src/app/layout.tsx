@@ -1,12 +1,47 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GEO Radar – Which products show up in AI answers?",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "AI Visibility Rankings | GEO Radar",
+    template: "%s | GEO Radar",
+  },
   description:
-    "SEO decides where you rank in search results. GEO decides whether AI recommends you.",
+    "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok.",
+  keywords: [
+    "AI visibility",
+    "AI visibility rankings",
+    "GEO rankings",
+    "generative engine optimization",
+    "ChatGPT rankings",
+    "Gemini rankings",
+    "Grok rankings",
+  ],
+  openGraph: {
+    title: "AI Visibility Rankings | GEO Radar",
+    description:
+      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok.",
+    url: "/",
+    siteName: "GEO Radar",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        alt: "GEO Radar",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Visibility Rankings | GEO Radar",
+    description:
+      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({

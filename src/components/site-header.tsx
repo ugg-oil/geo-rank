@@ -14,7 +14,13 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-5">
+          <Link
+            href="/#rankings"
+            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+          >
+            Rankings
+          </Link>
           <Link
             href="/methodology"
             className="text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"

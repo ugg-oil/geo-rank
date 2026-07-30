@@ -121,3 +121,22 @@ model Snapshot {
   @@index([week, category, engine])
   @@map("snapshots")
 }
+
+model PipelineRun {
+  id               String    @id @default(cuid())
+  week             String
+  status           String    @default("running")
+  currentStep      String?   @map("current_step")
+  startedAt        DateTime  @default(now()) @map("started_at")
+  finishedAt       DateTime? @map("finished_at")
+  collectedCount   Int?      @map("collected_count")
+  extractedCount   Int?      @map("extracted_count")
+  resolvedCount    Int?      @map("resolved_count")
+  classifiedCount  Int?      @map("classified_count")
+  snapshotCount    Int?      @map("snapshot_count")
+  manifestUrl      String?   @map("manifest_url")
+  errorMessage     String?   @map("error_message")
+
+  @@index([week, startedAt])
+  @@map("pipeline_runs")
+}

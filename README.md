@@ -1,8 +1,8 @@
 # GEO Radar
 
-*SEO decides where you rank in search results. GEO decides whether AI recommends you.*
+*AI visibility rankings for products recommended by ChatGPT, Gemini, and Grok.*
 
-每周用 ChatGPT / Gemini / Grok 的 AI 回答，动态生成各品类 Top 20 品牌排行榜。
+每周用 ChatGPT / Gemini / Grok 的 AI 回答，动态生成各品类 Top 20 品牌排行榜，衡量产品在 AI 推荐答案里的可见度。
 
 ## 文档
 
@@ -71,6 +71,8 @@ npm run publish -- "Week of 2026-07-27"
 ```
 
 首次发布后，将命令输出的 `latestManifest` URL 配置为 `LEADERBOARD_MANIFEST_URL`。
+
+每周运行结果会持久化到 `pipeline_runs` 表。生产检查时应确认最新记录的 `status=success`、`snapshot_count > 0`，并且生产环境有 `manifest_url`。
 
 `data/` 目录为运行时临时文件（已 gitignore），审核结果入库后可删除。
 

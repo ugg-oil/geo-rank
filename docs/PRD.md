@@ -15,8 +15,8 @@
 
 公开落地页排行榜。每周用固定英文 prompt 询问 **ChatGPT / Gemini / Grok**，从回答中**动态提取**被推荐的产品/品牌，按可解释公式计分，每品类取 **Top 20** 发布。
 
-**主文案：** *SEO decides where you rank in search results. GEO decides whether AI recommends you.*  
-**副标题：** *Which products show up in AI answers?*
+**主文案：** *AI Visibility Rankings for products in AI answers.*  
+**副标题：** *Track which products are recommended by ChatGPT, Gemini, and Grok.*
 
 ---
 
@@ -52,8 +52,6 @@ flowchart LR
 | AI Image / Video Tools | |
 | Developer Tools | |
 | Marketing Tools | |
-
-**第二阶段 — 追加 5 品类：** Website Builders、Hosting / Cloud、Productivity Apps、Education / Courses、Design Tools
 
 - 每品类每周动态产出 Top 20
 - 每周一凌晨自动跑采集 + 计分，当天发布
@@ -225,8 +223,4 @@ npm run review:export && npm run review:import  # 人工审核（备选）
 
 ---
 
-## 第二阶段功能
-
-- 追加 5 品类（Website Builders / Hosting / Productivity / Education / Design）
-- 追加引擎：Perplexity、Claude、DeepSeek
-- Brand Profile 页（`/brand/:slug`）：GEO Score、各引擎分数、品类排名、竞品对比
+> 第二阶段规划已拆分到 [PRD-phase-2.md](./PRD-phase-2.md)。
