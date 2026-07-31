@@ -1,4 +1,6 @@
-# PRD：GEO Radar（第二阶段）
+# Roadmap：GEO Radar（第二阶段）
+
+> 本文档是未来规划，不是当前系统规范。当前产品范围见 [PRD.md](./PRD.md)，系统架构见 [architecture.md](./architecture.md)。
 
 | 字段 | 内容 |
 |------|------|

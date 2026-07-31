@@ -4,6 +4,16 @@ Track which products are recommended by ChatGPT, Gemini, and Grok.
 
 GEO Radar measures AI visibility by analyzing AI-generated answers and producing weekly rankings across categories.
 
+![GEO Radar preview](./public/index.png)
+
+Built for teams working on AI Visibility and Generative Engine Optimization (GEO).
+
+## Why GEO Radar
+
+AI assistants are becoming the new recommendation layer.
+
+Instead of browsing ten blue links, users increasingly ask ChatGPT, Gemini, and Grok for product recommendations. GEO Radar tracks which brands appear most often in those answers and turns AI recommendations into measurable visibility rankings.
+
 ## Features
 
 - Weekly AI Visibility Rankings
@@ -29,11 +39,11 @@ GEO Radar measures AI visibility by analyzing AI-generated answers and producing
 
 ## How It Works
 
-1. Collect AI-generated answers
-2. Extract mentioned brands
-3. Normalize brand entities
-4. Score visibility
-5. Generate weekly rankings
+1. Query ChatGPT, Gemini, and Grok with category-specific prompts
+2. Extract and normalize brand mentions
+3. Aggregate visibility signals
+4. Calculate weekly visibility scores
+5. Publish leaderboard snapshots
 
 The ranking pipeline runs weekly and publishes static leaderboard snapshots.
 
@@ -50,12 +60,14 @@ The ranking pipeline runs weekly and publishes static leaderboard snapshots.
 
 | Document | Description |
 |----------|-------------|
-| [docs/PRD.md](./docs/PRD.md) | Product requirements |
+| [docs/PRD.md](./docs/PRD.md) | Current product scope and implementation status |
+| [docs/architecture.md](./docs/architecture.md) | System architecture and data flow |
 | [docs/setup.md](./docs/setup.md) | Environment, database, and deploy |
-| [docs/operations.md](./docs/operations.md) | Pipeline, publish, cron, review |
-| [docs/data-pipeline.md](./docs/data-pipeline.md) | Data pipeline design |
+| [docs/operations.md](./docs/operations.md) | Pipeline, publish, cron, and operations |
+| [docs/data-pipeline.md](./docs/data-pipeline.md) | Detailed pipeline design |
 | [docs/review-queue.md](./docs/review-queue.md) | Review workflow |
-| [docs/seo-part1.md](./docs/seo-part1.md) | SEO launch checklist |
+| [docs/seo.md](./docs/seo.md) | Technical SEO and SEO backlog |
+| [docs/PRD-phase-2.md](./docs/PRD-phase-2.md) | Phase 2 roadmap |
 
 ## Quick Start
 
@@ -126,7 +138,7 @@ Production checklist:
 - Metadata configured
 - Indexing requested
 
-See [docs/seo-part1.md](./docs/seo-part1.md)
+See [docs/seo.md](./docs/seo.md)
 
 ## License
 

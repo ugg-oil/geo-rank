@@ -80,4 +80,4 @@ curl "https://georadar.website/api/cron" \
 
 - [data-pipeline.md](./data-pipeline.md) — 管道设计细节
 - [review-queue.md](./review-queue.md) — Review Queue 操作说明
-- [seo-part1.md](./seo-part1.md) — 上线 SEO 检查清单
+- [seo.md](./seo.md) — 技术 SEO 检查与 SEO backlog

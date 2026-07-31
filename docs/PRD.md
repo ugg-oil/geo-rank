@@ -1,5 +1,7 @@
 # PRD：GEO Radar
 
+> 本文档只维护当前产品范围和实现状态。详细架构见 [architecture.md](./architecture.md)，具体运维步骤见 [operations.md](./operations.md)。
+
 | 字段 | 内容 |
 |------|------|
 | 产品名 | **GEO Radar** |

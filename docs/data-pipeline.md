@@ -1,5 +1,7 @@
 # GEO Radar 数据管道（MVP）
 
+> 本文档记录 pipeline 的详细实现和数据模型。整体系统边界与组件职责以 [architecture.md](./architecture.md) 为准，操作命令以 [operations.md](./operations.md) 为准。
+
 ## 1. 总目标
 把「非结构化 AI 回答」转成「可计分的品牌提及记录」，最终生成每周快照榜单（Top 20）。
 
