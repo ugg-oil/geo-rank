@@ -1,6 +1,26 @@
 import type { CategoryBoardsData } from "@/lib/leaderboard";
 import { getCurrentWeek } from "@/lib/week";
 
+export type PublishedLeaderboardManifest = {
+  version?: number;
+  week?: string;
+  publishedAt?: string;
+  boards?: Record<string, string>;
+};
+
+export async function getPublishedLeaderboardManifest(): Promise<PublishedLeaderboardManifest | null> {
+  const manifestUrl = process.env.LEADERBOARD_MANIFEST_URL;
+  if (!manifestUrl) return null;
+
+  try {
+    const response = await fetch(manifestUrl, { next: { revalidate: 300 } });
+    if (!response.ok) return null;
+    return (await response.json()) as PublishedLeaderboardManifest;
+  } catch {
+    return null;
+  }
+}
+
 export async function getPublishedCategoryLeaderboards(
   slug: string
 ): Promise<CategoryBoardsData | null> {
@@ -20,12 +40,7 @@ export async function getPublishedCategoryLeaderboards(
       if (debug) console.debug(`${logPrefix} manifest fetch not ok: ${manifestResponse.status}`);
       return null;
     }
-    const manifest = (await manifestResponse.json()) as {
-      version?: number;
-      week?: string;
-      publishedAt?: string;
-      boards?: Record<string, string>;
-    };
+    const manifest = (await manifestResponse.json()) as PublishedLeaderboardManifest;
 
     // 防止 latest 指错周导致页面展示错误数据：如果 manifest 带 week 字段且与当前周不一致则回退。
     if (manifest.week && manifest.week !== currentWeek) {

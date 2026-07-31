@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
   return (
@@ -14,7 +15,7 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-5">
+        <nav className="flex items-center gap-4 sm:gap-5">
           <Link
             href="/#rankings"
             className="text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
@@ -27,6 +28,7 @@ export function SiteHeader() {
           >
             Methodology
           </Link>
+          <ThemeToggle />
         </nav>
       </div>
     </header>

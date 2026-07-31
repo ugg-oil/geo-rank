@@ -1,17 +1,22 @@
 import { CATEGORY_SLUG_MAP } from "@/lib/categories";
 
+/** Canonical production domain used by sitemap, robots, metadataBase, OG, JSON-LD. */
+export const PRODUCTION_SITE_URL = "https://georadar.website";
+
 function normalizeSiteUrl(url: string) {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
 export function getSiteUrl() {
-  const fromEnv =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.SITE_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : undefined);
-  return normalizeSiteUrl(fromEnv ?? "http://localhost:3000");
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL;
+  if (fromEnv) return normalizeSiteUrl(fromEnv);
+
+  // Never fall back to *.vercel.app — that breaks Search Console / sitemap / canonical.
+  if (process.env.NODE_ENV === "development" && !process.env.VERCEL) {
+    return "http://localhost:3000";
+  }
+
+  return PRODUCTION_SITE_URL;
 }
 
 export const SITE_URL = getSiteUrl();

@@ -18,6 +18,7 @@
 
 复制 `.env.example` 为 `.env` 并填写：
 
+- `NEXT_PUBLIC_SITE_URL` — 正式域名（生产必须为 `https://georadar.website`，用于 sitemap / canonical / OG）
 - `DATABASE_URL` — PostgreSQL 连接串
 - `OPENROUTER_API_KEY` — OpenRouter API Key
 - `PIPELINE_SECRET` — 手动触发 `/api/pipeline` 的鉴权密钥

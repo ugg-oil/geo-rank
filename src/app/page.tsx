@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getPublishedCategoryLeaderboards, getPublishedLeaderboardManifest } from "@/lib/published-leaderboard";
 import { SITE_URL, stringifyJsonLd } from "@/lib/seo";
 
 const STATS = [
@@ -117,7 +118,20 @@ function ArrowIcon() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const [manifest, aiToolsBoard] = await Promise.all([
+    getPublishedLeaderboardManifest(),
+    getPublishedCategoryLeaderboards("ai-tools"),
+  ]);
+  const topFive = aiToolsBoard?.boards.overall.snapshots.slice(0, 5) ?? [];
+  const updatedAt = manifest?.publishedAt
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(manifest.publishedAt))
+    : null;
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -153,7 +167,7 @@ export default function Home() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--yellow)] opacity-60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--yellow)]" />
           </span>
-          Weekly AI visibility rankings · Updated every Monday
+          Weekly AI visibility rankings · {updatedAt ? `Last updated ${updatedAt}` : "Updated every Monday"}
         </div>
 
         <h1 className="animate-fade-up-delay-1 max-w-3xl text-4xl font-semibold tracking-tight text-[var(--text)] sm:text-6xl sm:leading-[1.08]">
@@ -234,6 +248,56 @@ export default function Home() {
               <div className="mt-0.5 text-xs text-[var(--text-muted)]">{stat.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Proof points */}
+      <section className="border-y border-[var(--border)] bg-[var(--bg-elevated)]">
+        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+              This week&apos;s snapshot
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Top 5 AI Tools</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+              Products most visible in recommendations from ChatGPT, Gemini, and Grok.
+            </p>
+            {topFive.length > 0 ? (
+              <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                {topFive.map((row) => (
+                  <Link
+                    key={row.brandId}
+                    href="/category/ai-tools"
+                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3 transition-colors hover:border-[var(--border-hover)]"
+                  >
+                    <span className="w-7 font-mono text-xs text-[var(--text-muted)]">#{row.rank}</span>
+                    <span className="text-sm font-medium">{row.brandName}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 text-sm text-[var(--text-muted)]">This week&apos;s ranking is being prepared.</p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">Coverage</p>
+            <div className="mt-5 grid grid-cols-2 gap-5">
+              {[
+                ["3", "AI engines"],
+                ["120", "Weekly queries"],
+                ["5", "Categories"],
+                ["Top 20", "Per category"],
+              ].map(([value, label]) => (
+                <div key={label}>
+                  <div className="font-mono text-xl font-semibold text-[var(--text)]">{value}</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">{label}</div>
+                </div>
+              ))}
+            </div>
+            <Link href="/methodology" className="mt-6 inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text)]">
+              How rankings work <ArrowIcon />
+            </Link>
+          </div>
         </div>
       </section>
 

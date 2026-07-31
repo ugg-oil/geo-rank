@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { ThemeScript } from "@/components/theme-script";
 import { SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
@@ -50,7 +51,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className="min-h-screen antialiased flex flex-col">
         <SiteHeader />
         <div className="flex-1">{children}</div>
