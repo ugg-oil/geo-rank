@@ -105,7 +105,7 @@ export function CategoryBoard({ slug, data, initialTab }: Props) {
                     #
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Brand
+                    Product
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Score
@@ -133,7 +133,14 @@ export function CategoryBoard({ slug, data, initialTab }: Props) {
                     className="border-b border-[var(--border)] bg-[var(--card)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)]"
                   >
                     <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{s.rank}</td>
-                    <td className="px-4 py-3.5 font-medium">{s.brandName}</td>
+                    <td className="px-4 py-3.5">
+                      <div className="font-medium text-[var(--text)]">{s.brandName}</div>
+                      {s.parentCompanyName && (
+                        <div className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">
+                          {s.parentCompanyName}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3.5 text-right font-mono font-medium">{s.score.toFixed(1)}</td>
                     <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">
                       {(s.appearanceRate * 100).toFixed(0)}%

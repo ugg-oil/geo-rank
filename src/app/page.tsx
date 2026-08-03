@@ -266,7 +266,14 @@ export default async function Home() {
                     className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-3 transition-colors hover:border-[var(--border-hover)]"
                   >
                     <span className="w-7 font-mono text-xs text-[var(--text-muted)]">#{row.rank}</span>
-                    <span className="text-sm font-medium">{row.brandName}</span>
+                    <span>
+                      <span className="block text-sm font-medium">{row.brandName}</span>
+                      {row.parentCompanyName && (
+                        <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                          {row.parentCompanyName}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 ))}
               </div>

@@ -10,6 +10,8 @@ export type LeaderboardRow = {
   rank: number;
   brandId: string;
   brandName: string;
+  /** Confirmed parent company at the time this leaderboard was published. */
+  parentCompanyName?: string | null;
   score: number;
   appearanceRate: number;
   avgRank: number;
@@ -37,7 +39,7 @@ async function fetchLeaderboard(
     prisma.snapshot.findMany({
       where: { week, category, engine },
       orderBy: { rank: "asc" },
-      include: { brand: true },
+      include: { brand: { include: { parentBrand: { select: { canonicalName: true } } } } },
     }),
     prisma.snapshot.findMany({
       where: { week: prevWeek, category, engine },
@@ -67,6 +69,7 @@ function toLeaderboardView(
       rank: s.rank,
       brandId: s.brandId,
       brandName: s.brand.canonicalName,
+      parentCompanyName: s.brand.parentBrand?.canonicalName ?? null,
       score: s.score,
       appearanceRate: s.appearanceRate,
       avgRank: s.avgRank,

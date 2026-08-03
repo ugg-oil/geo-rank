@@ -14,7 +14,14 @@ async function buildCategory(category: string, week: string): Promise<CategoryBo
     prisma.snapshot.findMany({
       where: { week, category },
       orderBy: { rank: "asc" },
-      include: { brand: { select: { canonicalName: true } } },
+      include: {
+        brand: {
+          select: {
+            canonicalName: true,
+            parentBrand: { select: { canonicalName: true } },
+          },
+        },
+      },
     }),
     prisma.snapshot.findMany({
       where: { week: prevWeek, category },
@@ -32,6 +39,7 @@ async function buildCategory(category: string, week: string): Promise<CategoryBo
       rank: row.rank,
       brandId: row.brandId,
       brandName: row.brand.canonicalName,
+      parentCompanyName: row.brand.parentBrand?.canonicalName ?? null,
       score: row.score,
       appearanceRate: row.appearanceRate,
       avgRank: row.avgRank,
