@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { publishLeaderboards } from "@/pipeline/publish";
 import { getCurrentWeek } from "@/lib/week";
 import { recordPublication, recordPublicationFailure } from "@/lib/pipeline-health";
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
   try {
     const publication = await publishLeaderboards(week);
     await recordPublication(week, publication);
+    // A same-week recovery can overwrite immutable Blob paths; invalidate pages that
+    // cache their published JSON so the verified snapshot is visible immediately.
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, week, ...publication });
   } catch (err) {
     const error = errorContext(err);
