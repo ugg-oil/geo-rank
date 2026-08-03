@@ -27,15 +27,15 @@ export function stringifyJsonLd(value: unknown) {
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "ai-tools":
-    "Weekly AI visibility rankings for AI tools recommended by ChatGPT, Gemini, and Grok.",
+    "See which AI tools ChatGPT, Gemini, and Grok recommend most. Weekly Top 20 AI visibility rankings, updated every Monday.",
   "saas-software":
-    "Weekly SaaS software AI visibility rankings based on recommendations across ChatGPT, Gemini, and Grok.",
+    "See which SaaS products AI recommends to buyers. Weekly Top 20 visibility rankings across ChatGPT, Gemini, and Grok.",
   "ai-image-video-tools":
-    "Weekly AI visibility rankings for generative image and video tools in leading AI engines.",
+    "See which image and video AI tools make the shortlist. Weekly Top 20 rankings from ChatGPT, Gemini, and Grok.",
   "developer-tools":
-    "Weekly developer tools AI visibility rankings across ChatGPT, Gemini, and Grok answers.",
+    "See which developer tools AI tells engineers to use. Weekly Top 20 rankings across ChatGPT, Gemini, and Grok.",
   "marketing-tools":
-    "Weekly marketing tools AI visibility rankings based on recommendations from generative AI engines.",
+    "See which marketing tools AI recommends for growth teams. Weekly Top 20 rankings from ChatGPT, Gemini, and Grok.",
 };
 
 export function getCategorySeo(slug: string) {
@@ -43,10 +43,10 @@ export function getCategorySeo(slug: string) {
   if (!category) return null;
   return {
     category,
-    title: `AI Visibility Rankings for ${category} 2026`,
+    title: `Who Does AI Recommend in ${category}? | GEO Radar`,
     description:
       CATEGORY_DESCRIPTIONS[slug] ??
-      `Weekly AI visibility rankings for ${category} across ChatGPT, Gemini, and Grok.`,
+      `See which ${category} products ChatGPT, Gemini, and Grok recommend. Weekly Top 20 AI visibility rankings.`,
     keywords: [
       `${category} AI visibility rankings`,
       `${category} AI visibility`,

@@ -8,11 +8,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "AI Visibility Rankings | GEO Radar",
+    default: "Which Products Does AI Recommend? | GEO Radar",
     template: "%s | GEO Radar",
   },
   description:
-    "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok.",
+    "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
   keywords: [
     "AI visibility",
     "AI visibility rankings",
@@ -23,9 +23,9 @@ export const metadata: Metadata = {
     "Grok rankings",
   ],
   openGraph: {
-    title: "AI Visibility Rankings | GEO Radar",
+    title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok.",
+      "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
     url: "/",
     siteName: "GEO Radar",
     type: "website",
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Visibility Rankings | GEO Radar",
+    title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok.",
+      "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
     images: ["/og-image.png"],
   },
 };

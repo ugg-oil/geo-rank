@@ -5,10 +5,10 @@ import { HOME_METHODOLOGY_SECTIONS } from "@/lib/page-content";
 import { SITE_URL, stringifyJsonLd } from "@/lib/seo";
 
 const STATS = [
-  { value: "3", label: "AI Engines" },
-  { value: "5", label: "Categories" },
-  { value: "120", label: "Weekly Queries" },
-  { value: "Top 20", label: "Per Category" },
+  { value: "3", label: "AI engines tracked" },
+  { value: "5", label: "Product categories" },
+  { value: "120", label: "Prompts every week" },
+  { value: "Top 20", label: "Products per board" },
 ];
 
 const ENGINES = [
@@ -19,38 +19,33 @@ const ENGINES = [
 
 const CATEGORY_CARDS = [
   {
-    name: "AI Tools Visibility Rankings",
+    name: "AI Tools",
     slug: "ai-tools",
-    description:
-      "Weekly AI visibility ranking of assistants, copilots, and productivity tools recommended by leading AI engines.",
+    description: "See which AI assistants and copilots ChatGPT, Gemini, and Grok recommend most.",
     count: "Top 20",
   },
   {
-    name: "SaaS AI Visibility Rankings",
+    name: "SaaS Software",
     slug: "saas-software",
-    description:
-      "Weekly AI visibility ranking of SaaS products and business software most frequently recommended in AI answers.",
+    description: "Find the SaaS products that show up when buyers ask AI what to use.",
     count: "Top 20",
   },
   {
-    name: "AI Image / Video Visibility Rankings",
+    name: "AI Image / Video",
     slug: "ai-image-video-tools",
-    description:
-      "Weekly AI visibility ranking of generative image and video tools across ChatGPT, Gemini, and Grok.",
+    description: "Track which creative AI tools land in generative media recommendations.",
     count: "Top 20",
   },
   {
-    name: "Developer Tools AI Visibility Rankings",
+    name: "Developer Tools",
     slug: "developer-tools",
-    description:
-      "Weekly AI visibility ranking of developer tools, IDEs, and coding platforms recommended by major AI engines.",
+    description: "See which coding and infrastructure tools AI keeps putting on shortlists.",
     count: "Top 20",
   },
   {
-    name: "Marketing Tools AI Visibility Rankings",
+    name: "Marketing Tools",
     slug: "marketing-tools",
-    description:
-      "Weekly AI visibility ranking of marketing and growth platforms recommended in generative AI responses.",
+    description: "Discover the growth platforms AI recommends for SEO, content, and campaigns.",
     count: "Top 20",
   },
 ];
@@ -65,10 +60,10 @@ const CATEGORY_SHORTCUTS = [
 
 export const metadata: Metadata = {
   title: {
-    absolute: "AI Visibility Rankings for Products | GEO Radar",
+    absolute: "Which Products Does AI Recommend? | GEO Radar",
   },
   description:
-    "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok across major software categories.",
+    "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
   keywords: [
     "AI visibility",
     "AI visibility rankings",
@@ -82,18 +77,18 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "AI Visibility Rankings for Products | GEO Radar",
+    title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok across major software categories.",
+      "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
     url: "/",
     type: "website",
     images: [{ url: "/og-image.png", alt: "GEO Radar" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Visibility Rankings for Products | GEO Radar",
+    title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      "Weekly AI visibility rankings showing which products are recommended by ChatGPT, Gemini, and Grok across major software categories.",
+      "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
     images: ["/og-image.png"],
   },
 };
@@ -139,7 +134,7 @@ export default async function Home() {
     name: "GEO Radar",
     url: SITE_URL,
     description:
-      "Weekly AI visibility rankings across ChatGPT, Gemini, and Grok based on GEO methodology.",
+      "See which products ChatGPT, Gemini, and Grok recommend. Weekly Top 20 AI visibility rankings.",
   };
   const organizationJsonLd = {
     "@context": "https://schema.org",
@@ -168,31 +163,30 @@ export default async function Home() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--yellow)] opacity-60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--yellow)]" />
           </span>
-          Weekly AI visibility rankings · {updatedAt ? `Last updated ${updatedAt}` : "Updated every Monday"}
+          Live weekly rankings · {updatedAt ? `Updated ${updatedAt}` : "Fresh every Monday"}
         </div>
 
         <h1 className="animate-fade-up-delay-1 max-w-3xl text-4xl font-semibold tracking-tight text-[var(--text)] sm:text-6xl sm:leading-[1.08]">
-          AI Visibility Rankings
+          Which products does
           <br />
-          for products in AI answers
+          AI actually recommend?
         </h1>
 
         <p className="animate-fade-up-delay-2 mt-6 max-w-xl text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
-          Track which products are recommended by ChatGPT, Gemini, and Grok.
-          <br />
-          GEO Radar turns AI answers into weekly visibility rankings.
+          If ChatGPT, Gemini, or Grok never mention a product, customers never see it.
+          GEO Radar shows the Top 20 that make the shortlist — every Monday.
         </p>
 
         <div className="animate-fade-up-delay-3 mt-8 flex flex-wrap items-center gap-3">
           <Link href="#rankings" className="btn-primary px-5 py-2.5">
-            Explore AI visibility rankings
+            See this week&apos;s rankings
             <ArrowIcon />
           </Link>
           <Link
             href="/methodology"
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--text)]"
           >
-            Why GEO matters
+            How we score them
           </Link>
         </div>
 
@@ -212,24 +206,24 @@ export default async function Home() {
           <div className="animate-fade-up-delay-2 hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 lg:block">
             <div className="mb-8 flex items-center justify-between">
               <span className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                Why AI visibility now
+                Why this matters
               </span>
               <span className="h-2 w-2 rounded-full bg-[var(--yellow)] shadow-[0_0_14px_var(--yellow)]" />
             </div>
             <p className="text-xl font-medium leading-snug tracking-tight text-[var(--text)]">
-              AI answers are becoming the new recommendation layer between people and products.
+              Search shows options. AI picks winners.
             </p>
             <div className="mt-8 space-y-4 border-t border-[var(--border)] pt-5">
               <div className="flex gap-3">
                 <span className="font-mono text-xs text-[var(--text-muted)]">01</span>
                 <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
-                  Search shows a list. Generative AI makes a shortlist.
+                  Buyers ask ChatGPT who to use — and trust the shortlist.
                 </p>
               </div>
               <div className="flex gap-3">
                 <span className="font-mono text-xs text-[var(--text-muted)]">02</span>
                 <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
-                  AI visibility tracks which products earn a place in those answers.
+                  GEO Radar shows who made that shortlist this week.
                 </p>
               </div>
             </div>
@@ -257,11 +251,11 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              This week&apos;s snapshot
+              This week
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Top 5 AI Tools</h2>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Top 5 AI Tools right now</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-              Products most visible in recommendations from ChatGPT, Gemini, and Grok.
+              The products AI is recommending most this week.
             </p>
             {topFive.length > 0 ? (
               <div className="mt-6 grid gap-2 sm:grid-cols-2">
@@ -281,13 +275,13 @@ export default async function Home() {
             )}
           </div>
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">Coverage</p>
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">What you get</p>
             <div className="mt-5 grid grid-cols-2 gap-5">
               {[
                 ["3", "AI engines"],
-                ["120", "Weekly queries"],
+                ["120", "Prompts / week"],
                 ["5", "Categories"],
-                ["Top 20", "Per category"],
+                ["Top 20", "Per board"],
               ].map(([value, label]) => (
                 <div key={label}>
                   <div className="font-mono text-xl font-semibold text-[var(--text)]">{value}</div>
@@ -296,7 +290,7 @@ export default async function Home() {
               ))}
             </div>
             <Link href="/methodology" className="mt-6 inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text)]">
-              How rankings work <ArrowIcon />
+              See the scoring method <ArrowIcon />
             </Link>
           </div>
         </div>
@@ -306,7 +300,7 @@ export default async function Home() {
       <section className="border-y border-[var(--border)] bg-[var(--bg-elevated)]">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-6 py-8 sm:flex-row sm:items-center">
           <p className="text-sm text-[var(--text-muted)]">
-            Tracked across three leading AI engines via official APIs
+            Rankings built from real answers across three AI engines
           </p>
           <div className="flex flex-wrap gap-3">
             {ENGINES.map((engine) => (
@@ -327,10 +321,10 @@ export default async function Home() {
         <div className="mb-10 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              AI Visibility Rankings by Category
+              Pick a category. See who AI picks.
             </h2>
             <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-              Weekly product visibility rankings across ChatGPT, Gemini, and Grok by category
+              Fresh Top 20 boards every Monday across ChatGPT, Gemini, and Grok
             </p>
           </div>
           <Link
@@ -370,24 +364,24 @@ export default async function Home() {
       <section className="border-t border-[var(--border)] bg-[var(--bg-elevated)]">
         <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
           <h2 className="mb-12 text-center text-xl font-semibold tracking-tight sm:text-2xl">
-            From AI response to visibility leaderboard
+            Ask AI. Extract the shortlist. Rank it.
           </h2>
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             {[
               {
                 step: "01",
-                title: "Collect",
-                desc: "8 category-specific prompts × 3 engines, every week via official APIs",
+                title: "Ask the engines",
+                desc: "Every week we run the same discovery prompts across ChatGPT, Gemini, and Grok.",
               },
               {
                 step: "02",
-                title: "Extract & Normalize",
-                desc: "LLM extracts brand mentions, matches aliases, and deduplicates names",
+                title: "Pull the names",
+                desc: "We extract which products get mentioned — and how high they appear.",
               },
               {
                 step: "03",
-                title: "Score & Publish",
-                desc: "Weighted AI visibility score ranks Top 20 with week-over-week movement",
+                title: "Publish the Top 20",
+                desc: "Scores update Monday with week-over-week movement, so you can see who rose.",
               },
             ].map((item) => (
               <div key={item.step} className="relative">
@@ -409,13 +403,11 @@ export default async function Home() {
                 Methodology
               </p>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                How GEO Radar turns AI answers into visibility rankings
+                How we turn AI answers into rankings
               </h2>
               <p className="mt-4 text-sm leading-relaxed text-[var(--text-secondary)]">
-                GEO Radar measures AI search visibility with repeatable prompts,
-                multi-engine collection, brand normalization, and weekly scoring.
-                The goal is to make Generative Engine Optimization measurable
-                without treating AI answers as a black box.
+                Same prompts every week. Three engines. Normalized brand mentions.
+                A visibility score that shows who made the shortlist — not a quality award.
               </p>
               <div className="mt-6 grid grid-cols-2 gap-3">
                 {[

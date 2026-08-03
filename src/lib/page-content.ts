@@ -39,83 +39,68 @@ export const CATEGORY_INTROS: Record<
   }
 > = {
   "ai-tools": {
-    title: "About the AI Tools Visibility Ranking",
+    title: "The AI tools shortlist this week",
     lead:
-      "This category tracks which AI tools are most visible when major AI assistants recommend products for everyday knowledge work, productivity, research, writing, automation, and general AI adoption.",
+      "When people ask ChatGPT, Gemini, or Grok which AI tool to use, these are the products that make the cut.",
     paragraphs: [
-      "The AI Tools ranking is designed for one of the broadest and fastest-moving areas in software. Users increasingly ask ChatGPT, Gemini, and Grok which AI assistant, copilot, automation product, research tool, or productivity platform they should try. Those answers create a new layer of product discovery that sits between classic search, word of mouth, and software review sites.",
-      "GEO Radar measures this layer by collecting category-specific recommendation prompts every week and tracking which products are mentioned, where they appear, and whether they show up across multiple engines. A strong ranking usually means the product is not only known by one model, but is repeatedly associated with common AI tool use cases. That can include broad assistants, specialized copilots, workflow automation tools, note-taking products, meeting assistants, and AI-native productivity apps.",
-      "Because this category is broad, interpretation matters. A product can rank highly because it is a general-purpose AI platform, because it is strongly associated with a specific workflow, or because AI assistants frequently include it as a familiar example. The leaderboard is therefore best used as a visibility benchmark rather than a direct feature comparison. Teams can watch whether their product is entering more recommendation sets, whether competitors are gaining ground, and whether visibility is concentrated in one engine or distributed across ChatGPT, Gemini, and Grok.",
-      "For GEO work, this page helps answer a practical question: when people ask AI systems for AI product recommendations, which names are becoming default suggestions? Weekly movement can reveal launches, shifts in positioning, stronger documentation, or broader market awareness as those signals begin to appear in AI-generated answers.",
+      "We run the same discovery prompts every week — assistants, copilots, research, writing, automation — then rank who gets mentioned most, how high they appear, and whether they show up across engines. Use this board to see who AI is pushing into the consideration set right now.",
     ],
     highlights: [
-      "General AI assistants and productivity tools",
-      "Research, writing, automation, and knowledge-work use cases",
-      "Cross-engine visibility across ChatGPT, Gemini, and Grok",
+      "Top 20 by AI recommendation presence",
+      "Overall + ChatGPT / Gemini / Grok tabs",
+      "Week-over-week movers included",
     ],
   },
   "saas-software": {
-    title: "About the SaaS Software Visibility Ranking",
+    title: "The SaaS shortlist AI is giving buyers",
     lead:
-      "This category tracks business software visibility in AI-generated recommendations, including SaaS products used by teams to manage operations, collaboration, sales, support, finance, analytics, and internal workflows.",
+      "Buyers ask AI for CRMs, project tools, and ops software. This board shows which products land in those answers.",
     paragraphs: [
-      "SaaS discovery has historically depended on search rankings, review platforms, analyst lists, communities, partner ecosystems, and sales-led education. AI assistants are adding another path. A buyer can now ask for the best CRM for a small team, the best project management tool for a remote company, or the best analytics stack for a startup and receive a concise recommendation set in seconds.",
-      "GEO Radar captures how often SaaS products appear in those recommendation moments. The weekly prompts are built around common business software discovery patterns: choosing a tool for a team, comparing alternatives, identifying options for a workflow, and finding products that fit common constraints. The ranking then scores products based on appearance rate, average position, and coverage across ChatGPT, Gemini, and Grok.",
-      "This category is intentionally wide, so the leaderboard should be read as a visibility map of business software rather than a single buyer guide. Some products rank because they are category leaders with long-standing brand awareness. Others surface because they are strongly associated with a particular role, workflow, or company stage. A product that appears in multiple AI engines is often benefiting from a broader set of public signals, such as documentation, comparison pages, customer conversations, ecosystem mentions, and repeated positioning around high-intent use cases.",
-      "For SaaS teams, the value is not just the current rank. The trend line is the interesting part. A new entrant appearing for the first time, a known brand losing coverage in one engine, or a competitor moving up across several weeks can all point to changes in AI search visibility. This makes the SaaS ranking useful for product marketing, competitive intelligence, and Generative Engine Optimization planning.",
+      "Every Monday we score SaaS products on how often they appear in AI recommendations, how high they rank in the shortlist, and how many engines mention them. Watch who enters, who rises, and who drops out of AI’s default suggestions.",
     ],
     highlights: [
-      "Business software and team workflows",
-      "Buyer-style prompts for SaaS recommendation intent",
-      "Weekly visibility movement for competitive tracking",
+      "Business software recommendation visibility",
+      "Buyer-style prompts, same set each week",
+      "Competitive movement you can track Monday to Monday",
     ],
   },
   "ai-image-video-tools": {
-    title: "About the AI Image and Video Tools Visibility Ranking",
+    title: "Which creative AI tools made the cut",
     lead:
-      "This category tracks generative media tools that appear in AI recommendations for image creation, video generation, design workflows, creative production, editing, and visual content automation.",
+      "Image and video tools rise and fall fast. This ranking shows who AI is recommending for generative media right now.",
     paragraphs: [
-      "AI image and video tools are unusually dependent on fast-changing perception. New models, creative features, licensing policies, output quality, pricing, and creator adoption can quickly change which products people ask about and which products AI assistants recommend. A tool that dominates one month may face new competition the next, while a specialized product can gain visibility if it becomes associated with a high-value creative workflow.",
-      "GEO Radar measures this category by collecting weekly recommendations from ChatGPT, Gemini, and Grok. The prompts reflect common discovery questions: which tools are best for generating images, creating product visuals, editing video, making social content, producing marketing assets, or exploring AI creative workflows. The pipeline extracts mentioned products, normalizes brand variants, and ranks the tools by appearance rate, average rank, and engine coverage.",
-      "The leaderboard is especially useful because generative media recommendations often mix broad creative platforms with specialized tools. Some products are recommended because they are known for image generation, others for video, design assistance, avatars, editing, animation, or production pipelines. A high overall score means the product is visible across the tracked recommendation set, not necessarily that it is the best tool for every creative task.",
-      "For founders, creators, marketers, and product teams, the weekly ranking shows which brands are becoming default names in AI-assisted creative discovery. Movement can reflect product launches, viral usage, public comparisons, improved documentation, stronger community discussion, or model-level shifts in how assistants frame creative tooling. In a category where attention moves quickly, AI visibility is an important signal to monitor alongside traffic, social reach, and product usage.",
+      "We ask ChatGPT, Gemini, and Grok the same creative discovery prompts each week — image gen, video, design, social assets — and publish who shows up. If a tool isn’t on this board, it’s harder for AI-led creators to discover it.",
     ],
     highlights: [
-      "Image generation, video generation, and creative tooling",
-      "Recommendation prompts for design and production workflows",
-      "Visibility tracking in a fast-changing generative media market",
+      "Image, video, and creative tooling visibility",
+      "Fast-moving category, weekly refresh",
+      "Cross-engine coverage in one view",
     ],
   },
   "developer-tools": {
-    title: "About the Developer Tools Visibility Ranking",
+    title: "What AI tells developers to use",
     lead:
-      "This category tracks developer tools, coding platforms, infrastructure products, IDEs, databases, testing tools, observability products, and engineering workflow software recommended by AI assistants.",
+      "Developers ask AI which IDE, database, or infra tool to pick. Here’s who ends up on that shortlist.",
     paragraphs: [
-      "Developers are among the heaviest users of AI-assisted discovery. They ask AI assistants which framework to use, which database fits a project, which tool can solve a deployment problem, which coding assistant is worth trying, or which monitoring product works for a particular stack. Those answers can influence evaluation long before a developer lands on a traditional search result or vendor page.",
-      "GEO Radar tracks developer tool visibility by querying ChatGPT, Gemini, and Grok with repeatable prompts that represent common engineering decision moments. The ranking measures which products are named, how prominent they are in the answer, and whether they appear across multiple engines. This creates a weekly view of AI search rankings for the developer ecosystem.",
-      "Developer tools require careful interpretation because the category spans many layers of the stack. A code editor, a hosting platform, an API tool, an observability product, and a database may all appear in different recommendation contexts. The overall board shows broad AI visibility across the prompt set, while individual engine tabs reveal whether a product is more visible in one assistant than another. For many teams, that split is as important as the combined score.",
-      "For product and DevRel teams, the ranking can surface gaps that are hard to see in conventional analytics. A tool may have strong GitHub activity or search demand but still be missing from AI-generated shortlists. Another may appear frequently because its docs, examples, integrations, and community references make it easy for AI systems to associate it with common developer tasks. Watching weekly movement helps teams connect documentation, positioning, launches, and ecosystem awareness to changes in AI recommendation visibility.",
+      "GEO Radar tracks coding, infrastructure, data, testing, and observability products across ChatGPT, Gemini, and Grok. The Top 20 reflects who AI repeatedly names — not who has the most stars on GitHub.",
     ],
     highlights: [
-      "Coding, infrastructure, data, testing, and observability tools",
-      "Developer-intent prompts across common engineering decisions",
-      "Useful for DevRel, product marketing, and competitive analysis",
+      "Dev tools AI actually names in answers",
+      "Overall board plus per-engine views",
+      "Useful for DevRel and competitive GEO",
     ],
   },
   "marketing-tools": {
-    title: "About the Marketing Tools Visibility Ranking",
+    title: "The marketing stack AI recommends",
     lead:
-      "This category tracks marketing and growth platforms that appear in AI-generated recommendations for SEO, content, email, analytics, automation, social media, advertising, conversion, and customer engagement.",
+      "Marketers ask AI for SEO, email, analytics, and growth tools. This board shows which platforms get named.",
     paragraphs: [
-      "Marketing teams are rapidly adopting AI assistants as research partners. Instead of browsing long software lists, a marketer can ask for the best SEO tools for a startup, the best email platform for a creator business, the best analytics product for a growth team, or the best AI tool for content operations. The resulting shortlist can shape awareness, evaluation, and purchase intent.",
-      "GEO Radar measures which marketing products appear in those AI-generated shortlists. Each week, ChatGPT, Gemini, and Grok are queried with category-specific prompts that reflect common marketing software discovery needs. The pipeline extracts product mentions, normalizes brand names, records position, and scores each product based on how often and how prominently it appears across the collected answers.",
-      "The marketing tools category includes a wide mix of products: SEO platforms, content tools, lifecycle marketing systems, analytics products, social scheduling tools, advertising platforms, landing page builders, CRM-adjacent tools, and AI-native growth products. Because the category is broad, a high ranking indicates strong visibility across the tracked prompt set rather than universal superiority for every marketing function.",
-      "For growth teams and software vendors, this page is useful because AI recommendation visibility can become an early signal of market narrative. Products that repeatedly appear in AI answers are more likely to be part of the default consideration set for users who rely on assistants during research. Weekly changes can reveal shifts in positioning, stronger association with a use case, increased public discussion, or competitive movement across engines. That makes the ranking a practical input for SEO, GEO, content strategy, and product marketing.",
+      "Same prompts every week across three engines. Scores reward products that appear often, near the top, and across more than one assistant — so you can see who owns the AI recommendation narrative in marketing software.",
     ],
     highlights: [
-      "SEO, content, email, analytics, automation, and growth software",
-      "Marketing recommendation prompts across common buyer needs",
-      "AI visibility signal for GEO and product marketing strategy",
+      "SEO, content, email, analytics, growth software",
+      "Weekly Top 20 with engine breakdowns",
+      "A direct signal for GEO and product marketing",
     ],
   },
 };

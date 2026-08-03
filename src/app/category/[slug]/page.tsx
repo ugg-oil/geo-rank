@@ -87,7 +87,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `AI Visibility Rankings for ${category}`,
+    name: `Who does AI recommend in ${category}?`,
     url: canonicalUrl,
     numberOfItems: overall.snapshots.length,
     itemListOrder: "https://schema.org/ItemListOrderAscending",
@@ -122,10 +122,10 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            AI Visibility Rankings for {category}
+            Who does AI recommend in {category}?
           </h1>
           <p className="mt-1.5 font-mono text-sm text-[var(--text-muted)]">
-            {data.week} · Top 20
+            {data.week} · Top 20 · ChatGPT · Gemini · Grok
           </p>
         </div>
       </div>
@@ -135,7 +135,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           <div className="grid gap-8 lg:grid-cols-[1fr_0.45fr]">
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                Category overview
+                This week&apos;s board
               </p>
               <h2 className="mt-3 text-xl font-semibold tracking-tight text-[var(--text)]">
                 {intro.title}
@@ -144,7 +144,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
                 {intro.lead}
               </p>
               <div className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
-                {intro.paragraphs.slice(0, 2).map((paragraph) => (
+                {intro.paragraphs.slice(0, 1).map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
               </div>
@@ -152,7 +152,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
             <aside className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
               <h3 className="text-sm font-semibold tracking-tight text-[var(--text)]">
-                What this page tracks
+                What you&apos;ll see
               </h3>
               <ul className="mt-4 space-y-3 text-sm leading-relaxed text-[var(--text-secondary)]">
                 {intro.highlights.map((highlight) => (
@@ -166,7 +166,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
                 href="/methodology"
                 className="mt-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text)]"
               >
-                Scoring methodology
+                How we score this
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                   <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
