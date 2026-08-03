@@ -9,16 +9,16 @@ export async function POST(req: NextRequest) {
   }
 
   const week = getCurrentWeek();
-  const sent = await sendPipelineAlert({
+  const delivery = await sendPipelineAlert({
     event: "manual_alert_test",
     week,
     message: "This is a delivery test. No pipeline was run.",
   });
-  if (!sent) {
+  if (!delivery.delivered) {
     return NextResponse.json(
-      { ok: false, error: "No alert delivery channel accepted the test" },
+      { ok: false, channel: delivery.channel, error: delivery.error ?? "No alert delivery channel accepted the test" },
       { status: 503 }
     );
   }
-  return NextResponse.json({ ok: true, week, message: "Alert delivery accepted" });
+  return NextResponse.json({ ok: true, week, channel: delivery.channel, message: "Alert delivery accepted" });
 }

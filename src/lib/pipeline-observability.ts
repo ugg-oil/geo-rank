@@ -7,6 +7,12 @@ type PipelineEvent = {
   [key: string]: unknown;
 };
 
+export type AlertDelivery = {
+  delivered: boolean;
+  channel: "email" | "webhook" | "none";
+  error?: string;
+};
+
 export function errorContext(error: unknown) {
   if (error instanceof Error) {
     const withCode = error as Error & { code?: string };
@@ -28,7 +34,9 @@ async function sendResendAlert(payload: PipelineEvent) {
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.PIPELINE_ALERT_EMAIL_TO;
   const from = process.env.PIPELINE_ALERT_EMAIL_FROM;
-  if (!apiKey || !to || !from) return false;
+  if (!apiKey || !to || !from) {
+    return { delivered: false, channel: "none" as const, error: "Resend email variables are incomplete" };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
@@ -44,18 +52,21 @@ async function sendResendAlert(payload: PipelineEvent) {
       }),
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 500);
+      throw new Error(`Resend returned ${response.status}${detail ? `: ${detail}` : ""}`);
+    }
     logPipelineEvent({ ...payload, event: "alert_email_sent" });
-    return true;
+    return { delivered: true, channel: "email" as const };
   } catch (error) {
     logPipelineEvent({ ...payload, event: "alert_email_delivery_failed", alertError: errorContext(error) });
-    return false;
+    return { delivered: false, channel: "none" as const, error: errorContext(error).message };
   } finally { clearTimeout(timer); }
 }
 
 async function sendWebhookAlert(payload: PipelineEvent) {
   const webhookUrl = process.env.PIPELINE_ALERT_WEBHOOK_URL;
-  if (!webhookUrl) return false;
+  if (!webhookUrl) return { delivered: false, channel: "none" as const, error: "No webhook configured" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -65,17 +76,20 @@ async function sendWebhookAlert(payload: PipelineEvent) {
     });
     if (!response.ok) throw new Error(`Alert webhook returned ${response.status}`);
     logPipelineEvent({ ...payload, event: "alert_sent" });
-    return true;
+    return { delivered: true, channel: "webhook" as const };
   } catch (error) {
     logPipelineEvent({ ...payload, event: "alert_delivery_failed", alertError: errorContext(error) });
-    return false;
+    return { delivered: false, channel: "none" as const, error: errorContext(error).message };
   } finally { clearTimeout(timer); }
 }
 
 /** Sends direct Resend email when configured; generic webhook is a fallback. */
 export async function sendPipelineAlert(payload: PipelineEvent) {
-  if (await sendResendAlert(payload)) return true;
-  if (await sendWebhookAlert(payload)) return true;
-  logPipelineEvent({ ...payload, event: "alert_skipped_no_delivery_channel" });
-  return false;
+  const email = await sendResendAlert(payload);
+  if (email.delivered) return email;
+  const webhook = await sendWebhookAlert(payload);
+  if (webhook.delivered) return webhook;
+  const error = email.error === "Resend email variables are incomplete" ? webhook.error : email.error;
+  logPipelineEvent({ ...payload, event: "alert_skipped_no_delivery_channel", alertError: error });
+  return { delivered: false, channel: "none" as const, error };
 }
