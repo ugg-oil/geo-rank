@@ -2,6 +2,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getOpenRouter } from "@/lib/openrouter";
 import { EXTRACTION_MODEL, MAX_MENTIONS_PER_RESPONSE } from "@/lib/constants";
+import {
+  assertBeforeDeadline,
+  PIPELINE_EXTRACTION_TIMEOUT_MS,
+} from "@/lib/pipeline-timeouts";
 
 const MentionSchema = z.object({
   raw_brand: z.string(),
@@ -83,8 +87,10 @@ export async function extractWeek(week: string) {
     select: { id: true },
   });
 
+  const deadline = Date.now() + PIPELINE_EXTRACTION_TIMEOUT_MS;
   let count = 0;
   for (const r of responses) {
+    assertBeforeDeadline("extraction", deadline, PIPELINE_EXTRACTION_TIMEOUT_MS);
     const mentions = await extractResponse(r.id);
     count += mentions.length;
   }

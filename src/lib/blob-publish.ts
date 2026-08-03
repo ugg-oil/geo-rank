@@ -8,15 +8,20 @@ export function canPublishToBlob() {
 }
 
 export function blobPutOptions(
-  contentType: string
+  contentType: string,
+  options?: { allowOverwrite?: boolean; cacheControlMaxAge?: number }
 ): PutCommandOptions {
-  const options: PutCommandOptions = {
+  const putOptions: PutCommandOptions = {
     access: "public",
     addRandomSuffix: false,
+    allowOverwrite: options?.allowOverwrite ?? false,
     contentType,
   };
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    options.token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (options?.cacheControlMaxAge !== undefined) {
+    putOptions.cacheControlMaxAge = options.cacheControlMaxAge;
   }
-  return options;
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    putOptions.token = process.env.BLOB_READ_WRITE_TOKEN;
+  }
+  return putOptions;
 }

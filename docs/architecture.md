@@ -38,5 +38,6 @@ AI 回答
 - [Getting Started](./setup.md)：环境、本地开发和部署
 - [Operations](./operations.md)：周更、Cron、发布和故障处理
 - [Review Queue](./review-queue.md)：品牌审核操作
-- [PRD](./PRD.md)：当前产品范围和实现状态
-- [Roadmap](./PRD-phase-2.md)：第二阶段规划
+- [Phase 1 PRD](./prd/PRD-phase-1.md)：已实现范围
+- [Phase 2 PRD](./prd/PRD-phase-2.md)：当前阶段规划
+- [Next PRD](./prd/PRD-phase-next.md)：后续 backlog

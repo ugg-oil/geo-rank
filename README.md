@@ -60,14 +60,15 @@ The ranking pipeline runs weekly and publishes static leaderboard snapshots.
 
 | Document | Description |
 |----------|-------------|
-| [docs/PRD.md](./docs/PRD.md) | Current product scope and implementation status |
+| [docs/prd/PRD-phase-1.md](./docs/prd/PRD-phase-1.md) | Implemented Phase 1 scope |
 | [docs/architecture.md](./docs/architecture.md) | System architecture and data flow |
 | [docs/setup.md](./docs/setup.md) | Environment, database, and deploy |
 | [docs/operations.md](./docs/operations.md) | Pipeline, publish, cron, and operations |
 | [docs/data-pipeline.md](./docs/data-pipeline.md) | Detailed pipeline design |
 | [docs/review-queue.md](./docs/review-queue.md) | Review workflow |
 | [docs/seo.md](./docs/seo.md) | Technical SEO and SEO backlog |
-| [docs/PRD-phase-2.md](./docs/PRD-phase-2.md) | Phase 2 roadmap |
+| [docs/prd/PRD-phase-2.md](./docs/prd/PRD-phase-2.md) | Current Phase 2 roadmap |
+| [docs/prd/PRD-phase-next.md](./docs/prd/PRD-phase-next.md) | Future backlog |
 
 ## Quick Start
 

@@ -8,12 +8,27 @@ export type PublishedLeaderboardManifest = {
   boards?: Record<string, string>;
 };
 
+function getWeekManifestUrl(manifestUrl: string, week: string) {
+  try {
+    const url = new URL(manifestUrl);
+    const latestPath = "/leaderboards/latest/manifest.json";
+    if (url.pathname.endsWith(latestPath)) {
+      url.pathname = url.pathname.slice(0, -latestPath.length) +
+        `/leaderboards/${encodeURIComponent(week)}/manifest.json`;
+    }
+    return url.toString();
+  } catch {
+    return manifestUrl;
+  }
+}
+
 export async function getPublishedLeaderboardManifest(): Promise<PublishedLeaderboardManifest | null> {
   const manifestUrl = process.env.LEADERBOARD_MANIFEST_URL;
   if (!manifestUrl) return null;
+  const weekManifestUrl = getWeekManifestUrl(manifestUrl, getCurrentWeek());
 
   try {
-    const response = await fetch(manifestUrl, { next: { revalidate: 300 } });
+    const response = await fetch(weekManifestUrl, { next: { revalidate: 300 } });
     if (!response.ok) return null;
     return (await response.json()) as PublishedLeaderboardManifest;
   } catch {
@@ -33,9 +48,10 @@ export async function getPublishedCategoryLeaderboards(
     if (debug) console.debug(`${logPrefix} LEADERBOARD_MANIFEST_URL not set; using fallback.`);
     return null;
   }
+  const weekManifestUrl = getWeekManifestUrl(manifestUrl, currentWeek);
 
   try {
-    const manifestResponse = await fetch(manifestUrl, { next: { revalidate: 300 } });
+    const manifestResponse = await fetch(weekManifestUrl, { next: { revalidate: 300 } });
     if (!manifestResponse.ok) {
       if (debug) console.debug(`${logPrefix} manifest fetch not ok: ${manifestResponse.status}`);
       return null;

@@ -15,6 +15,11 @@ cp .env.example .env
 | `OPENROUTER_API_KEY` | OpenRouter API Key |
 | `PIPELINE_SECRET` | `/api/pipeline`、`/api/publish` 鉴权 |
 | `CRON_SECRET` | `/api/cron` 鉴权（可与 `PIPELINE_SECRET` 相同） |
+| `PIPELINE_REQUEST_TIMEOUT_MS` | 单次 OpenRouter 请求超时，默认 45 秒 |
+| `PIPELINE_COLLECTION_TIMEOUT_MS` | 采集阶段总超时，默认 20 分钟 |
+| `PIPELINE_EXTRACTION_TIMEOUT_MS` | 抽取阶段总超时，默认 20 分钟 |
+| `PIPELINE_STAGE_TIMEOUT_MS` | 规范化、分类、计分和发布等阶段超时，默认 20 分钟 |
+| `PIPELINE_RUN_STALE_TIMEOUT_MS` | 判定旧运行记录失效的时间，默认 30 小时 |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 写入 Token |
 | `BLOB_STORE_ID` | Vercel Blob Store ID（项目连接 Blob 后自动注入） |
 | `LEADERBOARD_MANIFEST_URL` | 前台读取的 `latest/manifest.json` 公开 URL |

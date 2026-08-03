@@ -52,7 +52,15 @@ export async function publishLeaderboards(week: string) {
     );
   }
 
-  const jsonPut = blobPutOptions("application/json; charset=utf-8");
+  // Re-publishing a validated week must be idempotent so a transient latest failure
+  // can be recovered without re-running collection or changing the week path.
+  const jsonPut = blobPutOptions("application/json; charset=utf-8", {
+    allowOverwrite: true,
+  });
+  const latestManifestPut = blobPutOptions("application/json; charset=utf-8", {
+    allowOverwrite: true,
+    cacheControlMaxAge: 60,
+  });
   const published: Record<string, string> = {};
   for (const category of Object.keys(CATEGORY_TO_SLUG)) {
     const data = await buildCategory(category, week);
@@ -73,18 +81,13 @@ export async function publishLeaderboards(week: string) {
     boards: published,
   });
   const manifest = await put(`leaderboards/${week}/manifest.json`, manifestBody, jsonPut);
-  // latest 指向“当前周”。它失败时不阻断“本周 manifest”可用，避免整站回退到数据库。
-  let latestManifestUrl: string | null = null;
-  try {
-    const latestManifest = await put(
-      "leaderboards/latest/manifest.json",
-      manifestBody,
-      jsonPut
-    );
-    latestManifestUrl = latestManifest.url;
-  } catch (error) {
-    console.error("[Publish] Failed to publish latest manifest:", error);
-  }
+  // latest 是发布完成的提交点；写入失败时不能把本周标记为已发布。
+  const latestManifest = await put(
+    "leaderboards/latest/manifest.json",
+    manifestBody,
+    latestManifestPut
+  );
+  const latestManifestUrl = latestManifest.url;
 
   console.log(
     JSON.stringify(

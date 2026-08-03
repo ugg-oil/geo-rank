@@ -11,6 +11,8 @@ npm run review:auto -- --apply
 
 Pipeline 完成后会尝试发布榜单快照到 Vercel Blob。前台优先读 Blob JSON；未配置 Blob 时回退数据库。
 
+Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进 `latest`。同一周已有运行时，新的触发不会并发启动；超过 30 小时的陈旧运行会先被标记为失败。
+
 ## 命令
 
 | 命令 | 说明 |
@@ -62,7 +64,11 @@ curl "https://georadar.website/api/cron" \
 
 - 每周：`leaderboards/{week}/{slug}.json`
 - 每周：`leaderboards/{week}/manifest.json`
-- 当前：`leaderboards/latest/manifest.json`
+- 当前：`leaderboards/latest/manifest.json`（发布提交点，短缓存）
+
+前台在 `LEADERBOARD_MANIFEST_URL` 指向 `latest` 路径时，会按当前周推导并读取不可变的周 manifest，避免 mutable `latest` 的 CDN 缓存影响页面更新。
+
+同一周的已验证快照允许通过 `npm run publish -- "Week of YYYY-MM-DD"` 幂等重发，用于修复发布中断；该操作不会重新采集或计分。
 
 首次发布后，将 `latestManifest` URL 配置为 `LEADERBOARD_MANIFEST_URL`。
 

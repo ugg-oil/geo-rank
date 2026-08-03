@@ -8,34 +8,45 @@ export { preprocessBrand } from "@/lib/brand-keys";
 export async function normalizeWeek(week: string) {
   const mentions = await prisma.extractedMention.findMany({
     where: { response: { week } },
-    include: { response: true },
+    include: { response: { select: { id: true } } },
   });
+  const responseIds = [...new Set(mentions.map((mention) => mention.response.id))];
 
-  const ignoredTerms = await prisma.ignoredTerm.findMany();
-  const ignoredSet = new Set(ignoredTerms.map((t) => normalizeBrandKey(t.term)));
+  const [existingResolved, ignoredTerms, brands, aliases] = await Promise.all([
+    prisma.resolvedMention.findMany({
+      where: { responseId: { in: responseIds } },
+      select: { responseId: true, rawBrand: true },
+    }),
+    prisma.ignoredTerm.findMany(),
+    prisma.brand.findMany(),
+    prisma.brandAlias.findMany(),
+  ]);
 
-  const brands = await prisma.brand.findMany();
-  const aliases = await prisma.brandAlias.findMany();
-
+  const resolvedKeys = new Set(
+    existingResolved.map((mention) => `${mention.responseId}\u0000${mention.rawBrand}`)
+  );
+  const ignoredSet = new Set(ignoredTerms.map((term) => normalizeBrandKey(term.term)));
   const canonicalMap = new Map(
-    brands.map((b) => [normalizeBrandKey(b.canonicalName), b.id])
+    brands.map((brand) => [normalizeBrandKey(brand.canonicalName), brand.id])
   );
   const aliasMap = new Map(
-    aliases.map((a) => [normalizeBrandKey(a.alias), a.brandId])
+    aliases.map((alias) => [normalizeBrandKey(alias.alias), alias.brandId])
   );
-
   const reviewCounts = new Map<string, number>();
-  let resolved = 0;
+  const resolvedToCreate: Array<{
+    responseId: string;
+    brandId: string;
+    position: number;
+    matchType: string;
+    rawBrand: string;
+  }> = [];
 
   for (const mention of mentions) {
-    const existing = await prisma.resolvedMention.findFirst({
-      where: { responseId: mention.responseId, rawBrand: mention.rawBrand },
-    });
-    if (existing) continue;
+    const key = `${mention.response.id}\u0000${mention.rawBrand}`;
+    if (resolvedKeys.has(key)) continue;
 
     const processed = preprocessBrand(mention.rawBrand);
     const lower = normalizeBrandKey(processed);
-
     if (
       ignoredSet.has(lower) ||
       ignoredSet.has(normalizeBrandKey(mention.rawBrand))
@@ -62,40 +73,49 @@ export async function normalizeWeek(week: string) {
       brandId = newBrand.id;
       matchType = "auto_new";
       canonicalMap.set(lower, brandId);
-
-      reviewCounts.set(
-        processed,
-        (reviewCounts.get(processed) ?? 0) + 1
-      );
+      reviewCounts.set(processed, (reviewCounts.get(processed) ?? 0) + 1);
     }
 
-    await prisma.resolvedMention.create({
-      data: {
-        responseId: mention.responseId,
-        brandId,
-        position: mention.position,
-        matchType: matchType!,
-        rawBrand: mention.rawBrand,
-      },
+    resolvedToCreate.push({
+      responseId: mention.response.id,
+      brandId,
+      position: mention.position,
+      matchType: matchType!,
+      rawBrand: mention.rawBrand,
     });
-    resolved++;
+    resolvedKeys.add(key);
   }
 
-  for (const [rawBrand, count] of reviewCounts) {
-    const existing = await prisma.brandReviewQueue.findFirst({
-      where: { rawBrand, week },
+  if (resolvedToCreate.length > 0) {
+    await prisma.resolvedMention.createMany({
+      data: resolvedToCreate,
+      skipDuplicates: true,
     });
-    if (existing) {
-      await prisma.brandReviewQueue.update({
-        where: { id: existing.id },
-        data: { count: existing.count + count },
-      });
-    } else {
-      await prisma.brandReviewQueue.create({
-        data: { rawBrand, count, week, status: "pending" },
-      });
+  }
+
+  if (reviewCounts.size > 0) {
+    const existingReviews = await prisma.brandReviewQueue.findMany({
+      where: { week, rawBrand: { in: [...reviewCounts.keys()] } },
+      select: { id: true, rawBrand: true, count: true },
+    });
+    const existingReviewMap = new Map(
+      existingReviews.map((review) => [review.rawBrand, review])
+    );
+
+    for (const [rawBrand, count] of reviewCounts) {
+      const existing = existingReviewMap.get(rawBrand);
+      if (existing) {
+        await prisma.brandReviewQueue.update({
+          where: { id: existing.id },
+          data: { count: existing.count + count },
+        });
+      } else {
+        await prisma.brandReviewQueue.create({
+          data: { rawBrand, count, week, status: "pending" },
+        });
+      }
     }
   }
 
-  return resolved;
+  return resolvedToCreate.length;
 }

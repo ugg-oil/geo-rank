@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublishedCategoryLeaderboards, getPublishedLeaderboardManifest } from "@/lib/published-leaderboard";
+import { HOME_METHODOLOGY_SECTIONS } from "@/lib/page-content";
 import { SITE_URL, stringifyJsonLd } from "@/lib/seo";
 
 const STATS = [
@@ -395,6 +396,69 @@ export default async function Home() {
                 <p className="text-sm leading-relaxed text-[var(--text-muted)]">{item.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Methodology */}
+      <section className="border-t border-[var(--border)]">
+        <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+          <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                Methodology
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                How GEO Radar turns AI answers into visibility rankings
+              </h2>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--text-secondary)]">
+                GEO Radar measures AI search visibility with repeatable prompts,
+                multi-engine collection, brand normalization, and weekly scoring.
+                The goal is to make Generative Engine Optimization measurable
+                without treating AI answers as a black box.
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                {[
+                  ["AI visibility", "Recommendation presence"],
+                  ["GEO", "Generative Engine Optimization"],
+                  ["Signals", "Mentions, rank, coverage"],
+                  ["Cadence", "Weekly snapshots"],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
+                  >
+                    <div className="font-mono text-xs text-[var(--text-muted)]">{label}</div>
+                    <div className="mt-1 text-sm font-medium leading-snug text-[var(--text)]">{value}</div>
+                  </div>
+                ))}
+              </div>
+              <Link
+                href="/methodology"
+                className="mt-7 inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text)]"
+              >
+                Read the dedicated methodology page
+                <ArrowIcon />
+              </Link>
+            </div>
+
+            <div className="space-y-8">
+              {HOME_METHODOLOGY_SECTIONS.map((section) => (
+                <section
+                  key={section.title}
+                  className="border-b border-[var(--border)] pb-8 last:border-b-0 last:pb-0"
+                >
+                  <h3 className="text-base font-semibold tracking-tight text-[var(--text)]">
+                    {section.title}
+                  </h3>
+                  <div className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
+                    {section.paragraphs.map((paragraph) => (
+                      <p key={paragraph}>{paragraph}</p>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           </div>
         </div>
       </section>
