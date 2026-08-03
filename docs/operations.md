@@ -73,6 +73,17 @@ curl "https://georadar.website/api/pipeline-health?week=Week%20of%202026-08-03" 
 
 健康状态要求：最新运行成功、`snapshot_count > 0`、并且 immutable week manifest 与 `latest` manifest 都已验证。健康时返回 `200`；任一条件未满足时返回 `503`，响应会给出具体原因。
 
+### 邮件告警测试
+
+在配置 Resend 变量后，可发送一封不运行 Pipeline 的测试邮件：
+
+```bash
+curl -X POST "https://georadar.website/api/pipeline-alert-test" \
+  -H "Authorization: Bearer $PIPELINE_SECRET"
+```
+
+成功返回 `200`。测试邮件标题带有 `manual_alert_test`，不会调用 OpenRouter 或修改榜单数据。
+
 ## 发布产物
 
 - 每周：`leaderboards/{week}/{slug}.json`
