@@ -1,6 +1,7 @@
 import { collectAll } from "./collect";
 import { extractWeek } from "./extract";
 import { normalizeWeek } from "./normalize";
+import { consolidateBrands } from "./consolidate";
 import { classifyAllBrands } from "./classify-entities";
 import { scoreAll } from "./score";
 import { canPublishToBlob } from "@/lib/blob-publish";
@@ -56,7 +57,7 @@ export async function runFullPipeline(week?: string) {
   console.log(`[Pipeline] Starting for ${w}`);
 
   try {
-    console.log("[1/6] Collecting...");
+    console.log("[1/7] Collecting...");
     const collectResults = await collectAll(w);
     const collectedCount = await prisma.response.count({
       where: { week: w, status: "ok" },
@@ -65,49 +66,56 @@ export async function runFullPipeline(week?: string) {
       where: { id: run.id },
       data: { collectedCount, currentStep: "extracting" },
     });
-    console.log(`[1/6] Collected ${collectedCount} successful responses (${collectResults.length} attempts)`);
+    console.log(`[1/7] Collected ${collectedCount} successful responses (${collectResults.length} attempts)`);
 
-    console.log("[2/6] Extracting...");
+    console.log("[2/7] Extracting...");
     const mentionCount = await runStage("extraction", extractWeek(w));
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { extractedCount: mentionCount, currentStep: "normalizing" },
     });
-    console.log(`[2/6] Extracted ${mentionCount} mentions`);
+    console.log(`[2/7] Extracted ${mentionCount} mentions`);
 
-    console.log("[3/6] Normalizing...");
+    console.log("[3/7] Normalizing...");
     const resolved = await runStage("normalization", normalizeWeek(w));
     await prisma.pipelineRun.update({
       where: { id: run.id },
-      data: { resolvedCount: resolved, currentStep: "classifying" },
+      data: { resolvedCount: resolved, currentStep: "consolidating" },
     });
-    console.log(`[3/6] Resolved ${resolved} mentions`);
+    console.log(`[3/7] Resolved ${resolved} mentions`);
 
-    console.log("[4/6] Classifying entities...");
+    console.log("[4/7] Consolidating brand variants...");
+    await runStage("consolidation", consolidateBrands());
+    await prisma.pipelineRun.update({
+      where: { id: run.id },
+      data: { currentStep: "classifying" },
+    });
+
+    console.log("[5/7] Classifying entities...");
     const classified = await runStage("classification", classifyAllBrands());
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { classifiedCount: classified, currentStep: "scoring" },
     });
-    console.log(`[4/6] Classified ${classified} brands`);
+    console.log(`[5/7] Classified ${classified} brands`);
 
-    console.log("[5/6] Scoring...");
+    console.log("[6/7] Scoring...");
     await runStage("scoring", scoreAll(w));
     const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { snapshotCount, currentStep: "publishing" },
     });
-    console.log(`[5/6] Scoring complete (${snapshotCount} snapshots)`);
+    console.log(`[6/7] Scoring complete (${snapshotCount} snapshots)`);
 
     let manifestUrl: string | null = null;
     if (canPublishToBlob()) {
-      console.log("[6/6] Publishing leaderboard snapshots...");
+      console.log("[7/7] Publishing leaderboard snapshots...");
       manifestUrl = await runStage("publishing", publishLeaderboards(w));
-      console.log("[6/6] Publishing complete");
+      console.log("[7/7] Publishing complete");
     } else {
       console.warn(
-        "[6/6] Blob credentials missing; skipped publishing snapshots (need BLOB_READ_WRITE_TOKEN or Vercel Blob connection)"
+        "[7/7] Blob credentials missing; skipped publishing snapshots (need BLOB_READ_WRITE_TOKEN or Vercel Blob connection)"
       );
     }
 

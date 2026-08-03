@@ -3,6 +3,8 @@ const RAW_PREFERRED: Record<string, string> = {
   // Google / Gemini
   "google bard": "Gemini",
   "google gemini": "Gemini",
+  "google bard/gemini": "Gemini",
+  "google bard / gemini": "Gemini",
   bard: "Gemini",
   "google gemini / imagen": "Gemini",
   imagen: "Gemini",
@@ -12,6 +14,8 @@ const RAW_PREFERRED: Record<string, string> = {
   // OpenAI / ChatGPT product variants.
   // Keep the company name "OpenAI" separate for entity/visibility analysis.
   "openai's gpt": "ChatGPT",
+  "openai's gpt-3": "ChatGPT",
+  "openai's gpt-4": "ChatGPT",
   "openai's chatgpt": "ChatGPT",
   "openai chatgpt": "ChatGPT",
   "evolved chatgpt": "ChatGPT",
@@ -31,6 +35,7 @@ const RAW_PREFERRED: Record<string, string> = {
   // Microsoft Copilot (no bare "copilot")
   "microsoft copilot": "Microsoft Copilot",
   "microsoft 365 copilot": "Microsoft Copilot",
+  "microsoft bing chat": "Microsoft Copilot",
 
   // Products
   "jasper ai": "Jasper",
@@ -38,6 +43,7 @@ const RAW_PREFERRED: Record<string, string> = {
   "github copilot": "GitHub Copilot",
   "copy ai": "Copy",
   copy: "Copy",
+  alexa: "Amazon Alexa",
   "midjourney ai": "Midjourney",
   "mid journey": "Midjourney",
   "bing image creator": "Microsoft Designer",
