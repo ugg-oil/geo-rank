@@ -13,6 +13,8 @@ import {
   PIPELINE_RUN_STALE_TIMEOUT_MS,
   PIPELINE_STAGE_TIMEOUT_MS,
 } from "@/lib/pipeline-timeouts";
+import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
+import { verifyPublicCategoryPage } from "@/lib/pipeline-health";
 
 async function runStage<T>(stage: string, work: Promise<T>, timeoutMs = PIPELINE_STAGE_TIMEOUT_MS) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -54,11 +56,18 @@ export async function runFullPipeline(week?: string) {
   const run = await prisma.pipelineRun.create({
     data: { week: w, status: "running", currentStep: "collecting" },
   });
-  console.log(`[Pipeline] Starting for ${w}`);
+  logPipelineEvent({ event: "run_started", week: w, runId: run.id });
+
+  const timedStage = async <T>(stage: string, work: () => Promise<T>) => {
+    const startedAt = Date.now();
+    logPipelineEvent({ event: "stage_started", week: w, runId: run.id, stage });
+    const result = await runStage(stage, work());
+    logPipelineEvent({ event: "stage_completed", week: w, runId: run.id, stage, durationMs: Date.now() - startedAt });
+    return result;
+  };
 
   try {
-    console.log("[1/7] Collecting...");
-    const collectResults = await collectAll(w);
+    const collectResults = await timedStage("collecting", () => collectAll(w));
     const collectedCount = await prisma.response.count({
       where: { week: w, status: "ok" },
     });
@@ -66,53 +75,47 @@ export async function runFullPipeline(week?: string) {
       where: { id: run.id },
       data: { collectedCount, currentStep: "extracting" },
     });
-    console.log(`[1/7] Collected ${collectedCount} successful responses (${collectResults.length} attempts)`);
+    logPipelineEvent({ event: "collection_summary", week: w, runId: run.id, collectedCount, attemptedCount: collectResults.length });
 
-    console.log("[2/7] Extracting...");
-    const mentionCount = await runStage("extraction", extractWeek(w));
+    const mentionCount = await timedStage("extracting", () => extractWeek(w));
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { extractedCount: mentionCount, currentStep: "normalizing" },
     });
-    console.log(`[2/7] Extracted ${mentionCount} mentions`);
+    logPipelineEvent({ event: "extraction_summary", week: w, runId: run.id, extractedCount: mentionCount });
 
-    console.log("[3/7] Normalizing...");
-    const resolved = await runStage("normalization", normalizeWeek(w));
+    const resolved = await timedStage("normalizing", () => normalizeWeek(w));
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { resolvedCount: resolved, currentStep: "consolidating" },
     });
-    console.log(`[3/7] Resolved ${resolved} mentions`);
+    logPipelineEvent({ event: "normalization_summary", week: w, runId: run.id, resolvedCount: resolved });
 
-    console.log("[4/7] Consolidating brand variants...");
-    await runStage("consolidation", consolidateBrands());
+    await timedStage("consolidating", () => consolidateBrands());
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { currentStep: "classifying" },
     });
 
-    console.log("[5/7] Classifying entities...");
-    const classified = await runStage("classification", classifyAllBrands());
+    const classified = await timedStage("classifying", () => classifyAllBrands());
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { classifiedCount: classified, currentStep: "scoring" },
     });
-    console.log(`[5/7] Classified ${classified} brands`);
+    logPipelineEvent({ event: "classification_summary", week: w, runId: run.id, classifiedCount: classified });
 
-    console.log("[6/7] Scoring...");
-    await runStage("scoring", scoreAll(w));
+    await timedStage("scoring", () => scoreAll(w));
     const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: { snapshotCount, currentStep: "publishing" },
     });
-    console.log(`[6/7] Scoring complete (${snapshotCount} snapshots)`);
+    logPipelineEvent({ event: "scoring_summary", week: w, runId: run.id, snapshotCount });
 
-    let manifestUrl: string | null = null;
+    let publication: Awaited<ReturnType<typeof publishLeaderboards>> | null = null;
     if (canPublishToBlob()) {
-      console.log("[7/7] Publishing leaderboard snapshots...");
-      manifestUrl = await runStage("publishing", publishLeaderboards(w));
-      console.log("[7/7] Publishing complete");
+      publication = await timedStage("publishing", () => publishLeaderboards(w));
+      await timedStage("public_smoke_check", () => verifyPublicCategoryPage(w));
     } else {
       console.warn(
         "[7/7] Blob credentials missing; skipped publishing snapshots (need BLOB_READ_WRITE_TOKEN or Vercel Blob connection)"
@@ -124,14 +127,18 @@ export async function runFullPipeline(week?: string) {
       data: {
         status: "success",
         currentStep: null,
-        manifestUrl,
+        manifestUrl: publication?.manifestUrl ?? null,
+        latestManifestUrl: publication?.latestManifestUrl ?? null,
+        publishStatus: publication ? "success" : "skipped",
+        publishedAt: publication ? new Date(publication.publishedAt) : null,
         finishedAt: new Date(),
       },
     });
-    console.log(`[Pipeline] Done for ${w} (run ${run.id})`);
+    logPipelineEvent({ event: "run_completed", week: w, runId: run.id, snapshotCount });
     return { runId: run.id, week: w, status: "success" as const };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const details = errorContext(error);
+    const message = details.message;
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: {
@@ -140,7 +147,7 @@ export async function runFullPipeline(week?: string) {
         finishedAt: new Date(),
       },
     });
-    console.error(`[Pipeline] Failed for ${w} (run ${run.id})`, error);
+    logPipelineEvent({ event: "run_failed", week: w, runId: run.id, error: details });
     throw error;
   }
 }

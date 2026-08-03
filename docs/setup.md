@@ -15,6 +15,7 @@ cp .env.example .env
 | `OPENROUTER_API_KEY` | OpenRouter API Key |
 | `PIPELINE_SECRET` | `/api/pipeline`、`/api/publish` 鉴权 |
 | `CRON_SECRET` | `/api/cron` 鉴权（可与 `PIPELINE_SECRET` 相同） |
+| `PIPELINE_ALERT_WEBHOOK_URL` | 可选。Cron 运行或发布健康检查失败时接收 JSON 告警的通用 webhook。 |
 | `PIPELINE_REQUEST_TIMEOUT_MS` | 单次 OpenRouter 请求超时，默认 45 秒 |
 | `PIPELINE_COLLECTION_TIMEOUT_MS` | 采集阶段总超时，默认 20 分钟 |
 | `PIPELINE_EXTRACTION_TIMEOUT_MS` | 抽取阶段总超时，默认 20 分钟 |

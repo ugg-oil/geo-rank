@@ -135,6 +135,10 @@ model PipelineRun {
   classifiedCount Int?      @map("classified_count")
   snapshotCount   Int?      @map("snapshot_count")
   manifestUrl     String?   @map("manifest_url")
+  latestManifestUrl String? @map("latest_manifest_url")
+  publishStatus   String    @default("pending") @map("publish_status")
+  publishedAt     DateTime? @map("published_at")
+  publishError    String?   @map("publish_error")
   errorMessage    String?   @map("error_message")
 
   @@index([week, startedAt])
