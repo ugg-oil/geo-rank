@@ -86,7 +86,7 @@
 
 1. 已加入发布 manifest fixture：有效、旧周、缺榜单三种状态可通过 `npm run pipeline:fixtures` 本地验证。阶段超时和外部请求重试仍需在 staging 使用受控 fixture 演练。
 2. 已加入 `/api/pipeline`、`/api/publish` 的结构化运行日志：run ID、阶段、耗时、Blob 写入结果与错误类型。
-3. 已加入 Cron 后自动健康检查：确认运行成功、`snapshot_count > 0`、immutable week manifest 和 latest manifest 都已验证；生产环境会额外读取公开品类页确认实际渲染的周次；可选 webhook 在配置后发送失败告警。
+3. 已加入 Cron 后自动健康检查：确认运行成功、`snapshot_count > 0`、immutable week manifest 和 latest manifest 都已验证；生产环境会额外读取公开品类页确认实际渲染的周次；配置 Resend 后直发失败邮件，webhook 可作为备用通道。
 
 ### 后续迭代
 

@@ -13,7 +13,7 @@ Pipeline 完成后会尝试发布榜单快照到 Vercel Blob。前台优先读 B
 
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进 `latest`。同一周已有运行时，新的触发不会并发启动；超过 30 小时的陈旧运行会先被标记为失败。
 
-每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与双 manifest 发布状态；检查失败时返回 500，并在配置 `PIPELINE_ALERT_WEBHOOK_URL` 后向该通用 webhook 发送 JSON 告警。
+每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与双 manifest 发布状态；检查失败时返回 500。若配置完整的 Resend 邮件变量，会直发告警邮件；可选 webhook 是邮件不可用时的备用通道。
 
 ## 命令
 

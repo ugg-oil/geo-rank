@@ -15,7 +15,10 @@ cp .env.example .env
 | `OPENROUTER_API_KEY` | OpenRouter API Key |
 | `PIPELINE_SECRET` | `/api/pipeline`、`/api/publish` 鉴权 |
 | `CRON_SECRET` | `/api/cron` 鉴权（可与 `PIPELINE_SECRET` 相同） |
-| `PIPELINE_ALERT_WEBHOOK_URL` | 可选。Cron 运行或发布健康检查失败时接收 JSON 告警的通用 webhook。 |
+| `RESEND_API_KEY` | Resend API Key。与下两项同时配置时，Cron/健康检查失败会直发邮件。 |
+| `PIPELINE_ALERT_EMAIL_TO` | 接收告警的邮箱。 |
+| `PIPELINE_ALERT_EMAIL_FROM` | 已在 Resend 验证的发件人，例如 `GEO Radar Alerts <alerts@alerts.georadar.website>`。 |
+| `PIPELINE_ALERT_WEBHOOK_URL` | 可选备用通道。邮件无法发送时接收 JSON 告警的通用 webhook。 |
 | `PIPELINE_REQUEST_TIMEOUT_MS` | 单次 OpenRouter 请求超时，默认 45 秒 |
 | `PIPELINE_COLLECTION_TIMEOUT_MS` | 采集阶段总超时，默认 20 分钟 |
 | `PIPELINE_EXTRACTION_TIMEOUT_MS` | 抽取阶段总超时，默认 20 分钟 |
@@ -56,6 +59,12 @@ npm run dev
 3. 确认 `NEXT_PUBLIC_SITE_URL=https://georadar.website`
 4. Connect Blob Store，确保有 `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID`
 5. Deploy
+
+### 邮件告警（Resend）
+
+1. 在 [Resend](https://resend.com/) 创建 API Key，并验证用于 `PIPELINE_ALERT_EMAIL_FROM` 的发信域名。
+2. 在 Vercel 的 **Production** 环境添加 `RESEND_API_KEY`、`PIPELINE_ALERT_EMAIL_TO` 和 `PIPELINE_ALERT_EMAIL_FROM`。
+3. 重新部署。之后周更或健康检查失败时，系统优先发送邮件；邮件通道不可用时才尝试可选 webhook。
 
 部署后验证：
 
