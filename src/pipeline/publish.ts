@@ -2,11 +2,14 @@ import { put } from "@vercel/blob";
 import { canPublishToBlob, blobPutOptions } from "@/lib/blob-publish";
 import { prisma } from "@/lib/db";
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
-import { ENGINES } from "@/lib/constants";
+import { CATEGORIES, ENGINES } from "@/lib/constants";
 import { getPreviousWeek } from "@/lib/week";
 import type { CategoryBoardsData, LeaderboardRow, LeaderboardView } from "@/lib/leaderboard";
 import { assessPublishedManifest, type PublicationResult } from "@/lib/pipeline-health";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
+import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
+import { toBrandSlug } from "@/lib/brand-slug";
+import { publishBrandPages } from "@/pipeline/publish-brands";
 
 async function buildCategory(category: string, week: string): Promise<CategoryBoardsData> {
   const prevWeek = getPreviousWeek(week);
@@ -34,17 +37,24 @@ async function buildCategory(category: string, week: string): Promise<CategoryBo
     const engine = key === "overall" ? null : key;
     const rows = current.filter((row) => row.engine === engine);
     const previousRows = previous.filter((row) => row.engine === engine);
-    const snapshots: LeaderboardRow[] = rows.map((row) => ({
-      id: row.id,
-      rank: row.rank,
-      brandId: row.brandId,
-      brandName: row.brand.canonicalName,
-      parentCompanyName: row.brand.parentBrand?.canonicalName ?? null,
-      score: row.score,
-      appearanceRate: row.appearanceRate,
-      avgRank: row.avgRank,
-      modelCoverage: row.modelCoverage,
-    }));
+    const snapshots: LeaderboardRow[] = rows.map((row) => {
+      const brandName = getProductDisplayName(row.brand.canonicalName);
+      return {
+        id: row.id,
+        rank: row.rank,
+        brandId: row.brandId,
+        brandName,
+        brandSlug: toBrandSlug(brandName),
+        parentCompanyName: getCompanyColumnName(
+          row.brand.canonicalName,
+          row.brand.parentBrand?.canonicalName
+        ),
+        score: row.score,
+        appearanceRate: row.appearanceRate,
+        avgRank: row.avgRank,
+        modelCoverage: row.modelCoverage,
+      };
+    });
     boards[key] = {
       snapshots,
       prevRanks: Object.fromEntries(previousRows.map((row) => [row.brandId, row.rank])),
@@ -64,15 +74,16 @@ async function verifyManifest(url: string, week: string) {
   if (!assessment.ok) throw new Error(`Manifest verification failed: ${assessment.reason}`);
 }
 
-export async function publishLeaderboards(week: string): Promise<PublicationResult> {
+export async function publishLeaderboards(
+  week: string,
+  options: { updateLatest?: boolean } = {}
+): Promise<PublicationResult> {
   if (!canPublishToBlob()) {
     throw new Error(
       "Missing Blob credentials. Set BLOB_READ_WRITE_TOKEN locally, or connect Blob to this Vercel project (BLOB_STORE_ID + OIDC)."
     );
   }
 
-  // Re-publishing a validated week must be idempotent so a transient latest failure
-  // can be recovered without re-running collection or changing the week path.
   const jsonPut = blobPutOptions("application/json; charset=utf-8", {
     allowOverwrite: true,
   });
@@ -91,10 +102,30 @@ export async function publishLeaderboards(week: string): Promise<PublicationResu
     const publishedAt = new Date().toISOString();
     const manifestBody = JSON.stringify({ version: 1, week, publishedAt, boards: published });
     const manifest = await put(`leaderboards/${week}/manifest.json`, manifestBody, jsonPut);
-    // latest 是发布完成的提交点；写入失败时不能把本周标记为已发布。
-    const latestManifest = await put("leaderboards/latest/manifest.json", manifestBody, latestManifestPut);
-    await Promise.all([verifyManifest(manifest.url, week), verifyManifest(latestManifest.url, week)]);
-    const result = { manifestUrl: manifest.url, latestManifestUrl: latestManifest.url, publishedAt };
+    const snapshotCounts = await prisma.snapshot.groupBy({
+      by: ["week"],
+      _count: { id: true },
+    });
+    const weeks = snapshotCounts
+      .filter((row) => row._count.id >= CATEGORIES.length * 4)
+      .map((row) => row.week)
+      .sort((a, b) => b.localeCompare(a));
+    await put("leaderboards/index.json", JSON.stringify({ version: 1, weeks }), latestManifestPut);
+    const updateLatest = options.updateLatest ?? true;
+    const latestManifest = updateLatest
+      ? await put("leaderboards/latest/manifest.json", manifestBody, latestManifestPut)
+      : null;
+    await verifyManifest(manifest.url, week);
+    if (latestManifest) await verifyManifest(latestManifest.url, week);
+
+    // Publish brand pages (idempotent, same week data)
+    await publishBrandPages(week);
+
+    const result = {
+      manifestUrl: manifest.url,
+      latestManifestUrl: latestManifest?.url ?? "",
+      publishedAt,
+    };
     logPipelineEvent({ event: "publication_verified", week, boardCount: Object.keys(published).length, ...result });
     return result;
   } catch (error) {

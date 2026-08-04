@@ -111,6 +111,17 @@ const SECTIONS = [
       </p>
     ),
   },
+  {
+    title: "Historical Estimates",
+    content: (
+      <p>
+        Some early historical weeks may be labelled <strong className="text-[var(--text)]">Backfilled estimate</strong>.
+        These rankings are generated retrospectively using the current collection and scoring method;
+        they are not observations collected during the labelled week. Regular weekly collection is labelled
+        <strong className="text-[var(--text)]"> Observed</strong>.
+      </p>
+    ),
+  },
 ];
 
 export default function MethodologyPage() {

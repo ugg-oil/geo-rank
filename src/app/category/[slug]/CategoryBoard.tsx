@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { ENGINES } from "@/lib/constants";
 import type { CategoryBoardsData } from "@/lib/leaderboard";
+import { getRankDelta, type RankDelta } from "@/lib/rank-change";
 
 type TabKey = "overall" | (typeof ENGINES)[number];
 
@@ -10,26 +12,17 @@ function engineLabel(e: string) {
   return e === "chatgpt" ? "ChatGPT" : e === "gemini" ? "Gemini" : "Grok";
 }
 
-function DeltaBadge({ delta }: { delta: string | number | null }) {
-  if (delta === "New")
+function DeltaBadge({ delta }: { delta: RankDelta }) {
+  if (delta.kind === "new")
     return (
       <span className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--card-hover)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-        New
+        NEW
       </span>
     );
-  if (delta === "Not ranked last week")
-    return (
-      <span className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 text-xs font-medium text-[var(--text-muted)]">
-        Not ranked last week
-      </span>
-    );
-  if (typeof delta === "number") {
-    if (delta > 0)
-      return <span className="font-mono text-sm font-medium text-[var(--green)]">↑{delta}</span>;
-    if (delta < 0)
-      return <span className="font-mono text-sm font-medium text-[var(--red)]">↓{Math.abs(delta)}</span>;
-    return <span className="font-mono text-sm text-[var(--text-muted)]">—</span>;
-  }
+  if (delta.kind === "up")
+    return <span className="font-mono text-sm font-medium text-[var(--green)]">↑{delta.spots}</span>;
+  if (delta.kind === "down")
+    return <span className="font-mono text-sm font-medium text-[var(--red)]">↓{delta.spots}</span>;
   return <span className="font-mono text-sm text-[var(--text-muted)]">—</span>;
 }
 
@@ -37,31 +30,36 @@ type Props = {
   slug: string;
   data: CategoryBoardsData;
   initialTab: TabKey;
+  availableWeeks: string[];
 };
 
-export function CategoryBoard({ slug, data, initialTab }: Props) {
+export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props) {
   const [tab, setTab] = useState<TabKey>(initialTab);
+
+  const sourceParams = new URLSearchParams();
+  if (data.week !== availableWeeks[0]) {
+    sourceParams.set("week", data.week.replace("Week of ", ""));
+  }
+  if (tab !== "overall") sourceParams.set("engine", tab);
+  const sourcePath = `/category/${slug}${sourceParams.size ? `?${sourceParams}` : ""}`;
 
   const selectTab = useCallback(
     (next: TabKey) => {
       setTab(next);
-      const url =
-        next === "overall"
-          ? `/category/${slug}`
-          : `/category/${slug}?engine=${next}`;
+      const params = new URLSearchParams();
+      if (data.week !== availableWeeks[0]) params.set("week", data.week.replace("Week of ", ""));
+      if (next !== "overall") params.set("engine", next);
+      const url = `/category/${slug}${params.size ? `?${params}` : ""}`;
       window.history.replaceState(null, "", url);
     },
-    [slug]
+    [availableWeeks, data.week, slug]
   );
 
   const view = data.boards[tab];
   const isOverall = tab === "overall";
 
-  function getDelta(brandId: string, currentRank: number): string | number | null {
-    if (!view.hasPrevWeekData) return "New";
-    const prevRank = view.prevRanks[brandId];
-    if (prevRank === undefined) return "Not ranked last week";
-    return prevRank - currentRank;
+  function deltaFor(brandId: string, currentRank: number): RankDelta {
+    return getRankDelta(currentRank, view.prevRanks, brandId, view.hasPrevWeekData);
   }
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -107,6 +105,9 @@ export function CategoryBoard({ slug, data, initialTab }: Props) {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Product
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                    Company
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Score
                   </th>
@@ -132,14 +133,25 @@ export function CategoryBoard({ slug, data, initialTab }: Props) {
                     key={s.id}
                     className="border-b border-[var(--border)] bg-[var(--card)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)]"
                   >
-                    <td className="px-4 py-3.5 font-mono text-[var(--text-muted)]">{s.rank}</td>
+                    <td
+                      className={`px-4 py-3.5 font-mono ${
+                        s.rank <= 3
+                          ? "font-semibold text-[var(--text)]"
+                          : "text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {s.rank}
+                    </td>
                     <td className="px-4 py-3.5">
-                      <div className="font-medium text-[var(--text)]">{s.brandName}</div>
-                      {s.parentCompanyName && (
-                        <div className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">
-                          {s.parentCompanyName}
-                        </div>
-                      )}
+                      <Link
+                        href={`/brand/${s.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
+                        className="font-medium text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+                      >
+                        {s.brandName}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3.5 text-[var(--text-secondary)]">
+                      {s.parentCompanyName ?? "—"}
                     </td>
                     <td className="px-4 py-3.5 text-right font-mono font-medium">{s.score.toFixed(1)}</td>
                     <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">
@@ -156,7 +168,7 @@ export function CategoryBoard({ slug, data, initialTab }: Props) {
                       </td>
                     )}
                     <td className="px-4 py-3.5 text-right">
-                      <DeltaBadge delta={getDelta(s.brandId, s.rank)} />
+                      <DeltaBadge delta={deltaFor(s.brandId, s.rank)} />
                     </td>
                   </tr>
                 ))}

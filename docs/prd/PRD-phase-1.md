@@ -24,7 +24,6 @@ GEO Radar 每周使用固定英文 prompt 询问 ChatGPT、Gemini 和 Grok，从
 - 未匹配品牌自动创建并进入 Review Queue。
 - `review:auto` 自动审核，以及人工 review 导入流程。
 - Appearance Rate、Average Rank、Model Coverage 和 0–100 Score。
-- Top 20、上周排名变化、`New`、`Not ranked last week`。
 - 首页、Category board、Engine board 和 Methodology 页面。
 - 首页和 Category 页的 SEO 介绍内容。
 - 首个周快照：`Week of 2026-07-27`。

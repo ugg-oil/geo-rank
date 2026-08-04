@@ -21,6 +21,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
+      url: `${SITE_URL}/rankings`,
+      lastModified: rankingLastModified,
+      changeFrequency: "weekly",
+      priority: 0.95,
+    },
+    {
       url: `${SITE_URL}/methodology`,
       lastModified: METHODOLOGY_LAST_MODIFIED,
       changeFrequency: "monthly",

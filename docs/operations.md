@@ -9,7 +9,7 @@ npm run pipeline
 npm run review:auto -- --apply
 ```
 
-Pipeline 完成后会尝试发布榜单快照到 Vercel Blob。前台优先读 Blob JSON；未配置 Blob 时回退数据库。
+Pipeline 完成后会尝试发布榜单快照到 Vercel Blob（含 `leaderboards/*` 与 `brands/*`）。前台优先读 Blob JSON；未配置 Blob 时回退数据库。
 
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进 `latest`。同一周已有运行时，新的触发不会并发启动；超过 30 小时的陈旧运行会先被标记为失败。
 

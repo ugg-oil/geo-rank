@@ -3,21 +3,25 @@ import { CATEGORY_SLUG_MAP } from "@/lib/categories";
 import { ENGINES } from "@/lib/constants";
 import { getAllCategoryLeaderboards } from "@/lib/leaderboard";
 import { CATEGORY_INTROS } from "@/lib/page-content";
-import { getPublishedCategoryLeaderboards } from "@/lib/published-leaderboard";
+import { getPublishedCategoryLeaderboards, getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 import { getCategorySeo, SITE_URL, stringifyJsonLd } from "@/lib/seo";
+import { getCurrentWeek } from "@/lib/week";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { WeekSelector } from "@/components/week-selector";
 import { CategoryBoard } from "./CategoryBoard";
 
-export const revalidate = 300;
+export const revalidate = 0;
+// P0-A local preview: force this route to rebuild after entity hierarchy changes.
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ engine?: string }>;
+  searchParams: Promise<{ engine?: string; week?: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const { week } = await searchParams;
   const seo = getCategorySeo(slug);
   if (!seo) {
     return {
@@ -33,6 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: seo.canonicalPath,
     },
+    robots: week ? { index: false, follow: true } : undefined,
     openGraph: {
       title: seo.title,
       description: seo.description,
@@ -51,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { engine } = await searchParams;
+  const { engine, week: requestedWeek } = await searchParams;
   const category = CATEGORY_SLUG_MAP[slug];
   if (!category) notFound();
 
@@ -60,11 +65,20 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       ? (engine as (typeof ENGINES)[number])
       : "overall";
 
-  const data =
-    (await getPublishedCategoryLeaderboards(slug)) ??
-    (await getAllCategoryLeaderboards(category));
+  const currentWeek = getCurrentWeek();
+  const selectedWeek = requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
+    ? `Week of ${requestedWeek}`
+    : currentWeek;
+  const [publishedData, availableWeeks] = await Promise.all([
+    getPublishedCategoryLeaderboards(slug, selectedWeek),
+    getPublishedLeaderboardWeeks(),
+  ]);
+  const data = publishedData ?? (selectedWeek === currentWeek ? await getAllCategoryLeaderboards(category) : null);
   const intro = CATEGORY_INTROS[slug];
   const canonicalUrl = `${SITE_URL}/category/${slug}`;
+  if (!data) {
+    return <main className="mx-auto max-w-6xl px-6 py-10 sm:py-14"><Link href={`/category/${slug}`} className="text-sm text-[var(--text-secondary)]">← Back to latest rankings</Link><div className="mt-8 rounded-xl border border-[var(--border)] bg-[var(--card)] p-8"><h1 className="text-xl font-semibold">Historical week unavailable</h1><p className="mt-2 text-sm text-[var(--text-secondary)]">No published rankings are available for {selectedWeek}.</p></div></main>;
+  }
   const overall = data.boards.overall;
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -100,7 +114,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 sm:py-14">
+    <main className="mx-auto max-w-6xl px-6 pt-4 pb-10 sm:pt-5 sm:pb-14">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(breadcrumbJsonLd) }}
@@ -110,73 +124,47 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(itemListJsonLd) }}
       />
       <Link
-        href="/"
-        className="mb-8 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+        href="/rankings"
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
           <path d="M9 3L4 7l5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        All categories
+        All rankings
       </Link>
 
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Who does AI recommend in {category}?
-          </h1>
-          <p className="mt-1.5 font-mono text-sm text-[var(--text-muted)]">
-            {data.week} · Top 20 · ChatGPT · Gemini · Grok
-          </p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Who does AI recommend in {category}?
+        </h1>
+        {intro && (
+          <div className="mt-4 max-w-3xl">
+            <p className="text-sm leading-7 text-[var(--text-secondary)]">
+              {intro.lead}
+            </p>
+            <div className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
+              {intro.paragraphs.slice(0, 1).map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mt-5">
+          <WeekSelector
+            slug={slug}
+            week={data.week}
+            availableWeeks={availableWeeks.length > 0 ? availableWeeks : [data.week]}
+            engine={initialTab}
+          />
         </div>
       </div>
 
-      {intro && (
-        <section className="mb-8 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 sm:p-6">
-          <div className="grid gap-8 lg:grid-cols-[1fr_0.45fr]">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                This week&apos;s board
-              </p>
-              <h2 className="mt-3 text-xl font-semibold tracking-tight text-[var(--text)]">
-                {intro.title}
-              </h2>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-                {intro.lead}
-              </p>
-              <div className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
-                {intro.paragraphs.slice(0, 1).map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-              </div>
-            </div>
-
-            <aside className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
-              <h3 className="text-sm font-semibold tracking-tight text-[var(--text)]">
-                What you&apos;ll see
-              </h3>
-              <ul className="mt-4 space-y-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                {intro.highlights.map((highlight) => (
-                  <li key={highlight} className="flex gap-3">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--yellow)]" />
-                    <span>{highlight}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/methodology"
-                className="mt-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text)]"
-              >
-                How we score this
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                  <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </Link>
-            </aside>
-          </div>
-        </section>
-      )}
-
-      <CategoryBoard slug={slug} data={data} initialTab={initialTab} />
+      <CategoryBoard
+        slug={slug}
+        data={data}
+        initialTab={initialTab}
+        availableWeeks={availableWeeks.length > 0 ? availableWeeks : [data.week]}
+      />
     </main>
   );
 }

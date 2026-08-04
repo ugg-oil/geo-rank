@@ -43,7 +43,7 @@ export function getCategorySeo(slug: string) {
   if (!category) return null;
   return {
     category,
-    title: `Who Does AI Recommend in ${category}? | GEO Radar`,
+    title: `Who Does AI Recommend in ${category}?`,
     description:
       CATEGORY_DESCRIPTIONS[slug] ??
       `See which ${category} products ChatGPT, Gemini, and Grok recommend. Weekly Top 20 AI visibility rankings.`,

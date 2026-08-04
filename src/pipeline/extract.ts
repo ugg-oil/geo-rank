@@ -28,6 +28,11 @@ Rules:
 Return format:
 {"mentions": [{"raw_brand": "ProductName", "position": 1}]}`;
 
+const EXTRACTION_CONCURRENCY = Math.max(
+  1,
+  Math.floor(Number(process.env.PIPELINE_EXTRACTION_CONCURRENCY) || 4)
+);
+
 export async function extractResponse(responseId: string) {
   const response = await prisma.response.findUnique({
     where: { id: responseId },
@@ -88,11 +93,22 @@ export async function extractWeek(week: string) {
   });
 
   const deadline = Date.now() + PIPELINE_EXTRACTION_TIMEOUT_MS;
+  let cursor = 0;
   let count = 0;
-  for (const r of responses) {
-    assertBeforeDeadline("extraction", deadline, PIPELINE_EXTRACTION_TIMEOUT_MS);
-    const mentions = await extractResponse(r.id);
-    count += mentions.length;
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= responses.length) return;
+      assertBeforeDeadline("extraction", deadline, PIPELINE_EXTRACTION_TIMEOUT_MS);
+      const mentions = await extractResponse(responses[index].id);
+      count += mentions.length;
+    }
   }
+  await Promise.all(
+    Array.from(
+      { length: Math.min(EXTRACTION_CONCURRENCY, responses.length) },
+      () => worker()
+    )
+  );
   return count;
 }

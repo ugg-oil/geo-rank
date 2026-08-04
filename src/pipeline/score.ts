@@ -5,6 +5,7 @@ import {
   VALID_RESPONSE_THRESHOLD,
   TOP_N,
 } from "@/lib/constants";
+import { isExcludedFromCategory } from "@/lib/entity-audit";
 
 interface BrandStats {
   brandId: string;
@@ -15,12 +16,16 @@ interface BrandStats {
   engines: Set<string>;
 }
 
-async function getRankableBrandIds(): Promise<Set<string>> {
+async function getRankableBrandIds(category: string): Promise<Set<string>> {
   const brands = await prisma.brand.findMany({
     where: { rankingEnabled: true, entityType: "product" },
-    select: { id: true },
+    select: { id: true, canonicalName: true },
   });
-  return new Set(brands.map((b) => b.id));
+  return new Set(
+    brands
+      .filter((brand) => !isExcludedFromCategory(brand.canonicalName, category))
+      .map((brand) => brand.id)
+  );
 }
 
 export async function scoreCategory(
@@ -50,7 +55,7 @@ export async function scoreCategory(
   }
 
   const allValid = ENGINES.every((e) => engineValidity.get(e));
-  const rankableIds = await getRankableBrandIds();
+  const rankableIds = await getRankableBrandIds(category);
 
   for (const engine of ENGINES) {
     if (!engineValidity.get(engine)) continue;

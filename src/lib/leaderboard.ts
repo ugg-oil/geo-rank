@@ -2,6 +2,8 @@ import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { ENGINES } from "@/lib/constants";
 import { getCurrentWeek, getPreviousWeek } from "@/lib/week";
+import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
+import { toBrandSlug } from "@/lib/brand-slug";
 
 const REVALIDATE_SECONDS = 300;
 
@@ -10,6 +12,8 @@ export type LeaderboardRow = {
   rank: number;
   brandId: string;
   brandName: string;
+  /** URL-safe slug for the brand page (e.g. "github-copilot"). */
+  brandSlug: string;
   /** Confirmed parent company at the time this leaderboard was published. */
   parentCompanyName?: string | null;
   score: number;
@@ -68,8 +72,12 @@ function toLeaderboardView(
       id: s.id,
       rank: s.rank,
       brandId: s.brandId,
-      brandName: s.brand.canonicalName,
-      parentCompanyName: s.brand.parentBrand?.canonicalName ?? null,
+      brandName: getProductDisplayName(s.brand.canonicalName),
+      brandSlug: toBrandSlug(getProductDisplayName(s.brand.canonicalName)),
+      parentCompanyName: getCompanyColumnName(
+        s.brand.canonicalName,
+        s.brand.parentBrand?.canonicalName
+      ),
       score: s.score,
       appearanceRate: s.appearanceRate,
       avgRank: s.avgRank,

@@ -19,6 +19,9 @@
   --green: #4ade80;
   --red: #f87171;
   --yellow: #fbbf24;
+  --podium-1: rgba(251, 191, 36, 0.16);
+  --podium-2: rgba(180, 190, 210, 0.18);
+  --podium-3: rgba(205, 127, 50, 0.16);
   --selection: rgba(255, 255, 255, 0.15);
   --shine: rgba(255, 255, 255, 0.03);
 }
@@ -41,6 +44,9 @@
   --green: #15803d;
   --red: #b91c1c;
   --yellow: #b45309;
+  --podium-1: rgba(180, 83, 9, 0.14);
+  --podium-2: rgba(71, 85, 105, 0.14);
+  --podium-3: rgba(146, 64, 14, 0.14);
   --selection: rgba(20, 20, 20, 0.12);
   --shine: rgba(20, 20, 20, 0.02);
 }

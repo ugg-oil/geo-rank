@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
+import { SiteNav } from "@/components/site-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
@@ -15,21 +16,10 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-4 sm:gap-5">
-          <Link
-            href="/#rankings"
-            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
-          >
-            Rankings
-          </Link>
-          <Link
-            href="/methodology"
-            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
-          >
-            Methodology
-          </Link>
+        <div className="flex items-center gap-4 sm:gap-5">
+          <SiteNav />
           <ThemeToggle />
-        </nav>
+        </div>
       </div>
     </header>
   );

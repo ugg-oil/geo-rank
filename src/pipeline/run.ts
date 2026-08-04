@@ -32,7 +32,10 @@ async function runStage<T>(stage: string, work: Promise<T>, timeoutMs = PIPELINE
   }
 }
 
-export async function runFullPipeline(week?: string) {
+export async function runFullPipeline(
+  week?: string,
+  options: { publishLatest?: boolean } = {}
+) {
   const w = week ?? getCurrentWeek();
   const existingRun = await prisma.pipelineRun.findFirst({
     where: { week: w, status: "running" },
@@ -114,8 +117,12 @@ export async function runFullPipeline(week?: string) {
 
     let publication: Awaited<ReturnType<typeof publishLeaderboards>> | null = null;
     if (canPublishToBlob()) {
-      publication = await timedStage("publishing", () => publishLeaderboards(w));
-      await timedStage("public_smoke_check", () => verifyPublicCategoryPage(w));
+      publication = await timedStage("publishing", () =>
+        publishLeaderboards(w, { updateLatest: options.publishLatest })
+      );
+      if (options.publishLatest ?? true) {
+        await timedStage("public_smoke_check", () => verifyPublicCategoryPage(w));
+      }
     } else {
       console.warn(
         "[7/7] Blob credentials missing; skipped publishing snapshots (need BLOB_READ_WRITE_TOKEN or Vercel Blob connection)"

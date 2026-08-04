@@ -34,9 +34,18 @@ const RAW_ENTITY_RULES: Record<string, EntityRule> = {
   ibm: { type: "company", rankingEnabled: false },
   xai: { type: "company", rankingEnabled: false },
   adobe: { type: "company", rankingEnabled: false },
+  "black forest labs": { type: "company", rankingEnabled: false },
+  "stability ai": { type: "company", rankingEnabled: false },
+  github: { type: "company", rankingEnabled: false, parent: "Microsoft" },
   sap: { type: "company", rankingEnabled: false },
   oracle: { type: "company", rankingEnabled: false },
   salesforce: { type: "product", rankingEnabled: true },
+  "google ai": { type: "platform", rankingEnabled: false, parent: "Google" },
+  "amazon web services (aws) ai": {
+    type: "platform",
+    rankingEnabled: false,
+    parent: "Amazon",
+  },
   "power automate": { type: "product", rankingEnabled: true, parent: "Microsoft" },
 
   // --- Platforms / cloud (not consumer-facing products in GEO sense) ---
@@ -77,7 +86,7 @@ const RAW_ENTITY_RULES: Record<string, EntityRule> = {
   "github copilot": {
     type: "product",
     rankingEnabled: true,
-    parent: "Microsoft",
+    parent: "GitHub",
   },
   "copilot studio": {
     type: "product",

@@ -13,6 +13,12 @@ export function SiteFooter() {
         </div>
         <div className="flex items-center gap-6 text-sm">
           <Link
+            href="/rankings"
+            className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+          >
+            Rankings
+          </Link>
+          <Link
             href="/methodology"
             className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
           >
