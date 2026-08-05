@@ -60,15 +60,12 @@ The ranking pipeline runs weekly and publishes static leaderboard snapshots.
 
 | Document | Description |
 |----------|-------------|
-| [docs/prd/PRD-phase-1.md](./docs/prd/PRD-phase-1.md) | Implemented Phase 1 scope |
-| [docs/architecture.md](./docs/architecture.md) | System architecture and data flow |
-| [docs/setup.md](./docs/setup.md) | Environment, database, and deploy |
-| [docs/operations.md](./docs/operations.md) | Pipeline, publish, cron, and operations |
-| [docs/data-pipeline.md](./docs/data-pipeline.md) | Detailed pipeline design |
-| [docs/review-queue.md](./docs/review-queue.md) | Review workflow |
-| [docs/seo.md](./docs/seo.md) | Technical SEO and SEO backlog |
-| [docs/prd/PRD-phase-2.md](./docs/prd/PRD-phase-2.md) | Current Phase 2 roadmap |
-| [docs/prd/PRD-phase-next.md](./docs/prd/PRD-phase-next.md) | Future backlog |
+| [docs/README.md](./docs/README.md) | Docs index |
+| [docs/prd/phase-3/PRD-phase-3.md](./docs/prd/phase-3/PRD-phase-3.md) | Phase 3 PRD |
+| [docs/prd/phase-3/technical.md](./docs/prd/phase-3/technical.md) | Phase 3 technical design |
+| [docs/engineering/architecture.md](./docs/engineering/architecture.md) | System architecture and data flow |
+| [docs/ops/setup.md](./docs/ops/setup.md) | Environment, database, and deploy |
+| [docs/ops/operations.md](./docs/ops/operations.md) | Pipeline, publish, cron, and operations |
 
 ## Quick Start
 
@@ -84,7 +81,7 @@ npm install
 cp .env.example .env
 ```
 
-Fill in the required variables (see [docs/setup.md](./docs/setup.md)).
+Fill in the required variables (see [docs/ops/setup.md](./docs/ops/setup.md)).
 
 ### Database
 
@@ -126,7 +123,7 @@ After processing:
 - Snapshots are uploaded to Vercel Blob
 - Frontend loads static leaderboard JSON
 
-Details: [docs/operations.md](./docs/operations.md)
+Details: [docs/ops/operations.md](./docs/ops/operations.md)
 
 ## SEO
 
@@ -139,7 +136,7 @@ Production checklist:
 - Metadata configured
 - Indexing requested
 
-See [docs/seo.md](./docs/seo.md)
+See [docs/engineering/seo.md](./docs/engineering/seo.md)
 
 ## License
 

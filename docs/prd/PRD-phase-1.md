@@ -4,6 +4,13 @@
 >
 > 最后核对：2026-07-31
 
+| 字段 | 内容 |
+|------|------|
+| 产品 | GEO Radar |
+| 阶段 | Phase 1 |
+| 版本 | v1.1 |
+| 文档 | 中文 · 网站英文 |
+
 ## 产品范围
 
 GEO Radar 每周使用固定英文 prompt 询问 ChatGPT、Gemini 和 Grok，从 AI 回答中动态提取被推荐的产品和品牌，并按品类发布 Top 20 AI Visibility Rankings。
@@ -41,7 +48,7 @@ GEO Radar 每周使用固定英文 prompt 询问 ChatGPT、Gemini 和 Grok，从
 
 ## 参考文档
 
-- [系统架构](../architecture.md)
-- [数据管道](../data-pipeline.md)
-- [Review Queue](../review-queue.md)
-- [运维文档](../operations.md)
+- [系统架构](../engineering/architecture.md)
+- [数据管道](../engineering/data-pipeline.md)
+- [Review Queue](../ops/review-queue.md)
+- [运维文档](../ops/operations.md)

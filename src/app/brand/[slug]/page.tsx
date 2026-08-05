@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { BrandTrendCharts } from "@/components/brand-trend-charts";
+import { getBrandCategoryHistories } from "@/lib/brand-history";
 import { getBrandIndex, getPublishedBrandPage, type BrandPageData } from "@/lib/brand-page";
 import { CATEGORY_SLUG_MAP } from "@/lib/categories";
 import { CATEGORY_CARDS } from "@/lib/category-cards";
@@ -141,8 +143,10 @@ function EngineBadge({ engine, rank, score }: { engine: string; rank: number; sc
 
 function CategoryCard({
   category,
+  history,
 }: {
   category: { slug: string; rank: number; score: number; mentionFrequency: number; engines: Record<string, { rank: number; score: number }> };
+  history?: { week: string; weekDate: string; rank: number; score: number }[];
 }) {
   const categoryName = CATEGORY_SLUG_MAP[category.slug] ?? category.slug;
   const engineEntries = ENGINES
@@ -186,6 +190,8 @@ function CategoryCard({
           ))}
         </div>
       )}
+
+      {history && <BrandTrendCharts points={history} />}
     </div>
   );
 }
@@ -193,8 +199,15 @@ function CategoryCard({
 export default async function BrandPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { from } = await searchParams;
-  const data = await getBrandPage(slug);
+  const [data, histories] = await Promise.all([
+    getBrandPage(slug),
+    getBrandCategoryHistories(slug),
+  ]);
   if (!data) notFound();
+
+  const historyByCategory = Object.fromEntries(
+    histories.map((entry) => [entry.categorySlug, entry.points])
+  );
 
   const backTarget = getValidBrandBackTarget(from);
   const backCategorySlug = backTarget?.pathname.split("/")[2] ?? "";
@@ -274,7 +287,11 @@ export default async function BrandPage({ params, searchParams }: Props) {
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               {categoryList.map((cat) => (
-                <CategoryCard key={cat.slug} category={cat} />
+                <CategoryCard
+                  key={cat.slug}
+                  category={cat}
+                  history={historyByCategory[cat.slug]}
+                />
               ))}
             </div>
           </div>

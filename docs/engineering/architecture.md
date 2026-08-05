@@ -35,9 +35,9 @@ AI 回答
 
 ## 相关文档
 
-- [Getting Started](./setup.md)：环境、本地开发和部署
-- [Operations](./operations.md)：周更、Cron、发布和故障处理
-- [Review Queue](./review-queue.md)：品牌审核操作
-- [Phase 1 PRD](./prd/PRD-phase-1.md)：已实现范围
-- [Phase 2 PRD](./prd/PRD-phase-2.md)：当前阶段规划
-- [Next PRD](./prd/PRD-phase-next.md)：后续 backlog
+- [Getting Started](../ops/setup.md)：环境、本地开发和部署
+- [Operations](../ops/operations.md)：周更、Cron、发布和故障处理
+- [Review Queue](../ops/review-queue.md)：品牌审核操作
+- [Phase 1 PRD](../prd/PRD-phase-1.md)：已实现范围
+- [Phase 2 PRD](../prd/PRD-phase-2.md)：已实现范围
+- [Phase 3 PRD](../prd/phase-3/PRD-phase-3.md) · [技术文档](../prd/phase-3/technical.md)：当前阶段

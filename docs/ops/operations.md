@@ -111,6 +111,6 @@ curl -X POST "https://georadar.website/api/pipeline-alert-test" \
 
 ## 相关文档
 
-- [data-pipeline.md](./data-pipeline.md) — 管道设计细节
+- [data-pipeline.md](../engineering/data-pipeline.md) — 管道设计细节
 - [review-queue.md](./review-queue.md) — Review Queue 操作说明
-- [seo.md](./seo.md) — 技术 SEO 检查与 SEO backlog
+- [seo.md](../engineering/seo.md) — 技术 SEO 检查与 SEO backlog

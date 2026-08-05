@@ -1,16 +1,17 @@
 # Roadmap：GEO Radar（第二阶段）
 
-> 当前阶段规划，不是已实现规范。已实现见 [PRD-phase-1.md](./PRD-phase-1.md)，backlog 见 [PRD-phase-next.md](./PRD-phase-next.md)。
+> 本文档记录第二阶段已实现的功能，不再作为后续需求清单。下一阶段见 [PRD-phase-3.md](./phase-3/PRD-phase-3.md)。
 
 | 字段 | 内容 |
 |------|------|
 | 产品 | GEO Radar |
 | 阶段 | Phase 2 |
+| 版本 | v1.2 |
 | 文档 | 中文 · 网站英文 |
 
 ## 目标与顺序
 
-在稳定周更上完善实体信息、历史周、排名变化，并交付 Brand Page v1。
+在稳定周更上完善实体信息、历史周、排名变化，并交付 Brand Page v1（**v1.2**）。
 
 ```text
 P0-A ✅ 产品归属公司
@@ -18,7 +19,7 @@ P0-B ✅ 历史周榜
 P1 ✅ 排名变化 + Biggest Movers + Brand Page v1
 ```
 
-后续（趋势图、Similar Brands、商业化等）见 phase-next。
+后续（趋势图、Similar Brands、商业化等）见 phase-3。
 
 历史周要回答：谁涨谁跌、是否连续上榜、品类可见性是否稳定。不做复杂时间轴仪表盘。
 
@@ -30,7 +31,7 @@ P1 ✅ 排名变化 + Biggest Movers + Brand Page v1
 - 产品独立计分；所属公司仅展示，不合并排名。
 - 每个产品最多一个 `parent_brand_id`；无法确认则空。
 - 历史快照保留发布时的展示值；关系变更只影响新周。
-- 公司聚合能力在 phase-next。
+- 公司聚合能力在 phase-3。
 
 **Brand Page 分数**
 - 按 Category 展示 Rank / Score / 引擎分项 / Mention Frequency。
@@ -110,7 +111,7 @@ URL：`/brand/:slug`（如 `/brand/openai`）。
 
 **门槛**
 - Layer A（可访问 v1）：≥1 个有效发布周 + 最新周可读 + 能生成事实摘要 → `noindex`
-- Layer B（趋势 / SEO）：连续 4 周 → 规则在 phase-next
+- Layer B（趋势 / SEO）：连续 4 周 → 规则在 phase-3
 
 **数据契约**
 
@@ -179,5 +180,5 @@ P1 Brand Page → slug + brand 周快照 + Category 链接
 
 ## 文档规则
 
-- 已实现 → phase-1 · 当前开发 → 本文件 · 未排期 → phase-next
+- v1.1 → phase-1 · v1.2 → phase-2 · v1.3（开发中）→ phase-3 · 未排期 → phase-next
 - 同一需求只保留一处主定义

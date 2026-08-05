@@ -78,13 +78,15 @@ async function collectOne(job: CollectionJob, week: string) {
 export async function collectCategory(
   category: string,
   week?: string,
-  deadline?: number
+  deadline?: number,
+  onlyEngine?: Engine
 ) {
   const w = week ?? getCurrentWeek();
   const prompts = await prisma.prompt.findMany({
     where: { category, active: true },
   });
-  const jobs: CollectionJob[] = ENGINES.flatMap((engine) =>
+  const engines = onlyEngine ? [onlyEngine] : [...ENGINES];
+  const jobs: CollectionJob[] = engines.flatMap((engine) =>
     prompts.map((prompt) => ({
       category,
       engine,

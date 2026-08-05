@@ -1,6 +1,6 @@
 # Phase 2 上线前准备
 
-对照 `docs/prd/PRD-phase-2.md`。功能验收清单见 [phase-2-manual-qa.md](./phase-2-manual-qa.md)。
+对照 [PRD-phase-2.md](../prd/PRD-phase-2.md)。功能验收清单见 [phase-2-manual-qa.md](./phase-2-manual-qa.md)。
 
 当前数据面（本地 env 已验证）：
 

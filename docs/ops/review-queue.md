@@ -1,6 +1,6 @@
 # Review Queue 操作指南
 
-> 本文档只负责审核操作。品牌规范化和整体数据流见 [architecture.md](./architecture.md)，周更编排见 [operations.md](./operations.md)。
+> 本文档只负责审核操作。品牌规范化和整体数据流见 [architecture.md](../engineering/architecture.md)，周更编排见 [operations.md](./operations.md)。
 
 每周 pipeline 跑完后，未匹配到的品牌会**自动新建并参与当周计分**，同时写入 `brand_review_queue`（`status=pending`）。
 

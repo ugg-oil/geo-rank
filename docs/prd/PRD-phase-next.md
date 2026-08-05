@@ -1,28 +1,53 @@
 # GEO Radar：后续规划
 
-> 本文档收纳当前未实现、且没有纳入 Phase 2 的后续规划。
+> 本文档收纳尚未纳入 Phase 3 的后续规划。
+>
+> 已实现见 [PRD-phase-1.md](./PRD-phase-1.md)、[PRD-phase-2.md](./PRD-phase-2.md)，当前开发见 [PRD-phase-3.md](./phase-3/PRD-phase-3.md)。
 
-## 1. Brand Page 后续版本
+| 字段 | 内容 |
+|------|------|
+| 产品 | GEO Radar |
+| 阶段 | Phase Next（未排期） |
+| 文档 | 中文 · 网站英文 |
 
-待 Brand Page v1 稳定后，扩展：
+## AI 引擎扩展（phase-3 之后）
 
-- Rank History 和 Score History 趋势图。
-- 最近 30 天变化和 `Rising / Stable / Declining` 趋势标签。
-- Similar Brands，依据同一 Category、排名接近、引擎分布相似和共同出现关系生成。
-- 展示品牌在多个 Category 的分数和跨品类比较。
-- 更完整的 Why recommends 分析。
-- 满足数据门槛后开放 Brand Page SEO 索引。
+Phase 3 规划接入 Perplexity、Claude、DeepSeek（见 [PRD-phase-3.md](./phase-3/PRD-phase-3.md) P0）。验证本阶段新引擎的接入成本和 pipeline 稳定性后，再评估：
 
-## 2. 内容传播扩展
+- Microsoft Copilot 接入。
+- Kimi 接入。
+
+沿用 [phase-3 技术文档](./phase-3/technical.md) 的接入要求（staging/fixture、干跑、当周达标即计分、成本预估），不重新定义一套流程。
+
+## 品牌监测与商业化（phase-3 之后）
+
+Phase 3 仅落地 `Track Your Brand` 表单与线索入库（P3-1）。待线索验证有真实需求后，再启动：
+
+- 持续品牌监测。
+- 自定义品牌与竞品追踪。
+- GEO Audit 结构化报告。
+- 邮件 / webhook 通知（邮件优先）。
+- 付费分层、权限模型与团队配额。
+
+## 高级分析（phase-3 之后）
+
+依赖 phase-3 P0（多引擎）与 P1（Brand Page 增强）主链路数据稳定后再评估，探索性质强，暂不排期：
+
+- 任意时间范围筛选（周粒度）。
+- prompt / use-case 维度分析。
+- 推荐理由来源追踪与证据展示。
+- 模型间推荐差异的规则化自动解释。
+
+## 内容传播扩展
 
 在 Phase 2 手工验证周报价值后，扩展为：
 
-- 自动生成 AI Visibility Weekly Report。
-- 自动整理 Top Gainers、Top Losers 和 New Entries。
-- 自动生成 ChatGPT、Gemini、Grok 推荐差异。
-- 自动生成 X、LinkedIn、Reddit 和 Hacker News 发布素材。
+- P1-1：每周自动生成结构化 AI Visibility Weekly Report，含各品类摘要、关键变化与数据周期说明。
+- P1-2：从周榜快照自动提取 Top Gainers、Top Losers、New Entries，作为周报模块与独立摘要输出。
+- P1-3：自动生成 ChatGPT、Gemini、Grok 之间的推荐差异分析，统一术语与文案结构。
+- P1-4：基于周报内容生成 X、LinkedIn、Reddit、Hacker News 发布素材；支持预览与人工审核后发布。
 
-## 3. 覆盖范围扩展
+## 覆盖范围扩展
 
 在 Brand Page 和现有周更流程稳定后，再评估增加：
 
@@ -32,42 +57,9 @@
 - Education / Courses
 - Design Tools
 
-## 4. AI 引擎扩展
+---
 
-在新增引擎具备稳定采集、质量检查和独立解释口径后，再评估增加：
+## 文档规则
 
-- Perplexity
-- Claude
-- DeepSeek
-
-新增引擎需要同步评估评分权重、Model Coverage 分母、发布门槛和历史数据兼容性。
-
-## 5. 公司聚合能力
-
-在产品榜和 Brand Page 数据稳定后，可增加独立的 Company Visibility 页面：
-
-- 展示公司旗下产品的整体 AI 推荐曝光。
-- 公司聚合榜不替代产品 Top 20。
-- 产品仍保持独立实体、独立排名和独立分数。
-
-## 6. 品牌监测与商业化
-
-在 Phase 2 的 `Track Your Brand` CTA 验证用户需求后，再评估：
-
-```text
-Track Your Brand
-Get GEO Audit
-```
-
-- 持续品牌监测
-- 自定义品牌和竞品追踪
-- GEO Audit
-- 邮件或 webhook 通知
-- 付费报告和团队功能
-
-## 7. 高级分析
-
-- 任意时间范围筛选。
-- 更细粒度的 prompt 和 use-case 分析。
-- 推荐理由的来源追踪和证据展示。
-- 模型间推荐差异的自动解释。
+- 已实现 → phase-1、phase-2 · 当前开发 → phase-3 · 未排期 → 本文件
+- 同一需求只保留一处主定义

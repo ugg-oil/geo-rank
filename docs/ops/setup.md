@@ -1,6 +1,6 @@
 # Setup
 
-环境、数据库与部署配置。产品介绍见 [README.md](../README.md)，周更运维见 [operations.md](./operations.md)。
+环境、数据库与部署配置。产品介绍见 [README.md](../../README.md)，周更运维见 [operations.md](./operations.md)。
 
 ## 环境变量
 
