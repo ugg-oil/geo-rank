@@ -21,6 +21,7 @@ export interface BrandPageData {
   name: string;
   parentCompany: string | null;
   updatedAt: string;
+  collectedEngines?: string[];
   categories: BrandPageCategoryEntry[];
 }
 

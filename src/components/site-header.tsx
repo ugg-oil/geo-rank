@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
+import { LocaleToggle } from "@/components/locale-toggle";
 import { SiteNav } from "@/components/site-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -16,9 +17,12 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-4 sm:gap-5">
+        <div className="flex items-center gap-3 sm:gap-4">
           <SiteNav />
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LocaleToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>

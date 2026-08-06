@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useI18n } from "@/lib/i18n/use-i18n";
 
 type Theme = "light" | "dark";
 
@@ -42,12 +43,13 @@ function applyTheme(theme: Theme) {
 
 export function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const { m } = useI18n();
 
   function toggleTheme() {
     applyTheme(theme === "dark" ? "light" : "dark");
   }
 
-  const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  const label = theme === "dark" ? m.theme.toLight : m.theme.toDark;
 
   return (
     <button

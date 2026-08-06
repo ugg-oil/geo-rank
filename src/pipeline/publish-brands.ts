@@ -1,9 +1,11 @@
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
+import { COLLECTION_ENGINES, SCORING_VERSION } from "@/lib/constants";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
 import { canPublishToBlob, blobPutOptions } from "@/lib/blob-publish";
 import { logPipelineEvent } from "@/lib/pipeline-observability";
+import { publishCompanyPages } from "@/pipeline/publish-companies";
 import type { BrandPageData, BrandPageCategoryEntry, BrandPageEngineEntry } from "@/lib/brand-page";
 
 /**
@@ -108,12 +110,13 @@ export async function buildBrandPages(week: string) {
 
     brandPages.push({
       schemaVersion: 1,
-      scoringVersion: 1,
+      scoringVersion: SCORING_VERSION,
       week,
       slug,
       name: displayName,
       parentCompany: info.parentCompany,
       updatedAt: new Date().toISOString().split("T")[0],
+      collectedEngines: [...COLLECTION_ENGINES],
       categories,
     });
   }
@@ -159,4 +162,6 @@ export async function publishBrandPages(week: string) {
     week,
     brandCount: brandPages.length,
   });
+
+  await publishCompanyPages(week, brandPages);
 }

@@ -2,18 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const LINKS = [
-  { href: "/rankings", label: "Rankings", match: (path: string) => path === "/rankings" || path.startsWith("/category/") },
-  { href: "/methodology", label: "Methodology", match: (path: string) => path === "/methodology" },
-] as const;
+import { useI18n } from "@/lib/i18n/use-i18n";
 
 export function SiteNav() {
   const pathname = usePathname();
+  const { m } = useI18n();
+
+  const links = [
+    {
+      href: "/rankings",
+      label: m.nav.rankings,
+      match: (path: string) => path === "/rankings" || path.startsWith("/category/"),
+    },
+    {
+      href: "/methodology",
+      label: m.nav.methodology,
+      match: (path: string) => path === "/methodology",
+    },
+  ] as const;
 
   return (
     <nav className="flex items-center gap-4 sm:gap-5">
-      {LINKS.map((link) => {
+      {links.map((link) => {
         const active = link.match(pathname);
         return (
           <Link
