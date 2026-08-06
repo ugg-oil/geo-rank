@@ -1,5 +1,8 @@
 "use client";
 
+import { formatWeekLabel } from "@/lib/i18n/messages";
+import { useI18n } from "@/lib/i18n/use-i18n";
+
 type Props = {
   slug: string;
   week: string;
@@ -8,6 +11,7 @@ type Props = {
 };
 
 export function WeekSelector({ slug, week, availableWeeks, engine }: Props) {
+  const { m } = useI18n();
   if (availableWeeks.length === 0) return null;
 
   const latest = availableWeeks[0]?.replace("Week of ", "");
@@ -15,7 +19,7 @@ export function WeekSelector({ slug, week, availableWeeks, engine }: Props) {
 
   return (
     <label className="relative inline-flex shrink-0 items-center">
-      <span className="sr-only">Change ranking week</span>
+      <span className="sr-only">{m.common.changeWeek}</span>
       <select
         value={current}
         onChange={(event) => {
@@ -28,7 +32,7 @@ export function WeekSelector({ slug, week, availableWeeks, engine }: Props) {
       >
         {availableWeeks.map((item) => (
           <option key={item} value={item.replace("Week of ", "")}>
-            {item}
+            {formatWeekLabel(m, item)}
           </option>
         ))}
       </select>

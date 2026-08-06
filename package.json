@@ -15,6 +15,7 @@
     "pipeline": "npx tsx src/scripts/run-pipeline.ts",
     "pipeline:health": "npx tsx src/scripts/check-pipeline-health.ts",
     "pipeline:fixtures": "npx tsx src/scripts/verify-pipeline-fixtures.ts",
+    "pipeline:estimate-cost": "npx tsx src/scripts/estimate-engine-cost.ts",
     "audit:entities": "npx tsx src/scripts/audit-entities.ts",
     "migrate:entities": "npx tsx src/scripts/migrate-entity-audit.ts",
     "review:export": "npx tsx src/scripts/review-export.ts",
@@ -23,6 +24,7 @@
     "reprocess": "npx tsx src/scripts/reprocess-week.ts",
     "backfill": "npx tsx src/scripts/backfill-history.ts",
     "retry-category": "npx tsx src/scripts/retry-category.ts",
+    "collect-engine": "npx tsx src/scripts/collect-engine.ts",
     "publish": "npx tsx src/scripts/publish-leaderboards.ts"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
-import { collectAll } from "./collect";
+import { COLLECTION_ENGINES } from "@/lib/constants";
+import { collectEngine } from "./collect";
 import { extractWeek } from "./extract";
 import { normalizeWeek } from "./normalize";
 import { consolidateBrands } from "./consolidate";
@@ -10,6 +11,7 @@ import { getCurrentWeek } from "@/lib/week";
 import { prisma } from "@/lib/db";
 import {
   PipelineTimeoutError,
+  PIPELINE_COLLECTION_TIMEOUT_MS,
   PIPELINE_RUN_STALE_TIMEOUT_MS,
   PIPELINE_STAGE_TIMEOUT_MS,
 } from "@/lib/pipeline-timeouts";
@@ -70,7 +72,14 @@ export async function runFullPipeline(
   };
 
   try {
-    const collectResults = await timedStage("collecting", () => collectAll(w));
+    const collectResults: string[] = [];
+    for (const engine of COLLECTION_ENGINES) {
+      const batch = await timedStage(`collecting:${engine}`, () => {
+        const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
+        return collectEngine(w, engine, deadline);
+      });
+      collectResults.push(...batch);
+    }
     const collectedCount = await prisma.response.count({
       where: { week: w, status: "ok" },
     });

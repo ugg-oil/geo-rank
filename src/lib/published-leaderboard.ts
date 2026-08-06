@@ -1,4 +1,4 @@
-import type { CategoryBoardsData, LeaderboardRow } from "@/lib/leaderboard";
+import type { CategoryBoardsData, LeaderboardRow } from "@/lib/leaderboard-data";
 import { getCurrentWeek } from "@/lib/week";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
 import { toBrandSlug } from "@/lib/brand-slug";
@@ -8,6 +8,10 @@ export type PublishedLeaderboardManifest = {
   week?: string;
   publishedAt?: string;
   boards?: Record<string, string>;
+  scoringVersion?: number;
+  collectedEngines?: string[];
+  scoringEngineUnion?: string[];
+  promptCount?: number;
 };
 export type PublishedLeaderboardIndex = { version?: number; weeks?: string[] };
 

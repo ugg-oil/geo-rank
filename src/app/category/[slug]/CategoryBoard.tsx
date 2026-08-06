@@ -2,21 +2,20 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ENGINES } from "@/lib/constants";
-import type { CategoryBoardsData } from "@/lib/leaderboard";
+import { toBrandSlug } from "@/lib/brand-slug";
+import { engineLabel, formatEngineList } from "@/lib/constants";
+import { useI18n } from "@/lib/i18n/use-i18n";
+import { inferCollectedEngines, type CategoryBoardsData } from "@/lib/leaderboard-data";
 import { getRankDelta, type RankDelta } from "@/lib/rank-change";
 
-type TabKey = "overall" | (typeof ENGINES)[number];
-
-function engineLabel(e: string) {
-  return e === "chatgpt" ? "ChatGPT" : e === "gemini" ? "Gemini" : "Grok";
-}
+type TabKey = string;
 
 function DeltaBadge({ delta }: { delta: RankDelta }) {
+  const { m } = useI18n();
   if (delta.kind === "new")
     return (
       <span className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--card-hover)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-        NEW
+        {m.common.new}
       </span>
     );
   if (delta.kind === "up")
@@ -34,6 +33,8 @@ type Props = {
 };
 
 export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props) {
+  const { m } = useI18n();
+  const collectedEngines = inferCollectedEngines(data);
   const [tab, setTab] = useState<TabKey>(initialTab);
 
   const sourceParams = new URLSearchParams();
@@ -55,20 +56,27 @@ export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props)
     [availableWeeks, data.week, slug]
   );
 
-  const view = data.boards[tab];
+  const view = data.boards[tab] ?? { snapshots: [], prevRanks: {}, hasPrevWeekData: false };
   const isOverall = tab === "overall";
+  const hasAnyBoardData = Object.values(data.boards).some((board) => board.snapshots.length > 0);
 
   function deltaFor(brandId: string, currentRank: number): RankDelta {
     return getRankDelta(currentRank, view.prevRanks, brandId, view.hasPrevWeekData);
   }
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "overall", label: "Overall" },
-    ...ENGINES.map((e) => ({ key: e, label: engineLabel(e) })),
+    { key: "overall", label: m.common.overall },
+    ...collectedEngines.map((engine) => ({ key: engine, label: engineLabel(engine) })),
   ];
 
   return (
     <>
+      {data.coverageExpansion && data.coverageExpansion.length > 0 && (
+        <p className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+          {m.category.coverageExpansion(formatEngineList(data.coverageExpansion))}
+        </p>
+      )}
+
       <div className="mb-8 flex flex-wrap gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] p-1">
         {tabs.map(({ key, label }) => (
           <button
@@ -88,9 +96,13 @@ export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props)
 
       {view.snapshots.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] py-24 text-center">
-          <p className="text-base font-medium text-[var(--text-secondary)]">No data available yet</p>
+          <p className="text-base font-medium text-[var(--text-secondary)]">{m.common.noData}</p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Rankings will appear after the first weekly collection.
+            {!hasAnyBoardData
+              ? m.category.emptyNone
+              : isOverall
+                ? m.category.emptyOverall
+                : m.category.emptyEngine}
           </p>
         </div>
       ) : (
@@ -103,27 +115,27 @@ export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props)
                     #
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Product
+                    {m.common.product}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Company
+                    {m.common.company}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Score
+                    {m.common.score}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Appearance
+                    {m.common.appearance}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Avg Rank
+                    {m.common.avgRank}
                   </th>
                   {isOverall && (
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                      Coverage
+                      {m.common.coverage}
                     </th>
                   )}
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                    Δ
+                    {m.common.delta}
                   </th>
                 </tr>
               </thead>
@@ -131,7 +143,7 @@ export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props)
                 {view.snapshots.map((s) => (
                   <tr
                     key={s.id}
-                    className="border-b border-[var(--border)] bg-[var(--card)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)]"
+                    className="group border-b border-[var(--border)] bg-[var(--card)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)]"
                   >
                     <td
                       className={`px-4 py-3.5 font-mono ${
@@ -145,13 +157,22 @@ export function CategoryBoard({ slug, data, initialTab, availableWeeks }: Props)
                     <td className="px-4 py-3.5">
                       <Link
                         href={`/brand/${s.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
-                        className="font-medium text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+                        className="font-medium text-[var(--text)] underline decoration-[var(--border)] underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)] group-hover:decoration-[var(--border-hover)]"
                       >
                         {s.brandName}
                       </Link>
                     </td>
-                    <td className="px-4 py-3.5 text-[var(--text-secondary)]">
-                      {s.parentCompanyName ?? "—"}
+                    <td className="px-4 py-3.5">
+                      {s.parentCompanyName ? (
+                        <Link
+                          href={`/company/${toBrandSlug(s.parentCompanyName)}`}
+                          className="text-[var(--text-secondary)] underline decoration-transparent underline-offset-[3px] transition-colors hover:text-[var(--text)] hover:decoration-[var(--text-muted)] group-hover:text-[var(--text)] group-hover:decoration-[var(--border-hover)]"
+                        >
+                          {s.parentCompanyName}
+                        </Link>
+                      ) : (
+                        <span className="text-[var(--text-secondary)]">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-right font-mono font-medium">{s.score.toFixed(1)}</td>
                     <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">

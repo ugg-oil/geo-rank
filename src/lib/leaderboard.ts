@@ -1,37 +1,19 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
-import { ENGINES } from "@/lib/constants";
+import { COLLECTION_ENGINES, SCORING_VERSION } from "@/lib/constants";
+import { coverageExpansionEngines } from "@/lib/engine-scoring";
+import {
+  type CategoryBoardsData,
+  type LeaderboardView,
+} from "@/lib/leaderboard-data";
 import { getCurrentWeek, getPreviousWeek } from "@/lib/week";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
 import { toBrandSlug } from "@/lib/brand-slug";
 
+export type { CategoryBoardsData, LeaderboardRow, LeaderboardView } from "@/lib/leaderboard-data";
+export { inferCollectedEngines, inferScoringEngines } from "@/lib/leaderboard-data";
+
 const REVALIDATE_SECONDS = 300;
-
-export type LeaderboardRow = {
-  id: string;
-  rank: number;
-  brandId: string;
-  brandName: string;
-  /** URL-safe slug for the brand page (e.g. "github-copilot"). */
-  brandSlug: string;
-  /** Confirmed parent company at the time this leaderboard was published. */
-  parentCompanyName?: string | null;
-  score: number;
-  appearanceRate: number;
-  avgRank: number;
-  modelCoverage: number | null;
-};
-
-export type LeaderboardView = {
-  snapshots: LeaderboardRow[];
-  prevRanks: Record<string, number>;
-  hasPrevWeekData: boolean;
-};
-
-export type CategoryBoardsData = {
-  week: string;
-  boards: Record<string, LeaderboardView>;
-};
 
 async function fetchLeaderboard(
   week: string,
@@ -114,8 +96,8 @@ export async function getAllCategoryLeaderboards(
 
   return unstable_cache(
     async () => {
-      const keys = ["overall", ...ENGINES] as const;
-      const engineValues: (string | null)[] = [null, ...ENGINES];
+      const keys = ["overall", ...COLLECTION_ENGINES] as const;
+      const engineValues: (string | null)[] = [null, ...COLLECTION_ENGINES];
 
       const results = await Promise.all(
         engineValues.map((engine) =>
@@ -128,7 +110,21 @@ export async function getAllCategoryLeaderboards(
         boards[key] = toLeaderboardView(results[i]);
       });
 
-      return { week, boards };
+      const scoringEngines = COLLECTION_ENGINES.filter(
+        (engine) => boards[engine].snapshots.length > 0
+      );
+      const previousScoringEngines = COLLECTION_ENGINES.filter(
+        (_engine, index) => results[index + 1]?.prevSnapshots.length > 0
+      );
+
+      return {
+        week,
+        scoringVersion: SCORING_VERSION,
+        collectedEngines: [...COLLECTION_ENGINES],
+        scoringEngines,
+        coverageExpansion: coverageExpansionEngines(scoringEngines, previousScoringEngines),
+        boards,
+      };
     },
     ["category-all-boards", week, category],
     { revalidate: REVALIDATE_SECONDS, tags: [`leaderboard-${week}`] }

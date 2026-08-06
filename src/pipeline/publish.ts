@@ -2,9 +2,15 @@ import { put } from "@vercel/blob";
 import { canPublishToBlob, blobPutOptions } from "@/lib/blob-publish";
 import { prisma } from "@/lib/db";
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
-import { CATEGORIES, ENGINES } from "@/lib/constants";
+import {
+  CATEGORIES,
+  COLLECTION_ENGINES,
+  SCORING_VERSION,
+  weeklyPromptCount,
+} from "@/lib/constants";
+import { coverageExpansionEngines } from "@/lib/engine-scoring";
 import { getPreviousWeek } from "@/lib/week";
-import type { CategoryBoardsData, LeaderboardRow, LeaderboardView } from "@/lib/leaderboard";
+import type { CategoryBoardsData, LeaderboardRow, LeaderboardView } from "@/lib/leaderboard-data";
 import { assessPublishedManifest, type PublicationResult } from "@/lib/pipeline-health";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
@@ -33,7 +39,7 @@ async function buildCategory(category: string, week: string): Promise<CategoryBo
   ]);
 
   const boards: Record<string, LeaderboardView> = {};
-  for (const key of ["overall", ...ENGINES]) {
+  for (const key of ["overall", ...COLLECTION_ENGINES]) {
     const engine = key === "overall" ? null : key;
     const rows = current.filter((row) => row.engine === engine);
     const previousRows = previous.filter((row) => row.engine === engine);
@@ -62,7 +68,21 @@ async function buildCategory(category: string, week: string): Promise<CategoryBo
     };
   }
 
-  return { week, boards };
+  const scoringEngines = COLLECTION_ENGINES.filter(
+    (engine) => (boards[engine]?.snapshots.length ?? 0) > 0
+  );
+  const previousScoringEngines = [
+    ...new Set(previous.map((row) => row.engine).filter((engine): engine is string => Boolean(engine))),
+  ];
+
+  return {
+    week,
+    scoringVersion: SCORING_VERSION,
+    collectedEngines: [...COLLECTION_ENGINES],
+    scoringEngines,
+    coverageExpansion: coverageExpansionEngines(scoringEngines, previousScoringEngines),
+    boards,
+  };
 }
 
 async function verifyManifest(url: string, week: string) {
@@ -92,15 +112,26 @@ export async function publishLeaderboards(
     cacheControlMaxAge: 60,
   });
   const published: Record<string, string> = {};
+  const scoringEngineUnion = new Set<string>();
   try {
     for (const category of Object.keys(CATEGORY_TO_SLUG)) {
       const data = await buildCategory(category, week);
+      for (const engine of data.scoringEngines ?? []) scoringEngineUnion.add(engine);
       const slug = CATEGORY_TO_SLUG[category];
       const blob = await put(`leaderboards/${week}/${slug}.json`, JSON.stringify(data), jsonPut);
       published[slug] = blob.url;
     }
     const publishedAt = new Date().toISOString();
-    const manifestBody = JSON.stringify({ version: 1, week, publishedAt, boards: published });
+    const manifestBody = JSON.stringify({
+      version: 2,
+      week,
+      publishedAt,
+      boards: published,
+      scoringVersion: SCORING_VERSION,
+      collectedEngines: [...COLLECTION_ENGINES],
+      scoringEngineUnion: [...scoringEngineUnion],
+      promptCount: weeklyPromptCount(),
+    });
     const manifest = await put(`leaderboards/${week}/manifest.json`, manifestBody, jsonPut);
     const snapshotCounts = await prisma.snapshot.groupBy({
       by: ["week"],
@@ -118,7 +149,6 @@ export async function publishLeaderboards(
     await verifyManifest(manifest.url, week);
     if (latestManifest) await verifyManifest(latestManifest.url, week);
 
-    // Publish brand pages (idempotent, same week data)
     await publishBrandPages(week);
 
     const result = {

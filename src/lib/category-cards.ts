@@ -3,7 +3,7 @@ export const CATEGORY_CARDS = [
     name: "AI Tools",
     slug: "ai-tools",
     description:
-      "See which AI assistants and copilots ChatGPT, Gemini, and Grok recommend most.",
+      "See which AI assistants and copilots leading AI engines recommend most.",
   },
   {
     name: "SaaS Software",

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getOpenRouter } from "@/lib/openrouter";
-import { ENGINES, ENGINE_MODEL_SLUGS, type Engine } from "@/lib/constants";
+import { COLLECTION_ENGINES, ENGINE_MODEL_SLUGS, type Engine } from "@/lib/constants";
 import { getCurrentWeek } from "@/lib/week";
 import {
   assertBeforeDeadline,
@@ -8,6 +8,23 @@ import {
 } from "@/lib/pipeline-timeouts";
 
 const COLLECTION_CONCURRENCY = 4;
+
+function completionText(message: { content?: unknown } | undefined) {
+  const content = message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object" && "text" in part) {
+          return typeof part.text === "string" ? part.text : "";
+        }
+        return "";
+      })
+      .join("");
+  }
+  return "";
+}
 
 type CollectionJob = {
   category: string;
@@ -31,7 +48,7 @@ async function collectOne(job: CollectionJob, week: string) {
       temperature: 0.7,
     });
 
-    const rawText = completion.choices[0]?.message?.content ?? "";
+    const rawText = completionText(completion.choices[0]?.message);
     const tokenCost =
       ((completion.usage?.prompt_tokens ?? 0) +
         (completion.usage?.completion_tokens ?? 0)) *
@@ -85,7 +102,7 @@ export async function collectCategory(
   const prompts = await prisma.prompt.findMany({
     where: { category, active: true },
   });
-  const engines = onlyEngine ? [onlyEngine] : [...ENGINES];
+  const engines = onlyEngine ? [onlyEngine] : [...COLLECTION_ENGINES];
   const jobs: CollectionJob[] = engines.flatMap((engine) =>
     prompts.map((prompt) => ({
       category,
@@ -114,14 +131,22 @@ export async function collectCategory(
   return results;
 }
 
-export async function collectAll(week?: string) {
+export async function collectEngine(week: string, engine: Engine, deadline?: number) {
   const { CATEGORIES } = await import("@/lib/constants");
-  const w = week ?? getCurrentWeek();
-  const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
   const allResults: string[] = [];
   for (const category of CATEGORIES) {
-    assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
-    allResults.push(...(await collectCategory(category, w, deadline)));
+    if (deadline) assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
+    allResults.push(...(await collectCategory(category, week, deadline, engine)));
+  }
+  return allResults;
+}
+
+export async function collectAll(week?: string) {
+  const w = week ?? getCurrentWeek();
+  const allResults: string[] = [];
+  for (const engine of COLLECTION_ENGINES) {
+    const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
+    allResults.push(...(await collectEngine(w, engine, deadline)));
   }
   return allResults;
 }
