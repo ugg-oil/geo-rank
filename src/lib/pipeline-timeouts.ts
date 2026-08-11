@@ -23,9 +23,15 @@ export const PIPELINE_STAGE_TIMEOUT_MS = readPositiveInt(
   20 * 60_000
 );
 
+/**
+ * Age of last heartbeat (`pipeline_runs.updated_at`) before a `running` row is
+ * treated as dead. Keep well under a Monday of wall-clock wait: serverless cron
+ * often kills the process without writing `failed`, leaving a stuck `running`.
+ * Default 90 minutes (was 30 hours).
+ */
 export const PIPELINE_RUN_STALE_TIMEOUT_MS = readPositiveInt(
   "PIPELINE_RUN_STALE_TIMEOUT_MS",
-  30 * 60 * 60_000
+  90 * 60_000
 );
 
 export class PipelineTimeoutError extends Error {

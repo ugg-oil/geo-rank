@@ -11,7 +11,11 @@ npm run review:auto -- --apply
 
 Pipeline 完成后默认**不**写 Vercel Blob。仅当显式设置 `PUBLISH_BLOB_MIRROR=1`（且具备 `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID`）时，才将榜单镜像到 Blob（`leaderboards/*`、`brands/*`、`companies/*`）。**前台主读 PostgreSQL `snapshots`（DB-first）**；Blob 为可选镜像，跳过或失败不否定该周对前台可读。
 
-Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进 `latest`。同一周已有运行时，新的触发不会并发启动；超过 30 小时的陈旧运行会先被标记为失败。
+Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进错误发布。
+
+**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次只跑一个单位（一个引擎采集，或 extract/normalize/…/publish 之一），写回 `pipeline_runs.current_step` 并刷新 `updated_at` 心跳。同一请求可用 `after()` 自链式续跑（深度上限 12）；同时 `vercel.json` 在周一 UTC 02:00–04:30 每 15–30 分钟再触发，覆盖自链失败的情况。本地 `npm run pipeline` 仍是一次性跑完全流程。
+
+陈旧 `running` 判定看 **心跳**（`updated_at`），默认 **90 分钟**无更新即标 failed（可用 `PIPELINE_RUN_STALE_TIMEOUT_MS` 覆盖；不再用 30 小时）。
 
 每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与运行状态；缺 Blob manifest 记为 warning，不以之为硬失败。若配置完整的 Resend 邮件变量，会直发告警邮件；可选 webhook 是邮件不可用时的备用通道。
 
@@ -57,10 +61,14 @@ curl -X POST "https://georadar.website/api/publish" \
 
 ### Cron
 
+生产为**步进 tick**（非一次跑完全程）。一次调用推进一个 `current_step`；响应里 `done: false` 时会尝试 `after()` 自链。
+
 ```bash
 curl "https://georadar.website/api/cron" \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
+
+`vercel.json` 另有周一 UTC 错峰多次触发（02:00–04:30），即使自链被平台掐断也能续跑。路由 `maxDuration = 300`。
 
 鉴权失败返回 `401 Unauthorized`。
 

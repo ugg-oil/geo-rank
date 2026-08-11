@@ -128,6 +128,8 @@ model PipelineRun {
   status          String    @default("running")
   currentStep     String?   @map("current_step")
   startedAt       DateTime  @default(now()) @map("started_at")
+  /** Touched each tick / engine so stale detection survives serverless kills. */
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
   finishedAt      DateTime? @map("finished_at")
   collectedCount  Int?      @map("collected_count")
   extractedCount  Int?      @map("extracted_count")

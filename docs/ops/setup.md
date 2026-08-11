@@ -23,7 +23,7 @@ cp .env.example .env
 | `PIPELINE_COLLECTION_TIMEOUT_MS` | 采集阶段总超时，默认 20 分钟 |
 | `PIPELINE_EXTRACTION_TIMEOUT_MS` | 抽取阶段总超时，默认 20 分钟 |
 | `PIPELINE_STAGE_TIMEOUT_MS` | 规范化、分类、计分和发布等阶段超时，默认 20 分钟 |
-| `PIPELINE_RUN_STALE_TIMEOUT_MS` | 判定旧运行记录失效的时间，默认 30 小时 |
+| `PIPELINE_RUN_STALE_TIMEOUT_MS` | `running` 无心跳（`updated_at`）多久算死亡，默认 **90 分钟** |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob 写入 Token（仅 `PUBLISH_BLOB_MIRROR=1` 时需要） |
 | `BLOB_STORE_ID` | Vercel Blob Store ID（项目连接 Blob 后自动注入） |
 | `PUBLISH_BLOB_MIRROR` | 设为 `1` 才在 publish 时写 Blob；默认跳过 |
