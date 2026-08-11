@@ -1,107 +1,96 @@
 import { put } from "@vercel/blob";
-import { canPublishToBlob, blobPutOptions } from "@/lib/blob-publish";
+import {
+  blobMirrorSkipReason,
+  blobPutOptions,
+} from "@/lib/blob-publish";
 import { prisma } from "@/lib/db";
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
 import {
-  CATEGORIES,
   COLLECTION_ENGINES,
   SCORING_VERSION,
   weeklyPromptCount,
 } from "@/lib/constants";
-import { coverageExpansionEngines } from "@/lib/engine-scoring";
-import { getPreviousWeek } from "@/lib/week";
-import type { CategoryBoardsData, LeaderboardRow, LeaderboardView } from "@/lib/leaderboard-data";
+import { buildCategoryBoardsFromDb } from "@/lib/leaderboard";
 import { assessPublishedManifest, type PublicationResult } from "@/lib/pipeline-health";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
-import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
-import { toBrandSlug } from "@/lib/brand-slug";
 import { publishBrandPages } from "@/pipeline/publish-brands";
 
-async function buildCategory(category: string, week: string): Promise<CategoryBoardsData> {
-  const prevWeek = getPreviousWeek(week);
-  const [current, previous] = await Promise.all([
-    prisma.snapshot.findMany({
-      where: { week, category },
-      orderBy: { rank: "asc" },
-      include: {
-        brand: {
-          select: {
-            canonicalName: true,
-            parentBrand: { select: { canonicalName: true } },
-          },
-        },
-      },
-    }),
-    prisma.snapshot.findMany({
-      where: { week: prevWeek, category },
-      select: { engine: true, brandId: true, rank: true },
-    }),
-  ]);
-
-  const boards: Record<string, LeaderboardView> = {};
-  for (const key of ["overall", ...COLLECTION_ENGINES]) {
-    const engine = key === "overall" ? null : key;
-    const rows = current.filter((row) => row.engine === engine);
-    const previousRows = previous.filter((row) => row.engine === engine);
-    const snapshots: LeaderboardRow[] = rows.map((row) => {
-      const brandName = getProductDisplayName(row.brand.canonicalName);
-      return {
-        id: row.id,
-        rank: row.rank,
-        brandId: row.brandId,
-        brandName,
-        brandSlug: toBrandSlug(brandName),
-        parentCompanyName: getCompanyColumnName(
-          row.brand.canonicalName,
-          row.brand.parentBrand?.canonicalName
-        ),
-        score: row.score,
-        appearanceRate: row.appearanceRate,
-        avgRank: row.avgRank,
-        modelCoverage: row.modelCoverage,
-      };
-    });
-    boards[key] = {
-      snapshots,
-      prevRanks: Object.fromEntries(previousRows.map((row) => [row.brandId, row.rank])),
-      hasPrevWeekData: previous.some((row) => row.engine === engine),
-    };
-  }
-
-  const scoringEngines = COLLECTION_ENGINES.filter(
-    (engine) => (boards[engine]?.snapshots.length ?? 0) > 0
-  );
-  const previousScoringEngines = [
-    ...new Set(previous.map((row) => row.engine).filter((engine): engine is string => Boolean(engine))),
-  ];
-
-  return {
-    week,
-    scoringVersion: SCORING_VERSION,
-    collectedEngines: [...COLLECTION_ENGINES],
-    scoringEngines,
-    coverageExpansion: coverageExpansionEngines(scoringEngines, previousScoringEngines),
-    boards,
-  };
-}
-
-async function verifyManifest(url: string, week: string) {
+async function verifyManifest(
+  url: string,
+  week: string,
+  options: { requireAllBoards?: boolean; requiredSlugs?: string[] } = {}
+) {
   const verificationUrl = new URL(url);
   verificationUrl.searchParams.set("verify", Date.now().toString());
   const response = await fetch(verificationUrl, { cache: "no-store" });
   if (!response.ok) throw new Error(`Manifest verification returned ${response.status}`);
-  const assessment = assessPublishedManifest(await response.json(), week);
+  const assessment = assessPublishedManifest(await response.json(), week, options);
   if (!assessment.ok) throw new Error(`Manifest verification failed: ${assessment.reason}`);
 }
 
+async function readLatestBoards(): Promise<Record<string, string>> {
+  const manifestUrl = process.env.LEADERBOARD_MANIFEST_URL;
+  if (!manifestUrl) return {};
+  try {
+    const response = await fetch(manifestUrl, { cache: "no-store" });
+    if (!response.ok) return {};
+    const manifest = (await response.json()) as { boards?: Record<string, string> };
+    return manifest.boards ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Ensure DB boards exist for the week, then optionally mirror to Blob.
+ * Blob mirror is opt-in (`PUBLISH_BLOB_MIRROR=1`); default skips puts.
+ * Blob unavailable / put failure → soft-fail (DB remains SoT); does not throw.
+ * Throws only when no category snapshots exist for `week`.
+ */
 export async function publishLeaderboards(
   week: string,
   options: { updateLatest?: boolean } = {}
 ): Promise<PublicationResult> {
-  if (!canPublishToBlob()) {
-    throw new Error(
-      "Missing Blob credentials. Set BLOB_READ_WRITE_TOKEN locally, or connect Blob to this Vercel project (BLOB_STORE_ID + OIDC)."
+  const publishedAt = new Date().toISOString();
+  const boardsBySlug: Record<string, Awaited<ReturnType<typeof buildCategoryBoardsFromDb>>> = {};
+  const scoringEngineUnion = new Set<string>();
+
+  for (const category of Object.keys(CATEGORY_TO_SLUG)) {
+    const data = await buildCategoryBoardsFromDb(category, week);
+    if (!data) {
+      logPipelineEvent({
+        event: "publication_skip_category",
+        week,
+        category,
+        reason: "no_snapshots_for_period",
+      });
+      continue;
+    }
+    for (const engine of data.scoringEngines ?? []) scoringEngineUnion.add(engine);
+    boardsBySlug[CATEGORY_TO_SLUG[category]!] = data;
+  }
+
+  if (Object.keys(boardsBySlug).length === 0) {
+    throw new Error(`No category boards to publish for ${week}`);
+  }
+
+  const skipReason = blobMirrorSkipReason();
+  if (skipReason) {
+    console.log(
+      `[publish] Blob mirror skipped (${skipReason}); DB snapshots remain published SoT`
     );
+    logPipelineEvent({
+      event: "publication_blob_skipped",
+      week,
+      reason: skipReason,
+      boardCount: Object.keys(boardsBySlug).length,
+    });
+    return {
+      manifestUrl: null,
+      latestManifestUrl: null,
+      publishedAt,
+      publishStatus: "skipped",
+    };
   }
 
   const jsonPut = blobPutOptions("application/json; charset=utf-8", {
@@ -111,18 +100,19 @@ export async function publishLeaderboards(
     allowOverwrite: true,
     cacheControlMaxAge: 60,
   });
-  const published: Record<string, string> = {};
-  const scoringEngineUnion = new Set<string>();
+
   try {
-    for (const category of Object.keys(CATEGORY_TO_SLUG)) {
-      const data = await buildCategory(category, week);
-      for (const engine of data.scoringEngines ?? []) scoringEngineUnion.add(engine);
-      const slug = CATEGORY_TO_SLUG[category];
-      const blob = await put(`leaderboards/${week}/${slug}.json`, JSON.stringify(data), jsonPut);
+    const published: Record<string, string> = {};
+    for (const [slug, data] of Object.entries(boardsBySlug)) {
+      const blob = await put(
+        `leaderboards/${week}/${slug}.json`,
+        JSON.stringify(data),
+        jsonPut
+      );
       published[slug] = blob.url;
     }
-    const publishedAt = new Date().toISOString();
-    const manifestBody = JSON.stringify({
+
+    const weekManifestBody = JSON.stringify({
       version: 2,
       week,
       publishedAt,
@@ -132,34 +122,71 @@ export async function publishLeaderboards(
       scoringEngineUnion: [...scoringEngineUnion],
       promptCount: weeklyPromptCount(),
     });
-    const manifest = await put(`leaderboards/${week}/manifest.json`, manifestBody, jsonPut);
+    const manifest = await put(`leaderboards/${week}/manifest.json`, weekManifestBody, jsonPut);
     const snapshotCounts = await prisma.snapshot.groupBy({
       by: ["week"],
       _count: { id: true },
     });
     const weeks = snapshotCounts
-      .filter((row) => row._count.id >= CATEGORIES.length * 4)
+      .filter((row) => row._count.id >= 4)
       .map((row) => row.week)
       .sort((a, b) => b.localeCompare(a));
     await put("leaderboards/index.json", JSON.stringify({ version: 1, weeks }), latestManifestPut);
     const updateLatest = options.updateLatest ?? true;
-    const latestManifest = updateLatest
-      ? await put("leaderboards/latest/manifest.json", manifestBody, latestManifestPut)
-      : null;
-    await verifyManifest(manifest.url, week);
-    if (latestManifest) await verifyManifest(latestManifest.url, week);
+    let latestManifest: { url: string } | null = null;
+    let previousLatestBoards: Record<string, string> = {};
+    if (updateLatest) {
+      previousLatestBoards = await readLatestBoards();
+      const mergedBoards = { ...previousLatestBoards, ...published };
+      const latestBody = JSON.stringify({
+        version: 2,
+        week,
+        publishedAt,
+        boards: mergedBoards,
+        scoringVersion: SCORING_VERSION,
+        collectedEngines: [...COLLECTION_ENGINES],
+        scoringEngineUnion: [...scoringEngineUnion],
+        promptCount: weeklyPromptCount(),
+      });
+      latestManifest = await put("leaderboards/latest/manifest.json", latestBody, latestManifestPut);
+    }
+    await verifyManifest(manifest.url, week, { requireAllBoards: false });
+    if (latestManifest) {
+      await verifyManifest(latestManifest.url, week, {
+        requireAllBoards: true,
+        requiredSlugs: Object.keys(previousLatestBoards),
+      });
+    }
 
     await publishBrandPages(week);
 
-    const result = {
+    const result: PublicationResult = {
       manifestUrl: manifest.url,
-      latestManifestUrl: latestManifest?.url ?? "",
+      latestManifestUrl: latestManifest?.url ?? null,
       publishedAt,
+      publishStatus: "success",
     };
-    logPipelineEvent({ event: "publication_verified", week, boardCount: Object.keys(published).length, ...result });
+    logPipelineEvent({
+      event: "publication_verified",
+      week,
+      boardCount: Object.keys(published).length,
+      ...result,
+    });
     return result;
   } catch (error) {
-    logPipelineEvent({ event: "publication_failed", week, error: errorContext(error) });
-    throw error;
+    const details = errorContext(error);
+    logPipelineEvent({
+      event: "publication_failed_mirror",
+      week,
+      boardCount: Object.keys(boardsBySlug).length,
+      error: details,
+    });
+    return {
+      manifestUrl: null,
+      latestManifestUrl: null,
+      publishedAt,
+      publishStatus: "failed_mirror",
+      publishError: details.message,
+    };
   }
 }

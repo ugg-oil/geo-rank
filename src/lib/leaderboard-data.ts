@@ -1,4 +1,7 @@
 import { LEGACY_COLLECTION_ENGINES } from "@/lib/constants";
+import type { PeriodHighlight } from "@/lib/period-highlight";
+
+export type { PeriodHighlight };
 
 export type LeaderboardRow = {
   id: string;
@@ -21,6 +24,16 @@ export type LeaderboardView = {
   hasPrevWeekData: boolean;
 };
 
+export type AlsoMentionedRow = {
+  brandId: string;
+  brandName: string;
+  brandSlug: string;
+  parentCompanyName: string | null;
+  mentionRate: number;
+  cumulativeMentions: number;
+  hasBrandPage: boolean;
+};
+
 export type CategoryBoardsData = {
   week: string;
   scoringVersion?: number;
@@ -28,6 +41,10 @@ export type CategoryBoardsData = {
   scoringEngines?: string[];
   coverageExpansion?: string[];
   boards: Record<string, LeaderboardView>;
+  /** P2: Overall-only also-mentioned preview (omit when empty). */
+  alsoMentioned?: AlsoMentionedRow[];
+  /** P3: one fact highlight vs prior published period (omit when none). */
+  periodHighlight?: PeriodHighlight;
 };
 
 export function inferCollectedEngines(data: CategoryBoardsData): string[] {

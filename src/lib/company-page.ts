@@ -1,10 +1,16 @@
+import { unstable_cache } from "next/cache";
+import { prisma } from "@/lib/db";
 import {
   getBrandIndex,
+  getBrandPagesForWeek,
   getPublishedBrandPage,
   type BrandPageData,
 } from "@/lib/brand-page";
 import { toBrandSlug } from "@/lib/brand-slug";
-import { buildCompanyPagesFromBrandPages } from "@/lib/company-data";
+import {
+  buildCompanyPagesFromBrandPages,
+  mergeCompanyIndex,
+} from "@/lib/company-data";
 import { SCORING_VERSION } from "@/lib/constants";
 import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 
@@ -37,56 +43,72 @@ export interface CompanyIndexEntry {
 
 export type CompanyIndex = Record<string, CompanyIndexEntry>;
 
-const PUBLISHED_REVALIDATE_SECONDS =
-  process.env.NODE_ENV === "development" ? 0 : 300;
+const REVALIDATE_SECONDS = process.env.NODE_ENV === "development" ? 0 : 300;
 
-function getCompaniesBlobBaseUrl(): string | null {
-  const manifestUrl = process.env.LEADERBOARD_MANIFEST_URL;
-  if (!manifestUrl) return null;
-  try {
-    const url = new URL(manifestUrl);
-    const path = url.pathname.replace(/\/leaderboards\/(latest\/)?manifest\.json$/, "");
-    url.pathname = `${path}/companies`;
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return null;
-  }
+async function buildCompanyIndexFromDb(week: string): Promise<CompanyIndex> {
+  const { brandPages } = await getBrandPagesForWeek(week);
+  const { companyIndex: fromProducts } = buildCompanyPagesFromBrandPages(brandPages, {
+    week,
+    scoringVersion: SCORING_VERSION,
+  });
+
+  const [companyEntities, parentBrands] = await Promise.all([
+    prisma.brand.findMany({
+      where: { entityType: "company" },
+      select: { canonicalName: true },
+    }),
+    prisma.brand.findMany({
+      where: { parentBrandId: { not: null } },
+      select: { parentBrand: { select: { canonicalName: true } } },
+    }),
+  ]);
+
+  const extras = [
+    ...companyEntities.map((row) => ({ name: row.canonicalName })),
+    ...parentBrands
+      .map((row) => row.parentBrand?.canonicalName)
+      .filter((name): name is string => Boolean(name))
+      .map((name) => ({ name })),
+  ];
+
+  return mergeCompanyIndex(fromProducts, extras);
 }
 
+/**
+ * Company index from DB (brand snapshots + company entities). Blob not required.
+ */
 export async function getCompanyIndex(): Promise<CompanyIndex> {
-  const base = getCompaniesBlobBaseUrl();
-  if (!base) return {};
-  try {
-    const response = await fetch(`${base}/index.json`, {
-      next: { revalidate: PUBLISHED_REVALIDATE_SECONDS },
-    });
-    if (!response.ok) return {};
-    return (await response.json()) as CompanyIndex;
-  } catch {
-    return {};
+  const weeks = await getPublishedLeaderboardWeeks();
+  const week = weeks[0];
+  if (!week) return {};
+
+  if (!process.env.NEXT_RUNTIME) {
+    return buildCompanyIndexFromDb(week);
   }
+  return unstable_cache(
+    () => buildCompanyIndexFromDb(week),
+    ["company-index-db", week],
+    { revalidate: REVALIDATE_SECONDS, tags: [`brand-pages-${week}`] }
+  )();
 }
 
+/**
+ * Company page for a published week — DB SoT via brand pages.
+ */
 export async function getPublishedCompanyPage(
   slug: string,
   week: string
 ): Promise<CompanyPageData | null> {
-  const base = getCompaniesBlobBaseUrl();
-  if (!base) return null;
-  try {
-    const response = await fetch(
-      `${base}/${encodeURIComponent(slug)}/${encodeURIComponent(week)}.json`,
-      { next: { revalidate: PUBLISHED_REVALIDATE_SECONDS } }
-    );
-    if (!response.ok) return null;
-    return (await response.json()) as CompanyPageData;
-  } catch {
-    return null;
-  }
+  const { brandPages } = await getBrandPagesForWeek(week);
+  const { companyPages } = buildCompanyPagesFromBrandPages(brandPages, {
+    week,
+    scoringVersion: SCORING_VERSION,
+  });
+  return companyPages.find((page) => page.slug === slug) ?? null;
 }
 
 /**
- * Derive a company page from published brand pages when companies Blob is missing.
+ * Derive a company page from DB brand pages when no direct company snapshot.
  */
 export async function getFallbackCompanyPage(
   slug: string,
@@ -96,7 +118,11 @@ export async function getFallbackCompanyPage(
   const targetWeek = weeks[0];
   if (!targetWeek) return null;
 
-  const brandIndex = await getBrandIndex();
+  const published = await getPublishedCompanyPage(slug, targetWeek);
+  if (published) return published;
+
+  // Narrow path: children via brand index when full week build missed the company.
+  const brandIndex = await getBrandIndex(targetWeek);
   const childSlugs = Object.entries(brandIndex)
     .filter(([, entry]) => entry.parentCompany && toBrandSlug(entry.parentCompany) === slug)
     .map(([brandSlug]) => brandSlug);

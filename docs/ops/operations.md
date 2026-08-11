@@ -9,11 +9,11 @@ npm run pipeline
 npm run review:auto -- --apply
 ```
 
-Pipeline 完成后会尝试发布榜单快照到 Vercel Blob（含 `leaderboards/*` 与 `brands/*`）。前台优先读 Blob JSON；未配置 Blob 时回退数据库。
+Pipeline 完成后默认**不**写 Vercel Blob。仅当显式设置 `PUBLISH_BLOB_MIRROR=1`（且具备 `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID`）时，才将榜单镜像到 Blob（`leaderboards/*`、`brands/*`、`companies/*`）。**前台主读 PostgreSQL `snapshots`（DB-first）**；Blob 为可选镜像，跳过或失败不否定该周对前台可读。
 
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进 `latest`。同一周已有运行时，新的触发不会并发启动；超过 30 小时的陈旧运行会先被标记为失败。
 
-每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与双 manifest 发布状态；检查失败时返回 500。若配置完整的 Resend 邮件变量，会直发告警邮件；可选 webhook 是邮件不可用时的备用通道。
+每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与运行状态；缺 Blob manifest 记为 warning，不以之为硬失败。若配置完整的 Resend 邮件变量，会直发告警邮件；可选 webhook 是邮件不可用时的备用通道。
 
 ## 命令
 
@@ -22,7 +22,7 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 | `npm run pipeline` | 完整周更：采集 → 抽取 → 标准化 → 分类 → 计分 → 发布 |
 | `npm run pipeline:health` | 检查当前周运行、快照和发布状态；不健康时以非零状态退出 |
 | `npm run pipeline:fixtures` | 验证发布 manifest 的有效、旧周和缺榜单 fixture |
-| `npm run publish` | 仅发布已有周次快照到 Blob |
+| `npm run publish` | 确认 DB 快照可构建；默认跳过 Blob（见 `PUBLISH_BLOB_MIRROR`） |
 | `npm run review:auto` | 预览自动审核 |
 | `npm run review:auto -- --apply` | 应用高置信度审核结果 |
 | `npm run review:export` | 导出待确认到 `data/review.json` |
@@ -71,7 +71,7 @@ curl "https://georadar.website/api/pipeline-health?week=Week%20of%202026-08-03" 
   -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-健康状态要求：最新运行成功、`snapshot_count > 0`、并且 immutable week manifest 与 `latest` manifest 都已验证。健康时返回 `200`；任一条件未满足时返回 `503`，响应会给出具体原因。
+健康状态要求：最新运行成功、`snapshot_count > 0`。Blob `manifest_url` / `latest_manifest_url` 为可选镜像元数据；缺失时健康检查仍可返回 `200`（响应可带 `warnings`）。运行失败或无快照时返回 `503`。
 
 ### 邮件告警测试
 
@@ -86,17 +86,29 @@ curl -X POST "https://georadar.website/api/pipeline-alert-test" \
 
 ## 发布产物
 
+默认不写 Blob。开启镜像后产物路径为：
+
 - 每周：`leaderboards/{week}/{slug}.json`
 - 每周：`leaderboards/{week}/manifest.json`
 - 当前：`leaderboards/latest/manifest.json`（发布提交点，短缓存）
 
-前台在 `LEADERBOARD_MANIFEST_URL` 指向 `latest` 路径时，会按当前周推导并读取不可变的周 manifest，避免 mutable `latest` 的 CDN 缓存影响页面更新。
+### Blob 镜像 opt-in
 
-同一周的已验证快照允许通过 `npm run publish -- "Week of YYYY-MM-DD"` 幂等重发，用于修复发布中断；该操作不会重新采集或计分。
+| 变量 | 说明 |
+|------|------|
+| `PUBLISH_BLOB_MIRROR` | 设为 `1` 才执行 Blob `put`；未设置或其它值 → `publish_status=skipped`，日志含 `Blob mirror skipped` |
+| `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID` | 镜像开启时仍需写凭证；缺凭证同样 skipped |
+| `LEADERBOARD_MANIFEST_URL` | 可选；首页引擎计数等元数据 fallback，**不是**榜单 SoT |
 
-发布会先写各品类与 immutable week manifest，再写 `latest`，最后用 cache-busting 请求验证两份 manifest 的周次和五个品类链接。生产环境还会读取公开的 AI Tools 页，确认页面实际渲染当前周次（可用 `PIPELINE_PUBLIC_SMOKE_CHECK=0` 临时关闭）。任一步失败，发布状态会记录为 `failed`，不会被健康检查视为成功。
+R2 未实现；日后若要全球静态加速，仅作 mirror，永不 SoT。
 
-首次发布后，将 `latestManifest` URL 配置为 `LEADERBOARD_MANIFEST_URL`。
+前台周列表与品类榜从 DB `snapshots` 构建，不依赖 `LEADERBOARD_MANIFEST_URL` / `index.json` 完整性。
+
+同一周的已验证快照允许通过 `npm run publish -- "Week of YYYY-MM-DD"` 幂等重跑（默认只校验 DB 可读；开镜像时才重写 Blob）；该操作不会重新采集或计分。
+
+发布会先确认 DB 各品类快照可构建。未开镜像时立即 skipped。开启后写各品类与 immutable week manifest、`latest`，并用 cache-busting 请求验证；put/verify 失败时 `publish_status` 记为 `failed_mirror`，**不**使 pipeline `status` 失败（前提：`snapshot_count > 0`）。生产环境在 Blob 镜像成功时还会读取公开的 AI Tools 页做 smoke check（可用 `PIPELINE_PUBLIC_SMOKE_CHECK=0` 临时关闭）。
+
+首次成功镜像后，可将 `latestManifest` URL 配置为 `LEADERBOARD_MANIFEST_URL`（仍非 SoT）。
 
 ## 生产检查
 
@@ -104,13 +116,15 @@ curl -X POST "https://georadar.website/api/pipeline-alert-test" \
 
 - `status = success`
 - `snapshot_count > 0`
-- 生产环境有 `manifest_url`（若已发布）
-- `publish_status = success`，且 `latest_manifest_url`、`published_at` 已写入
+- `manifest_url` / `latest_manifest_url` 可选（Blob 镜像成功时有值）
+- `publish_status` 可为 `success` | `skipped` | `failed_mirror`；不以缺 manifest 判红
 
 `data/` 为运行时临时目录（gitignore），审核结果入库后可删除。
 
 ## 相关文档
 
-- [data-pipeline.md](../engineering/data-pipeline.md) — 管道设计细节
+- [data-pipeline-2026-07-30.md](../engineering/data-pipeline-2026-07-30.md) — 管道设计细节（legacy）
+- [data-pipeline-db-primary-2026-08-08.md](../engineering/data-pipeline-db-primary-2026-08-08.md) — Snapshot SoT 决策
+- [data-pipeline-db-primary-impl-2026-08-08.md](../engineering/data-pipeline-db-primary-impl-2026-08-08.md) — B1–B3 落地 runbook
 - [review-queue.md](./review-queue.md) — Review Queue 操作说明
 - [seo.md](../engineering/seo.md) — 技术 SEO 检查与 SEO backlog

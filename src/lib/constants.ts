@@ -64,6 +64,14 @@ export const CATEGORIES = [
   "AI Image / Video Tools",
   "Developer Tools",
   "Marketing Tools",
+  "VPN Services",
+  "E-commerce Platforms",
+  "Online Course Platforms",
+  "Language Learning Apps",
+  "Password Managers",
+  "AI Meeting Assistants",
+  "AI Cybersecurity Tools",
+  "Recruiting Tools",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 

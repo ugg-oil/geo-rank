@@ -9,21 +9,21 @@ AI 回答
   → mention 抽取
   → 品牌规范化与审核
   → 分类与计分
-  → 周榜快照
-  → Vercel Blob
-  → 前台榜单页面
+  → 周榜快照（PostgreSQL snapshots = SoT）
+  → 前台服务端 builder
+  → （可选）Blob / R2 mirror
 ```
 
 ## 组件职责
 
-- PostgreSQL：后台计算、品牌、提及、审核队列和历史记录。
+- PostgreSQL：后台计算、品牌、提及、审核队列、历史记录；**前台可读榜单的唯一真相（snapshots）**。
 - Prisma：数据库 schema 和应用侧数据访问。
 - Pipeline：采集、抽取、规范化、分类、计分和发布。
-- Vercel Blob：前台使用的静态榜单 JSON。
+- Vercel Blob：可选静态镜像（CDN）；**默认关闭写入**（`PUBLISH_BLOB_MIRROR=1` 才 put）；失败/跳过不否定 DB 快照。R2 未实现（日后仅 mirror）。
 - Next.js：渲染首页、分类页、方法论页及 pipeline API。
 - Cron：按周触发 pipeline。
 
-用户访问榜单时优先读取 Blob 快照；本地开发或 Blob 不可用时回退到数据库查询。
+用户访问品类榜单时主路径从 `snapshots` 构建（`published-leaderboard` / `leaderboard`）；Blob 不再作为事实主源。周列表由 DB distinct weeks 推导。
 
 ## 品牌规范化
 
@@ -31,10 +31,13 @@ AI 回答
 
 ## 发布与回退
 
-一次 pipeline 会生成各品类榜单 JSON，并记录 `pipeline_runs`。生产环境应同时确认运行状态成功、快照数量大于零、manifest URL 已写入。Blob 读取失败或周次不一致时，前台使用数据库回退路径，避免显示错误周次的数据。
+一次 pipeline 会写入 `snapshots` 并记录 `pipeline_runs`。生产健康以运行成功 + `snapshot_count > 0` 为准；`manifest_url` / Blob 镜像为可选。默认不写 Blob；`PUBLISH_BLOB_MIRROR=1` 时 put 失败仍可标记该周对前台可读（`publish_status` 可为 `skipped` / `failed_mirror`）。
 
 ## 相关文档
 
+- [数据管道 · 现行实现](./data-pipeline-2026-07-30.md)：legacy 实现细节（B1 前 Blob-first 对照）
+- [数据管道 · 架构决策（已定：DB-first）](./data-pipeline-db-primary-2026-08-08.md)：Snapshot 唯一真相
+- [数据管道 · B1–B3 可执行落地](./data-pipeline-db-primary-impl-2026-08-08.md)：文件清单与验收（DB-first + Blob opt-in mirror）
 - [Getting Started](../ops/setup.md)：环境、本地开发和部署
 - [Operations](../ops/operations.md)：周更、Cron、发布和故障处理
 - [Review Queue](../ops/review-queue.md)：品牌审核操作

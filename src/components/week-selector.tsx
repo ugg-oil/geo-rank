@@ -28,7 +28,7 @@ export function WeekSelector({ slug, week, availableWeeks, engine }: Props) {
           if (engine && engine !== "overall") params.set("engine", engine);
           window.location.assign(`/category/${slug}${params.size ? `?${params}` : ""}`);
         }}
-        className="appearance-none rounded-lg border border-[var(--border)] bg-[var(--card)] py-2.5 pl-3.5 pr-10 text-sm font-medium text-[var(--text)] shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:border-[var(--border-hover)] focus:border-[var(--border-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--border-hover)]"
+        className="appearance-none rounded-lg border border-[var(--border)] bg-[var(--card)] py-2 pl-3.5 pr-10 text-sm font-medium text-[var(--text)] shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-colors hover:border-[var(--border-hover)] focus:border-[var(--border-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--border-hover)]"
       >
         {availableWeeks.map((item) => (
           <option key={item} value={item.replace("Week of ", "")}>

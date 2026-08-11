@@ -1,6 +1,6 @@
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/db";
-import { canPublishToBlob, blobPutOptions } from "@/lib/blob-publish";
+import { blobMirrorSkipReason, blobPutOptions } from "@/lib/blob-publish";
 import type { BrandPageData } from "@/lib/brand-page";
 import {
   buildCompanyPagesFromBrandPages,
@@ -43,68 +43,80 @@ async function verifyCompanyPublication(
 
 /**
  * Publish company aggregation snapshots derived from brand pages.
+ * Opt-in Blob mirror (`PUBLISH_BLOB_MIRROR=1`) — skip/failure does not block reads (DB SoT).
  * - companies/index.json: slug → { name } (includes never-ranked company entities)
  * - companies/{slug}/{week}.json: products × category facts only
  */
 export async function publishCompanyPages(week: string, brandPages: BrandPageData[]) {
-  if (!canPublishToBlob()) {
-    logPipelineEvent({ event: "company_publish_skipped", week, reason: "no blob credentials" });
+  const skipReason = blobMirrorSkipReason();
+  if (skipReason) {
+    console.log(`[publish] Blob company mirror skipped (${skipReason})`);
+    logPipelineEvent({ event: "company_publish_skipped", week, reason: skipReason });
     return;
   }
 
-  const { companyPages, companyIndex: fromProducts } = buildCompanyPagesFromBrandPages(
-    brandPages,
-    { week, updatedAt: new Date().toISOString().split("T")[0] }
-  );
+  try {
+    const { companyPages, companyIndex: fromProducts } = buildCompanyPagesFromBrandPages(
+      brandPages,
+      { week, updatedAt: new Date().toISOString().split("T")[0] }
+    );
 
-  const [companyEntities, parentBrands] = await Promise.all([
-    prisma.brand.findMany({
-      where: { entityType: "company" },
-      select: { canonicalName: true },
-    }),
-    prisma.brand.findMany({
-      where: { parentBrandId: { not: null } },
-      select: { parentBrand: { select: { canonicalName: true } } },
-    }),
-  ]);
+    const [companyEntities, parentBrands] = await Promise.all([
+      prisma.brand.findMany({
+        where: { entityType: "company" },
+        select: { canonicalName: true },
+      }),
+      prisma.brand.findMany({
+        where: { parentBrandId: { not: null } },
+        select: { parentBrand: { select: { canonicalName: true } } },
+      }),
+    ]);
 
-  const extras = [
-    ...companyEntities.map((row) => ({ name: row.canonicalName })),
-    ...parentBrands
-      .map((row) => row.parentBrand?.canonicalName)
-      .filter((name): name is string => Boolean(name))
-      .map((name) => ({ name })),
-  ];
+    const extras = [
+      ...companyEntities.map((row) => ({ name: row.canonicalName })),
+      ...parentBrands
+        .map((row) => row.parentBrand?.canonicalName)
+        .filter((name): name is string => Boolean(name))
+        .map((name) => ({ name })),
+    ];
 
-  const companyIndex = mergeCompanyIndex(fromProducts, extras);
+    const companyIndex = mergeCompanyIndex(fromProducts, extras);
 
-  const jsonPut = blobPutOptions("application/json; charset=utf-8", {
-    allowOverwrite: true,
-  });
+    const jsonPut = blobPutOptions("application/json; charset=utf-8", {
+      allowOverwrite: true,
+    });
 
-  let sampleUrl: string | null = null;
-  for (const page of companyPages) {
-    const uploaded = await put(
-      `companies/${page.slug}/${week}.json`,
-      JSON.stringify(page),
+    let sampleUrl: string | null = null;
+    for (const page of companyPages) {
+      const uploaded = await put(
+        `companies/${page.slug}/${week}.json`,
+        JSON.stringify(page),
+        jsonPut
+      );
+      sampleUrl ??= uploaded.url;
+    }
+
+    const indexUpload = await put(
+      "companies/index.json",
+      JSON.stringify(companyIndex),
       jsonPut
     );
-    sampleUrl ??= uploaded.url;
+
+    await verifyCompanyPublication(week, indexUpload.url, sampleUrl, companyPages.length);
+
+    logPipelineEvent({
+      event: "company_pages_published",
+      week,
+      companyCount: companyPages.length,
+      indexCount: Object.keys(companyIndex).length,
+      verified: true,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logPipelineEvent({
+      event: "company_publish_failed_mirror",
+      week,
+      error: message,
+    });
   }
-
-  const indexUpload = await put(
-    "companies/index.json",
-    JSON.stringify(companyIndex),
-    jsonPut
-  );
-
-  await verifyCompanyPublication(week, indexUpload.url, sampleUrl, companyPages.length);
-
-  logPipelineEvent({
-    event: "company_pages_published",
-    week,
-    companyCount: companyPages.length,
-    indexCount: Object.keys(companyIndex).length,
-    verified: true,
-  });
 }

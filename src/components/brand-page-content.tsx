@@ -385,6 +385,74 @@ export function BrandPageContent({
           </div>
         )}
 
+        {(() => {
+          const excerptGroups = categoryList.flatMap((cat) => {
+            const entries = Object.entries(cat.engineExcerpts ?? {}).filter(
+              ([, texts]) => texts.length > 0
+            );
+            if (entries.length === 0) return [];
+            const catName = getCategoryMessages(m, cat.slug)?.name ?? cat.slug;
+            return entries.map(([engine, texts]) => ({
+              key: `${cat.slug}-${engine}`,
+              catName,
+              engine,
+              text: texts[0]!,
+            }));
+          });
+          if (excerptGroups.length === 0) return null;
+          const engineCount = new Set(excerptGroups.map((g) => g.engine)).size;
+          return (
+            <details className="group border-t border-[var(--border)] pt-6">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)] [&::-webkit-details-marker]:hidden">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  aria-hidden
+                  className="shrink-0 transition-transform duration-200 group-open:rotate-90"
+                >
+                  <path
+                    d="M4.5 2.5L8 6l-3.5 3.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="font-mono text-xs uppercase tracking-[0.18em]">
+                  {m.brand.evidenceTitle}
+                </span>
+                <span className="text-xs normal-case tracking-normal">
+                  · {m.brand.evidenceCount(engineCount)}
+                </span>
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">{m.brand.evidenceLead}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">{m.brand.basedOn(weekLabel)}</p>
+                </div>
+                <div className="space-y-5">
+                  {excerptGroups.map((group) => (
+                    <div key={group.key}>
+                      <p className="text-xs font-medium text-[var(--text-secondary)]">
+                        {engineLabel(group.engine)}
+                        <span className="font-normal text-[var(--text-muted)]"> · {group.catName}</span>
+                      </p>
+                      <p
+                        className="mt-2 border-l-2 border-[var(--border)] pl-3 text-sm leading-6 text-[var(--text-secondary)]"
+                        lang="en"
+                      >
+                        {group.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
+          );
+        })()}
+
         <LeadForm sourcePath={`/brand/${data.slug}`} />
       </div>
     </>

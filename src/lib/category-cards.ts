@@ -29,4 +29,52 @@ export const CATEGORY_CARDS = [
     description:
       "Discover the growth platforms AI recommends for SEO, content, and campaigns.",
   },
+  {
+    name: "VPN Services",
+    slug: "vpn-services",
+    description:
+      "See which VPN providers AI recommends for privacy, streaming, and travel.",
+  },
+  {
+    name: "E-commerce Platforms",
+    slug: "ecommerce-platforms",
+    description:
+      "Find the ecommerce platforms AI names for launching and scaling online stores.",
+  },
+  {
+    name: "Online Course Platforms",
+    slug: "online-course-platforms",
+    description:
+      "Track which MOOC and cohort platforms AI recommends for adult learners.",
+  },
+  {
+    name: "Language Learning Apps",
+    slug: "language-learning-apps",
+    description:
+      "See which language learning apps AI recommends for daily practice.",
+  },
+  {
+    name: "Password Managers",
+    slug: "password-managers",
+    description:
+      "Discover which password managers AI recommends for personal and team vaults.",
+  },
+  {
+    name: "AI Meeting Assistants",
+    slug: "ai-meeting-assistants",
+    description:
+      "See which AI meeting note-takers AI recommends for transcripts and action items.",
+  },
+  {
+    name: "AI Cybersecurity Tools",
+    slug: "ai-cybersecurity-tools",
+    description:
+      "Track which AI security products land in threat detection shortlists.",
+  },
+  {
+    name: "Recruiting Tools",
+    slug: "recruiting-tools",
+    description:
+      "Find the ATS and recruiting platforms AI recommends for hiring teams.",
+  },
 ] as const;

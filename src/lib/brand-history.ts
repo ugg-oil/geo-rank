@@ -10,7 +10,7 @@ export type { BrandCategoryHistory, BrandHistoryPoint };
 
 /**
  * Rank/score history for a brand across published weekly overall boards.
- * Read-only from Blob leaderboard snapshots — not recomputed, not from Postgres.
+ * Uses DB published weeks + DB boards (same SoT as B1).
  */
 export async function getBrandCategoryHistories(
   slug: string

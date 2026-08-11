@@ -5,7 +5,6 @@ import { normalizeWeek } from "./normalize";
 import { consolidateBrands } from "./consolidate";
 import { classifyAllBrands } from "./classify-entities";
 import { scoreAll } from "./score";
-import { canPublishToBlob } from "@/lib/blob-publish";
 import { publishLeaderboards } from "./publish";
 import { getCurrentWeek } from "@/lib/week";
 import { prisma } from "@/lib/db";
@@ -124,18 +123,20 @@ export async function runFullPipeline(
     });
     logPipelineEvent({ event: "scoring_summary", week: w, runId: run.id, snapshotCount });
 
-    let publication: Awaited<ReturnType<typeof publishLeaderboards>> | null = null;
-    if (canPublishToBlob()) {
-      publication = await timedStage("publishing", () =>
-        publishLeaderboards(w, { updateLatest: options.publishLatest })
-      );
-      if (options.publishLatest ?? true) {
-        await timedStage("public_smoke_check", () => verifyPublicCategoryPage(w));
-      }
-    } else {
+    const publication = await timedStage("publishing", () =>
+      publishLeaderboards(w, { updateLatest: options.publishLatest })
+    );
+    if (publication.publishStatus === "skipped") {
       console.warn(
-        "[7/7] Blob credentials missing; skipped publishing snapshots (need BLOB_READ_WRITE_TOKEN or Vercel Blob connection)"
+        "[7/7] Blob mirror skipped (PUBLISH_BLOB_MIRROR off or no credentials); DB snapshots remain published SoT"
       );
+    } else if (publication.publishStatus === "failed_mirror") {
+      console.warn(
+        `[7/7] Blob mirror failed; DB snapshots remain published SoT: ${publication.publishError ?? "unknown"}`
+      );
+    }
+    if (publication.publishStatus === "success" && (options.publishLatest ?? true)) {
+      await timedStage("public_smoke_check", () => verifyPublicCategoryPage(w));
     }
 
     await prisma.pipelineRun.update({
@@ -143,10 +144,11 @@ export async function runFullPipeline(
       data: {
         status: "success",
         currentStep: null,
-        manifestUrl: publication?.manifestUrl ?? null,
-        latestManifestUrl: publication?.latestManifestUrl ?? null,
-        publishStatus: publication ? "success" : "skipped",
-        publishedAt: publication ? new Date(publication.publishedAt) : null,
+        manifestUrl: publication.manifestUrl,
+        latestManifestUrl: publication.latestManifestUrl,
+        publishStatus: publication.publishStatus,
+        publishError: publication.publishError?.slice(0, 4000) ?? null,
+        publishedAt: new Date(publication.publishedAt),
         finishedAt: new Date(),
       },
     });

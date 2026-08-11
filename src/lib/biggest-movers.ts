@@ -8,7 +8,6 @@ import {
   getPublishedCategoryLeaderboards,
   getPublishedLeaderboardWeeks,
 } from "@/lib/published-leaderboard";
-import { getPreviousWeek } from "@/lib/week";
 
 export type BiggestMoversResult = {
   week: string;
@@ -18,17 +17,16 @@ export type BiggestMoversResult = {
 };
 
 /**
- * Biggest Movers from published overall boards: latest week vs previous week.
- * Brand links point to Brand Page v1.
+ * Biggest Movers from DB published overall boards: latest week vs previous week.
+ * Week sequence matches getPublishedLeaderboardWeeks (snapshots SoT).
  */
 export async function getBiggestMovers(limit = 5): Promise<BiggestMoversResult | null> {
   const weeks = await getPublishedLeaderboardWeeks();
   if (weeks.length === 0) return null;
 
-  const week = weeks[0];
-  const calendarPrev = getPreviousWeek(week);
-  const previousWeek =
-    weeks.find((candidate) => candidate === calendarPrev) ?? weeks[1] ?? null;
+  const week = weeks[0]!;
+  // Prefer previous key in published index (sequence), not calendar -7.
+  const previousWeek = weeks[1] ?? null;
 
   const slugs = Object.keys(CATEGORY_SLUG_MAP);
   const boards = await Promise.all(

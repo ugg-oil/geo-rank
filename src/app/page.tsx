@@ -3,20 +3,17 @@ import { HomeContent } from "@/components/home-content";
 import { getBiggestMovers } from "@/lib/biggest-movers";
 import {
   COLLECTION_ENGINES,
-  formatEngineList,
   weeklyPromptCount,
 } from "@/lib/constants";
 import { getPublishedLeaderboardManifest } from "@/lib/published-leaderboard";
 import { SITE_URL, stringifyJsonLd } from "@/lib/seo";
-
-const ENGINE_COPY = formatEngineList();
 
 export const metadata: Metadata = {
   title: {
     absolute: "Which Products Does AI Recommend? | GEO Radar",
   },
   description:
-    `See the Top 20 products showing up in ${ENGINE_COPY} answers. Weekly AI visibility rankings, updated every Monday.`,
+    "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
   keywords: [
     "AI visibility",
     "AI visibility rankings",
@@ -35,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      `See the Top 20 products showing up in ${ENGINE_COPY} answers. Weekly AI visibility rankings, updated every Monday.`,
+      "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
     url: "/",
     type: "website",
     images: [{ url: "/og-image.png", alt: "GEO Radar" }],
@@ -44,7 +41,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      `See the Top 20 products showing up in ${ENGINE_COPY} answers. Weekly AI visibility rankings, updated every Monday.`,
+      "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
     images: ["/og-image.png"],
   },
 };
@@ -60,7 +57,7 @@ export default async function Home() {
     name: "GEO Radar",
     url: SITE_URL,
     description:
-      `See which products ${ENGINE_COPY} recommend. Weekly Top 20 AI visibility rankings.`,
+      "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
   };
   const organizationJsonLd = {
     "@context": "https://schema.org",
@@ -81,7 +78,6 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(organizationJsonLd) }}
       />
       <HomeContent
-        publishedAt={manifest?.publishedAt ?? null}
         scoringEngineCount={manifest?.scoringEngineUnion?.length ?? COLLECTION_ENGINES.length}
         promptCount={manifest?.promptCount ?? weeklyPromptCount()}
         movers={movers}

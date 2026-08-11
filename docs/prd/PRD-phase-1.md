@@ -49,6 +49,6 @@ GEO Radar 每周使用固定英文 prompt 询问 ChatGPT、Gemini 和 Grok，从
 ## 参考文档
 
 - [系统架构](../engineering/architecture.md)
-- [数据管道](../engineering/data-pipeline.md)
+- [数据管道](../engineering/data-pipeline-2026-07-30.md)
 - [Review Queue](../ops/review-queue.md)
 - [运维文档](../ops/operations.md)

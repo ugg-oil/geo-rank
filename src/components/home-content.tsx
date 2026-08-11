@@ -8,7 +8,7 @@ import {
   ENGINE_MODEL_LABELS,
   engineLabel,
 } from "@/lib/constants";
-import { formatLocaleDate, getCategoryMessages } from "@/lib/i18n/messages";
+import { getCategoryMessages } from "@/lib/i18n/messages";
 import { useI18n } from "@/lib/i18n/use-i18n";
 import type { RankMover } from "@/lib/rank-change";
 
@@ -39,23 +39,29 @@ const CATEGORY_SHORTCUT_SLUGS = [
   "ai-image-video-tools",
   "developer-tools",
   "marketing-tools",
+  "vpn-services",
+  "ecommerce-platforms",
+  "online-course-platforms",
+  "language-learning-apps",
+  "password-managers",
+  "ai-meeting-assistants",
+  "ai-cybersecurity-tools",
+  "recruiting-tools",
 ] as const;
 
 type Props = {
-  publishedAt: string | null;
   scoringEngineCount: number;
   promptCount: number;
   movers: { week: string; risers: RankMover[]; fallers: RankMover[] } | null;
 };
 
 export function HomeContent({
-  publishedAt,
   scoringEngineCount,
   promptCount,
   movers,
 }: Props) {
-  const { locale, m } = useI18n();
-  const updatedAt = publishedAt ? formatLocaleDate(locale, publishedAt) : null;
+  const { m } = useI18n();
+  // P0-7: homepage must not show a single global latest date.
 
   return (
     <>
@@ -64,7 +70,7 @@ export function HomeContent({
           <div>
             <div className="animate-fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-xs text-[var(--text-secondary)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--yellow)]" />
-              {updatedAt ? m.home.badgeLive(updatedAt) : m.home.badgeFresh}
+              {m.home.badgeFresh}
             </div>
 
             <h1 className="animate-fade-up-delay-1 max-w-3xl text-4xl font-semibold tracking-tight text-[var(--text)] sm:text-6xl sm:leading-[1.08]">

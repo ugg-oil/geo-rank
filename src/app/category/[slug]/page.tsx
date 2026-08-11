@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { CategoryUnavailable, CategoryPageShell } from "@/components/category-page-content";
 import { CATEGORY_SLUG_MAP } from "@/lib/categories";
-import { getAllCategoryLeaderboards } from "@/lib/leaderboard";
 import { inferCollectedEngines } from "@/lib/leaderboard-data";
 import { getPublishedCategoryLeaderboards, getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 import { getCategorySeo, SITE_URL, stringifyJsonLd } from "@/lib/seo";
@@ -59,14 +58,25 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   if (!category) notFound();
 
   const currentWeek = getCurrentWeek();
-  const selectedWeek = requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
-    ? `Week of ${requestedWeek}`
-    : currentWeek;
-  const [publishedData, availableWeeks] = await Promise.all([
-    getPublishedCategoryLeaderboards(slug, selectedWeek),
-    getPublishedLeaderboardWeeks(),
-  ]);
-  const data = publishedData ?? (selectedWeek === currentWeek ? await getAllCategoryLeaderboards(category) : null);
+  const availableWeeks = await getPublishedLeaderboardWeeks();
+  let selectedWeek =
+    requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
+      ? `Week of ${requestedWeek}`
+      : currentWeek;
+
+  // DB-first: any week with snapshots (Blob not required).
+  let data = await getPublishedCategoryLeaderboards(slug, selectedWeek);
+  // P0: category may refresh on 14-day cadence — fall back to newest week that has this board.
+  if (!data && !requestedWeek) {
+    for (const week of availableWeeks) {
+      data = await getPublishedCategoryLeaderboards(slug, week);
+      if (data) {
+        selectedWeek = week;
+        break;
+      }
+    }
+  }
+
   const initialTab =
     data && engine && inferCollectedEngines(data).includes(engine) ? engine : "overall";
   const canonicalUrl = `${SITE_URL}/category/${slug}`;
@@ -109,7 +119,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-6 pt-4 pb-10 sm:pt-5 sm:pb-14">
+    <main className="mx-auto max-w-6xl px-6 pt-3 pb-10 sm:pt-4 sm:pb-14">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(breadcrumbJsonLd) }}

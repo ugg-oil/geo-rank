@@ -180,5 +180,5 @@ P1 Brand Page → slug + brand 周快照 + Category 链接
 
 ## 文档规则
 
-- v1.1 → phase-1 · v1.2 → phase-2 · v1.3（开发中）→ phase-3 · 未排期 → phase-next
+- v1.1 → phase-1 · v1.2 → phase-2 · v1.3（已实现上线）→ phase-3 · v1.4 → phase-4 · 未排期 → phase-next
 - 同一需求只保留一处主定义

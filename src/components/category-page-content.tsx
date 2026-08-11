@@ -28,7 +28,7 @@ export function CategoryPageShell({
     <>
       <Link
         href="/rankings"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+        className="mb-3 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
           <path d="M9 3L4 7l5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -36,24 +36,26 @@ export function CategoryPageShell({
         {m.common.allRankings}
       </Link>
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {m.category.whoRecommends(categoryName)}
-        </h1>
+      <div className="mb-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            {m.category.whoRecommends(categoryName)}
+          </h1>
+          <div className="shrink-0 sm:pt-0.5">
+            <WeekSelector
+              slug={slug}
+              week={week}
+              availableWeeks={availableWeeks}
+              engine={initialTab}
+            />
+          </div>
+        </div>
         {cat && (
-          <div className="mt-4 max-w-3xl">
-            <p className="text-sm leading-7 text-[var(--text-secondary)]">{cat.lead}</p>
-            <p className="mt-2 text-sm leading-7 text-[var(--text-muted)]">{cat.body}</p>
+          <div className="mt-2.5 max-w-3xl">
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">{cat.lead}</p>
+            <p className="mt-1.5 text-sm leading-6 text-[var(--text-muted)]">{cat.body}</p>
           </div>
         )}
-        <div className="mt-5">
-          <WeekSelector
-            slug={slug}
-            week={week}
-            availableWeeks={availableWeeks}
-            engine={initialTab}
-          />
-        </div>
       </div>
 
       {children}
