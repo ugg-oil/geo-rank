@@ -7,7 +7,10 @@ import {
   PIPELINE_COLLECTION_TIMEOUT_MS,
 } from "@/lib/pipeline-timeouts";
 
-const COLLECTION_CONCURRENCY = 4;
+const COLLECTION_CONCURRENCY = Math.max(
+  1,
+  Math.floor(Number(process.env.PIPELINE_COLLECTION_CONCURRENCY) || 1)
+);
 
 function completionText(message: { content?: unknown } | undefined) {
   const content = message?.content;

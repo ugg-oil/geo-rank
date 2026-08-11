@@ -30,7 +30,7 @@ Return format:
 
 const EXTRACTION_CONCURRENCY = Math.max(
   1,
-  Math.floor(Number(process.env.PIPELINE_EXTRACTION_CONCURRENCY) || 4)
+  Math.floor(Number(process.env.PIPELINE_EXTRACTION_CONCURRENCY) || 1)
 );
 
 export async function extractResponse(responseId: string) {

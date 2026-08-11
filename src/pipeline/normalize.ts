@@ -62,18 +62,31 @@ export async function normalizeWeek(week: string) {
       : null;
 
     if (!brandId) {
-      const rule = classifyEntity(processed);
-      const newBrand = await prisma.brand.create({
-        data: {
-          canonicalName: processed,
-          entityType: rule.type,
-          rankingEnabled: rule.rankingEnabled,
-        },
+      // Avoid hard-failing on brand canonicalName uniqueness.
+      // We may "not see" an existing brand in the precomputed maps due to
+      // key normalization mismatches, but the DB constraint is still the source
+      // of truth.
+      const existing = await prisma.brand.findUnique({
+        where: { canonicalName: processed },
       });
-      brandId = newBrand.id;
-      matchType = "auto_new";
-      canonicalMap.set(lower, brandId);
-      reviewCounts.set(processed, (reviewCounts.get(processed) ?? 0) + 1);
+      if (existing) {
+        brandId = existing.id;
+        matchType = "canonical_existing";
+        canonicalMap.set(lower, brandId);
+      } else {
+        const rule = classifyEntity(processed);
+        const newBrand = await prisma.brand.create({
+          data: {
+            canonicalName: processed,
+            entityType: rule.type,
+            rankingEnabled: rule.rankingEnabled,
+          },
+        });
+        brandId = newBrand.id;
+        matchType = "auto_new";
+        canonicalMap.set(lower, brandId);
+        reviewCounts.set(processed, (reviewCounts.get(processed) ?? 0) + 1);
+      }
     }
 
     resolvedToCreate.push({
