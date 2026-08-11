@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getLayerBBrandSlugs } from "@/lib/brand-enrichment";
 import { CATEGORY_SLUG_MAP } from "@/lib/categories";
 import { SITE_URL } from "@/lib/seo";
 import { getCurrentWeek } from "@/lib/week";
@@ -11,7 +12,7 @@ function getCurrentWeekDate() {
   return new Date(`${date}T00:00:00.000Z`);
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const rankingLastModified = getCurrentWeekDate();
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -43,5 +44,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })
   );
 
-  return [...staticRoutes, ...categoryRoutes];
+  let brandRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const layerBSlugs = await getLayerBBrandSlugs();
+    brandRoutes = layerBSlugs.map((slug) => ({
+      url: `${SITE_URL}/brand/${slug}`,
+      lastModified: rankingLastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+  } catch {
+    brandRoutes = [];
+  }
+
+  return [...staticRoutes, ...categoryRoutes, ...brandRoutes];
 }

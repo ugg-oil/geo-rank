@@ -24,11 +24,12 @@ cp .env.example .env
 | `PIPELINE_EXTRACTION_TIMEOUT_MS` | 抽取阶段总超时，默认 20 分钟 |
 | `PIPELINE_STAGE_TIMEOUT_MS` | 规范化、分类、计分和发布等阶段超时，默认 20 分钟 |
 | `PIPELINE_RUN_STALE_TIMEOUT_MS` | 判定旧运行记录失效的时间，默认 30 小时 |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 写入 Token |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 写入 Token（仅 `PUBLISH_BLOB_MIRROR=1` 时需要） |
 | `BLOB_STORE_ID` | Vercel Blob Store ID（项目连接 Blob 后自动注入） |
-| `LEADERBOARD_MANIFEST_URL` | 前台读取的 `latest/manifest.json` 公开 URL |
+| `PUBLISH_BLOB_MIRROR` | 设为 `1` 才在 publish 时写 Blob；默认跳过 |
+| `LEADERBOARD_MANIFEST_URL` | 可选 Blob `latest/manifest.json` URL（元数据 fallback，非 SoT） |
 
-本地开发可先不配 Blob；未配置时前台会回退到数据库读取。
+本地开发可先不配 Blob / 不设 `PUBLISH_BLOB_MIRROR`；前台主读数据库。
 
 ## 数据库
 
@@ -57,7 +58,7 @@ npm run dev
 1. 绑定自定义域名 `georadar.website`
 2. 在 Vercel Environment Variables 配置上表变量（Production / Preview）
 3. 确认 `NEXT_PUBLIC_SITE_URL=https://georadar.website`
-4. Connect Blob Store，确保有 `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID`
+4. （可选）Connect Blob Store；仅在需要镜像时设 `PUBLISH_BLOB_MIRROR=1` 与 `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID`
 5. Deploy
 
 ### 邮件告警（Resend）
@@ -74,8 +75,8 @@ npm run dev
 
 ## 首次发布快照
 
-1. 有周数据后执行 `npm run publish`（或触发线上 `/api/publish`）
-2. 将输出的 `latestManifest` URL 写入 `LEADERBOARD_MANIFEST_URL`
+1. 有周数据后执行 `npm run publish`（确认 DB 可读；默认跳过 Blob）
+2. 若需 CDN 镜像：设 `PUBLISH_BLOB_MIRROR=1` 后重跑 publish，将输出的 `latestManifest` URL 写入 `LEADERBOARD_MANIFEST_URL`
 3. Redeploy
 
 详见 [operations.md](./operations.md)。

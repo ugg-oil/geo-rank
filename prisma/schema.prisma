@@ -144,3 +144,31 @@ model PipelineRun {
   @@index([week, startedAt])
   @@map("pipeline_runs")
 }
+
+model CollectionRetry {
+  id        String   @id @default(cuid())
+  week      String
+  category  String
+  engine    String
+  attempts  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([week, category, engine])
+  @@map("collection_retries")
+}
+
+model Lead {
+  id         String   @id @default(cuid())
+  email      String
+  brandName  String   @map("brand_name")
+  website    String?
+  intent     String
+  message    String?
+  consent    Boolean
+  sourcePath String   @map("source_path")
+  ipHash     String   @map("ip_hash")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([ipHash, createdAt])
+  @@map("leads")
+}

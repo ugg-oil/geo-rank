@@ -23,6 +23,26 @@ assert(
   "SparkToro remains eligible outside its incorrect category"
 );
 assert(
+  isExcludedFromCategory("Wix", "E-commerce Platforms"),
+  "Wix excluded from E-commerce Platforms"
+);
+assert(
+  !isExcludedFromCategory("Wix", "SaaS Software"),
+  "Wix remains eligible outside E-commerce Platforms"
+);
+assert(
+  isExcludedFromCategory("Zoom", "AI Meeting Assistants"),
+  "Zoom excluded from AI Meeting Assistants"
+);
+assert(
+  isExcludedFromCategory("Norton", "AI Cybersecurity Tools"),
+  "Norton excluded from AI Cybersecurity Tools"
+);
+assert(
+  isExcludedFromCategory("Workday", "Recruiting Tools"),
+  "Workday excluded from Recruiting Tools"
+);
+assert(
   !classifyEntity("Black Forest Labs").rankingEnabled,
   "Black Forest Labs classified as a non-ranked company"
 );

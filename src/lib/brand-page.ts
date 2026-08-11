@@ -1,3 +1,10 @@
+import { unstable_cache } from "next/cache";
+import {
+  buildBrandIndexFromDb,
+  buildBrandPages,
+} from "@/lib/brand-page-build";
+import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+
 // ── Types (matching PRD data contract) ──────────────────────────────
 
 export interface BrandPageEngineEntry {
@@ -11,6 +18,8 @@ export interface BrandPageCategoryEntry {
   score: number;
   mentionFrequency: number;
   engines: Record<string, BrandPageEngineEntry>;
+  /** P1: raw AI excerpts per engine (English, unpublished translation). */
+  engineExcerpts?: Record<string, string[]>;
 }
 
 export interface BrandPageData {
@@ -21,6 +30,7 @@ export interface BrandPageData {
   name: string;
   parentCompany: string | null;
   updatedAt: string;
+  collectedEngines?: string[];
   categories: BrandPageCategoryEntry[];
 }
 
@@ -42,15 +52,15 @@ export function toBrandSlug(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// ── Read from Vercel Blob ───────────────────────────────────────────
+// ── DB-first reads (Blob brands/* is optional mirror only) ───────────
 
-const PUBLISHED_REVALIDATE_SECONDS =
-  process.env.NODE_ENV === "development" ? 0 : 300;
+const REVALIDATE_SECONDS = process.env.NODE_ENV === "development" ? 0 : 300;
 
 /**
  * Derive the Blob base from LEADERBOARD_MANIFEST_URL, which points at
  * leaderboards/latest/manifest.json (or a week manifest). Brand data is
  * published next to it under brands/... on the same Blob store.
+ * Optional mirror only — not required for primary UX.
  */
 function getBlobBaseUrl(): string | null {
   const manifestUrl = process.env.LEADERBOARD_MANIFEST_URL;
@@ -65,37 +75,72 @@ function getBlobBaseUrl(): string | null {
   }
 }
 
-/**
- * Read the brands index from Blob (published during pipeline runs).
- * Returns a map of slug → { name, parentCompany }.
- */
-export async function getBrandIndex(): Promise<BrandIndex> {
-  const base = getBlobBaseUrl();
-  if (!base) return {};
-  try {
-    const response = await fetch(`${base}/index.json`, {
-      next: { revalidate: PUBLISHED_REVALIDATE_SECONDS },
-    });
-    if (!response.ok) return {};
-    return (await response.json()) as BrandIndex;
-  } catch {
-    return {};
+/** Cached full-week brand pages (DB SoT). Shared by brand + company reads. */
+export async function getBrandPagesForWeek(week: string) {
+  if (!process.env.NEXT_RUNTIME) {
+    return buildBrandPages(week);
   }
+  return unstable_cache(
+    () => buildBrandPages(week),
+    ["brand-pages-db", week],
+    { revalidate: REVALIDATE_SECONDS, tags: [`brand-pages-${week}`] }
+  )();
+}
+
+async function cachedBrandIndex(week: string) {
+  if (!process.env.NEXT_RUNTIME) {
+    return buildBrandIndexFromDb(week);
+  }
+  return unstable_cache(
+    () => buildBrandIndexFromDb(week),
+    ["brand-index-db", week],
+    { revalidate: REVALIDATE_SECONDS, tags: [`brand-pages-${week}`] }
+  )();
+}
+
+async function resolvePublishedWeek(week?: string): Promise<string | null> {
+  if (week) return week;
+  const weeks = await getPublishedLeaderboardWeeks();
+  return weeks[0] ?? null;
 }
 
 /**
- * Read a single brand's data for a given week from Blob.
+ * Brand index from DB snapshots for the latest (or given) published week.
+ * Blob brands/index.json is not consulted.
+ */
+export async function getBrandIndex(week?: string): Promise<BrandIndex> {
+  const target = await resolvePublishedWeek(week);
+  if (!target) return {};
+  return cachedBrandIndex(target);
+}
+
+/**
+ * Single brand page for a published week — DB SoT (includes engineExcerpts when responses exist).
+ * Optional Blob fetch is unused for primary reads.
  */
 export async function getPublishedBrandPage(
   slug: string,
   week: string
 ): Promise<BrandPageData | null> {
+  const { brandPages } = await getBrandPagesForWeek(week);
+  return brandPages.find((page) => page.slug === slug) ?? null;
+}
+
+/**
+ * Optional Blob mirror read (debug only). Gated behind `PUBLISH_BLOB_MIRROR=1`.
+ * Not used by primary UX paths — brand pages read DB.
+ */
+export async function getBlobBrandPage(
+  slug: string,
+  week: string
+): Promise<BrandPageData | null> {
+  if (process.env.PUBLISH_BLOB_MIRROR !== "1") return null;
   const base = getBlobBaseUrl();
   if (!base) return null;
   try {
     const response = await fetch(
       `${base}/${encodeURIComponent(slug)}/${encodeURIComponent(week)}.json`,
-      { next: { revalidate: PUBLISHED_REVALIDATE_SECONDS } }
+      { next: { revalidate: REVALIDATE_SECONDS } }
     );
     if (!response.ok) return null;
     return (await response.json()) as BrandPageData;

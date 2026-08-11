@@ -1,58 +1,50 @@
-import { getPublishedBrandPage } from "@/lib/brand-page";
-import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+import { CATEGORY_CARDS } from "@/lib/category-cards";
+import {
+  buildBrandCategoryHistories,
+  type BrandCategoryHistory,
+  type BrandHistoryPoint,
+} from "@/lib/brand-history-data";
+import { getPublishedCategoryLeaderboards, getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 
-export type BrandHistoryPoint = {
-  week: string;
-  weekDate: string;
-  rank: number;
-  score: number;
-};
-
-export type BrandCategoryHistory = {
-  categorySlug: string;
-  points: BrandHistoryPoint[];
-};
+export type { BrandCategoryHistory, BrandHistoryPoint };
 
 /**
- * Read rank/score history for a brand across published weekly snapshots.
- * Data is read-only from Blob; scores are not recomputed.
+ * Rank/score history for a brand across published weekly overall boards.
+ * Uses DB published weeks + DB boards (same SoT as B1).
  */
 export async function getBrandCategoryHistories(
   slug: string
 ): Promise<BrandCategoryHistory[]> {
   const weeks = await getPublishedLeaderboardWeeks();
-  if (weeks.length < 2) return [];
+  if (weeks.length === 0) return [];
 
   const chronological = [...weeks].reverse();
-  const snapshots = await Promise.all(
-    chronological.map((week) => getPublishedBrandPage(slug, week))
+  const categorySlugs = CATEGORY_CARDS.map((category) => category.slug);
+
+  const boardsByWeek: Record<string, Record<string, { brandSlug: string; rank: number; score: number }[]>> =
+    {};
+
+  await Promise.all(
+    chronological.map(async (week) => {
+      const categoryBoards = await Promise.all(
+        categorySlugs.map(async (categorySlug) => {
+          const board = await getPublishedCategoryLeaderboards(categorySlug, week);
+          return {
+            categorySlug,
+            rows:
+              board?.boards.overall.snapshots.map((row) => ({
+                brandSlug: row.brandSlug,
+                rank: row.rank,
+                score: row.score,
+              })) ?? [],
+          };
+        })
+      );
+      boardsByWeek[week] = Object.fromEntries(
+        categoryBoards.map((entry) => [entry.categorySlug, entry.rows])
+      );
+    })
   );
 
-  const categorySlugs = new Set<string>();
-  for (const snapshot of snapshots) {
-    for (const category of snapshot?.categories ?? []) {
-      categorySlugs.add(category.slug);
-    }
-  }
-
-  const histories: BrandCategoryHistory[] = [];
-  for (const categorySlug of categorySlugs) {
-    const points: BrandHistoryPoint[] = [];
-    for (let i = 0; i < chronological.length; i++) {
-      const week = chronological[i];
-      const category = snapshots[i]?.categories.find((entry) => entry.slug === categorySlug);
-      if (!category) continue;
-      points.push({
-        week,
-        weekDate: week.replace("Week of ", ""),
-        rank: category.rank,
-        score: category.score,
-      });
-    }
-    if (points.length >= 2) {
-      histories.push({ categorySlug, points });
-    }
-  }
-
-  return histories;
+  return buildBrandCategoryHistories(slug, chronological, boardsByWeek);
 }

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { LocaleScript } from "@/components/locale-script";
 import { ThemeScript } from "@/components/theme-script";
 import { SITE_URL } from "@/lib/seo";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
     template: "%s | GEO Radar",
   },
   description:
-    "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
+    "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
   keywords: [
     "AI visibility",
     "AI visibility rankings",
@@ -21,11 +23,14 @@ export const metadata: Metadata = {
     "ChatGPT rankings",
     "Gemini rankings",
     "Grok rankings",
+    "Perplexity rankings",
+    "Claude rankings",
+    "DeepSeek rankings",
   ],
   openGraph: {
     title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
+      "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
     url: "/",
     siteName: "GEO Radar",
     type: "website",
@@ -40,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Which Products Does AI Recommend? | GEO Radar",
     description:
-      "See the Top 20 products showing up in ChatGPT, Gemini, and Grok answers. Weekly AI visibility rankings, updated every Monday.",
+      "See how often leading AI engines mention your brand — and how that rank trends week over week — so you can improve GEO.",
     images: ["/og-image.png"],
   },
 };
@@ -54,6 +59,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <ThemeScript />
+        <LocaleScript />
       </head>
       <body className="min-h-screen antialiased flex flex-col">
         <SiteHeader />

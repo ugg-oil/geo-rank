@@ -3,7 +3,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createPrismaClient() {
   if (!process.env.DATABASE_URL) {
@@ -15,6 +15,17 @@ function createPrismaClient() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma || createPrismaClient();
+function hasLeadDelegate(client: PrismaClient) {
+  const lead = (client as unknown as { lead?: { count?: unknown } }).lead;
+  return typeof lead?.count === "function";
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+function getPrismaClient() {
+  const existing = globalForPrisma.prisma;
+  if (existing && hasLeadDelegate(existing)) return existing;
+  const client = createPrismaClient();
+  if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
+  return client;
+}
+
+export const prisma = getPrismaClient();

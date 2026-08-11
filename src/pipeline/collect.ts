@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getOpenRouter } from "@/lib/openrouter";
-import { ENGINES, ENGINE_MODEL_SLUGS, type Engine } from "@/lib/constants";
+import { COLLECTION_ENGINES, ENGINE_MODEL_SLUGS, type Engine } from "@/lib/constants";
 import { getCurrentWeek } from "@/lib/week";
 import {
   assertBeforeDeadline,
@@ -8,6 +8,23 @@ import {
 } from "@/lib/pipeline-timeouts";
 
 const COLLECTION_CONCURRENCY = 4;
+
+function completionText(message: { content?: unknown } | undefined) {
+  const content = message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object" && "text" in part) {
+          return typeof part.text === "string" ? part.text : "";
+        }
+        return "";
+      })
+      .join("");
+  }
+  return "";
+}
 
 type CollectionJob = {
   category: string;
@@ -31,7 +48,7 @@ async function collectOne(job: CollectionJob, week: string) {
       temperature: 0.7,
     });
 
-    const rawText = completion.choices[0]?.message?.content ?? "";
+    const rawText = completionText(completion.choices[0]?.message);
     const tokenCost =
       ((completion.usage?.prompt_tokens ?? 0) +
         (completion.usage?.completion_tokens ?? 0)) *
@@ -75,23 +92,37 @@ async function collectOne(job: CollectionJob, week: string) {
   }
 }
 
+export type CollectOptions = {
+  /** Appended to each seed prompt (P5 backfill: ` as of YYYY-MM-DD`). */
+  promptSuffix?: string;
+  /** Limit collection to these categories (default: all CATEGORIES). */
+  categories?: readonly string[];
+  /**
+   * When true, skip period-cadence gating (explicit category backfill for a period key).
+   * Default false — cron still uses shouldCollectCategoryInPeriod.
+   */
+  forceCategories?: boolean;
+};
+
 export async function collectCategory(
   category: string,
   week?: string,
   deadline?: number,
-  onlyEngine?: Engine
+  onlyEngine?: Engine,
+  options: CollectOptions = {}
 ) {
   const w = week ?? getCurrentWeek();
   const prompts = await prisma.prompt.findMany({
     where: { category, active: true },
   });
-  const engines = onlyEngine ? [onlyEngine] : [...ENGINES];
+  const engines = onlyEngine ? [onlyEngine] : [...COLLECTION_ENGINES];
+  const suffix = options.promptSuffix ?? "";
   const jobs: CollectionJob[] = engines.flatMap((engine) =>
     prompts.map((prompt) => ({
       category,
       engine,
       promptId: prompt.id,
-      promptText: prompt.promptText,
+      promptText: `${prompt.promptText}${suffix}`,
     }))
   );
   const results: string[] = [];
@@ -114,14 +145,36 @@ export async function collectCategory(
   return results;
 }
 
-export async function collectAll(week?: string) {
+export async function collectEngine(
+  week: string,
+  engine: Engine,
+  deadline?: number,
+  options: CollectOptions = {}
+) {
   const { CATEGORIES } = await import("@/lib/constants");
-  const w = week ?? getCurrentWeek();
-  const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
+  const { getCategoryPeriodDays } = await import("@/lib/category-period");
+  const { shouldCollectCategoryInPeriod } = await import("@/lib/period");
+  const categories = options.categories ?? CATEGORIES;
   const allResults: string[] = [];
-  for (const category of CATEGORIES) {
-    assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
-    allResults.push(...(await collectCategory(category, w, deadline)));
+  for (const category of categories) {
+    if (
+      !options.forceCategories &&
+      !shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+    ) {
+      continue;
+    }
+    if (deadline) assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
+    allResults.push(...(await collectCategory(category, week, deadline, engine, options)));
+  }
+  return allResults;
+}
+
+export async function collectAll(week?: string, options: CollectOptions = {}) {
+  const w = week ?? getCurrentWeek();
+  const allResults: string[] = [];
+  for (const engine of COLLECTION_ENGINES) {
+    const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
+    allResults.push(...(await collectEngine(w, engine, deadline, options)));
   }
   return allResults;
 }

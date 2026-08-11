@@ -1,5 +1,11 @@
 # GEO Radar 数据管道（MVP）
 
+> **文件名日期**：`2026-07-30` = 本文 git 首次入库日（首版 authorship）。正文为 **legacy MVP 管道写照**（此后可能有小改，但角色不变：实现细节 / 历史对照）。  
+> **现行实现说明（legacy）**：B1 前默认行为——PostgreSQL 计算 + Vercel Blob 为前台主读。**B1–B3 已落地**：DB-first 读；Blob 写入默认关（`PUBLISH_BLOB_MIRROR=1`）。本文保留计分/模型/Blob 路径等实现细节作历史对照。  
+> **架构已改定为** Snapshot SoT / DB-first → [数据管道架构决策：Snapshot 唯一真相（已定）](./data-pipeline-db-primary-2026-08-08.md)。  
+> **可执行落地**：[B1–B3 实现 runbook](./data-pipeline-db-primary-impl-2026-08-08.md)。  
+> **本文保留作实现细节与历史对照，不是备选方案。**
+
 > 本文档记录 pipeline 的详细实现和数据模型。整体系统边界与组件职责以 [architecture.md](./architecture.md) 为准，操作命令以 [operations.md](../ops/operations.md) 为准。
 
 ## 1. 总目标
