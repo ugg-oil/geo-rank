@@ -70,6 +70,14 @@ body {
   color: var(--text);
 }
 
+/* Tailwind v4 preflight drops the legacy pointer cursor on buttons. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+select {
+  cursor: pointer;
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;

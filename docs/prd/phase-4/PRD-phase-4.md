@@ -1,11 +1,12 @@
 # GEO Radar：第四阶段 PRD
 
-> v1.4。未纳入见 [PRD-phase-next.md](../PRD-phase-next.md)。品类 / 周期 / Prompt / exclude 见 [category-selection.md](../category-selection.md)。
+> v1.4 · **已发布**。下一阶段见 [PRD-phase-5.md](../phase-5/PRD-phase-5.md)；未排期见 [PRD-phase-next.md](../PRD-phase-next.md)。品类 / 周期 / Prompt / exclude 见 [category-selection.md](../category-selection.md)。
 
 | 字段 | 内容 |
 |------|------|
 | 产品 | GEO Radar |
 | 阶段 | Phase 4 · 基线 v1.3 → 目标 v1.4 |
+| 状态 | 已发布 |
 | 文档 | 中文 · 网站英文 |
 
 ## 顺序
@@ -134,7 +135,7 @@ Overall 下、Top 20 正下方；同宽同栏。
 
 - [x] 按上表「未采」补齐各品类（VPN / E-commerce：`07-27` + `08-10`；其余：`08-10`）
 - [x] 各品类临近 4 档 launch-gate 通过（`08-10` `--all-new` + VPN/Ecom `07-27`）
-- [ ] `publish` / 确认 DB SoT 可读；category-selection 状态 →「已发布」
+- [x] `publish` / 确认 DB SoT 可读；category-selection 状态 →「已发布」
 
 ### 条目（配置 vs 采集分开勾）
 

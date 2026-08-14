@@ -1,6 +1,6 @@
 # GEO Radar：后续规划
 
-> 未排期。已实现见 [phase-1](./PRD-phase-1.md)、[phase-2](./PRD-phase-2.md)、[phase-3](./phase-3/PRD-phase-3.md)；当前开发见 [phase-4](./phase-4/PRD-phase-4.md)。
+> **未排期**（后续开发池）。已发布见 [phase-1](./PRD-phase-1.md)、[phase-2](./PRD-phase-2.md)、[phase-3](./phase-3/PRD-phase-3.md)、[phase-4](./phase-4/PRD-phase-4.md)（v1.4）；**当前开发**见 [phase-5](./phase-5/PRD-phase-5.md)。
 >
 > 品类清单 / 周期 / Prompt 维护见 [category-selection.md](./category-selection.md)。
 
