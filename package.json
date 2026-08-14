@@ -20,6 +20,8 @@
     "pipeline:also-mentioned": "npx tsx src/scripts/verify-also-mentioned.ts",
     "pipeline:period-highlight": "npx tsx src/scripts/verify-period-highlight.ts",
     "pipeline:quadrant": "npx tsx src/scripts/verify-competition-quadrant.ts",
+    "pipeline:category-board": "npx tsx src/scripts/verify-category-board.ts",
+    "pipeline:category-board-e2e": "bash src/scripts/run-category-board-e2e.sh",
     "pipeline:estimate-cost": "npx tsx src/scripts/estimate-engine-cost.ts",
     "audit:entities": "npx tsx src/scripts/audit-entities.ts",
     "migrate:entities": "npx tsx src/scripts/migrate-entity-audit.ts",

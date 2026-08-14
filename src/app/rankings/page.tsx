@@ -42,7 +42,8 @@ export default async function RankingsPage() {
   const week = manifest?.week ?? weeks[0] ?? null;
   const cards = CATEGORY_CARDS.map((cat) => ({
     slug: cat.slug as CategorySlug,
-    leader: leaders[cat.slug] ?? null,
+    family: cat.family,
+    leaders: leaders[cat.slug] ?? null,
   }));
 
   return (
