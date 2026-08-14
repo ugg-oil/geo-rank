@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
+import { cache, Suspense } from "react";
 import { notFound } from "next/navigation";
+import { BrandEvidenceSection } from "@/components/brand-evidence-section";
 import { BrandPageContent } from "@/components/brand-page-content";
-import {
-  getBrandLayerBStatus,
-  getSimilarBrandsForBrand,
-} from "@/lib/brand-enrichment";
-import { getBrandCategoryHistories } from "@/lib/brand-history";
-import { getPublishedBrandPage, type BrandPageData } from "@/lib/brand-page";
-import {
-  getPublishedLeaderboardWeeks,
-} from "@/lib/published-leaderboard";
+import { getBrandPageBundle } from "@/lib/brand-page";
 import { getSiteUrl, stringifyJsonLd } from "@/lib/seo";
 import { formatEngineList } from "@/lib/constants";
 
@@ -41,51 +35,29 @@ function getValidBrandBackTarget(from?: string): URL | null {
   }
 }
 
-async function getBrandPage(slug: string, requestedWeek?: string): Promise<BrandPageData | null> {
-  const weeks = await getPublishedLeaderboardWeeks();
-  const selectedWeek =
-    requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
-      ? `Week of ${requestedWeek}`
-      : weeks[0];
-
-  if (selectedWeek) {
-    const published = await getPublishedBrandPage(slug, selectedWeek);
-    if (published) return published;
-  }
-
-  // Fall back across published weeks when latest has no brand snapshot yet.
-  if (!requestedWeek) {
-    for (const week of weeks) {
-      if (week === selectedWeek) continue;
-      const published = await getPublishedBrandPage(slug, week);
-      if (published) return published;
-    }
-  }
-
-  return null;
-}
+const getBundle = cache(async (slug: string, requestedWeek?: string) => {
+  return getBrandPageBundle(slug, requestedWeek);
+});
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
   const { week, from } = await searchParams;
   const weekParam = week ?? weekFromFromParam(from);
-  const [data, layerB] = await Promise.all([
-    getBrandPage(slug, weekParam),
-    getBrandLayerBStatus(slug),
-  ]);
+  const bundle = await getBundle(slug, weekParam);
+  const data = bundle?.data ?? null;
   if (!data) {
     return { title: "Brand not found", robots: { index: false, follow: false } };
   }
   return {
     title: `${data.name} — AI Visibility`,
-    description: `See how ${data.name} ranks in weekly AI visibility rankings across ${formatEngineList()}.`,
-    robots: layerB.layerB
+    description: `See how ${data.name} ranks in AI visibility rankings across ${formatEngineList()}.`,
+    robots: bundle?.layerB.layerB
       ? { index: true, follow: true }
       : { index: false, follow: true },
     alternates: { canonical: `/brand/${slug}` },
     openGraph: {
       title: `${data.name} — AI Visibility | GEO Radar`,
-      description: `See how ${data.name} ranks in weekly AI visibility rankings across ${formatEngineList()}.`,
+      description: `See how ${data.name} ranks in AI visibility rankings across ${formatEngineList()}.`,
       url: `/brand/${slug}`,
       siteName: "GEO Radar",
       type: "website",
@@ -94,7 +66,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     twitter: {
       card: "summary_large_image",
       title: `${data.name} — AI Visibility | GEO Radar`,
-      description: `See how ${data.name} ranks in weekly AI visibility rankings across ${formatEngineList()}.`,
+      description: `See how ${data.name} ranks in AI visibility rankings across ${formatEngineList()}.`,
       images: ["/og-image.png"],
     },
   };
@@ -104,16 +76,9 @@ export default async function BrandPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { from, week } = await searchParams;
   const weekParam = week ?? weekFromFromParam(from);
-  const data = await getBrandPage(slug, weekParam);
-  if (!data) notFound();
-
-  const [histories, similarByCategory] = await Promise.all([
-    getBrandCategoryHistories(slug),
-    getSimilarBrandsForBrand(
-      slug,
-      data.categories.map((category) => category.slug)
-    ),
-  ]);
+  const bundle = await getBundle(slug, weekParam);
+  if (!bundle) notFound();
+  const { data, histories, similarByCategory } = bundle;
 
   const historyByCategory = Object.fromEntries(
     histories.map((entry) => [entry.categorySlug, entry.points])
@@ -146,6 +111,11 @@ export default async function BrandPage({ params, searchParams }: Props) {
         similarByCategory={similarByCategory}
         backHref={backHref}
         backCategorySlug={backCategorySlug}
+        evidence={
+          <Suspense fallback={null}>
+            <BrandEvidenceSection slug={slug} week={data.week} />
+          </Suspense>
+        }
       />
     </main>
   );

@@ -1,9 +1,19 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { CATEGORY_TO_SLUG } from "@/lib/categories";
+import { CATEGORY_SLUG_MAP, CATEGORY_TO_SLUG } from "@/lib/categories";
 import { COLLECTION_ENGINES, SCORING_VERSION } from "@/lib/constants";
 import { selectBrandExcerpts } from "@/lib/brand-excerpts";
+import { resolveBrandBySlug, resolveBrandIdBySlug } from "@/lib/brand-resolve";
 import { toBrandSlug } from "@/lib/brand-slug";
+import { evaluateLayerB } from "@/lib/brand-layer-b";
+import {
+  buildBrandCategoryHistories,
+  type BrandCategoryHistory,
+} from "@/lib/brand-history-data";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
+import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+import { selectSimilarBrands, type SimilarBrandCandidate } from "@/lib/similar-brands";
+import { ttlCache } from "@/lib/ttl-cache";
 import type {
   BrandIndex,
   BrandPageCategoryEntry,
@@ -188,6 +198,405 @@ export async function buildBrandPages(week: string): Promise<{
   }
 
   return { brandPages, brandIndex };
+}
+
+function toBrandPage(
+  week: string,
+  slug: string,
+  info: BrandBuildInfo,
+  engineMap: Map<string, Map<string, Record<string, BrandPageEngineEntry>>>,
+  mentionIndex: Map<
+    string,
+    Map<string, Map<string, { responseId: string; rawText: string; position: number }[]>>
+  >,
+  brandId: string
+): BrandPageData {
+  const displayName = getProductDisplayName(info.canonicalName);
+  const matchNames = [displayName, info.canonicalName, ...info.aliases];
+  const categories: BrandPageCategoryEntry[] = info.categories
+    .filter((c) => CATEGORY_TO_SLUG[c.category] !== undefined)
+    .map((c) => {
+      const engines = engineMap.get(brandId)?.get(c.category) ?? {};
+      const engineExcerpts: Record<string, string[]> = {};
+      const byEngine = mentionIndex.get(brandId)?.get(c.category);
+      if (byEngine) {
+        for (const [engine, candidates] of byEngine) {
+          const selected = selectBrandExcerpts(candidates, matchNames);
+          if (selected.length > 0) engineExcerpts[engine] = selected;
+        }
+      }
+      return {
+        slug: CATEGORY_TO_SLUG[c.category]!,
+        rank: c.rank,
+        score: c.score,
+        mentionFrequency: c.appearanceRate,
+        engines,
+        ...(Object.keys(engineExcerpts).length > 0 ? { engineExcerpts } : {}),
+      };
+    });
+
+  return {
+    schemaVersion: 2,
+    scoringVersion: SCORING_VERSION,
+    week,
+    slug,
+    name: displayName,
+    parentCompany: info.parentCompany,
+    updatedAt: new Date().toISOString().split("T")[0]!,
+    collectedEngines: [...COLLECTION_ENGINES],
+    categories,
+  };
+}
+
+/**
+ * Rank/engine shell only. Excerpts are `loadBrandExcerptsForPage` (Suspense).
+ */
+export async function buildBrandPageForSlug(
+  week: string,
+  slug: string
+): Promise<BrandPageData | null> {
+  const brandId = await resolveBrandIdBySlug(slug);
+  if (!brandId) return null;
+
+  const [brand, snaps] = await Promise.all([
+    prisma.brand.findUnique({
+      where: { id: brandId },
+      select: {
+        canonicalName: true,
+        parentBrand: { select: { canonicalName: true } },
+      },
+    }),
+    prisma.snapshot.findMany({
+      where: { week, brandId },
+      select: {
+        category: true,
+        engine: true,
+        rank: true,
+        score: true,
+        appearanceRate: true,
+      },
+    }),
+  ]);
+  const overalls = snaps.filter((row) => row.engine == null);
+  const engineSnapshots = snaps.filter((row) => row.engine != null);
+  if (!brand || overalls.length === 0) return null;
+
+  const info: BrandBuildInfo = {
+    canonicalName: brand.canonicalName,
+    parentCompany: getCompanyColumnName(
+      brand.canonicalName,
+      brand.parentBrand?.canonicalName
+    ),
+    aliases: [],
+    categories: overalls.map((s) => ({
+      category: s.category,
+      rank: s.rank,
+      score: s.score,
+      appearanceRate: s.appearanceRate,
+    })),
+  };
+
+  const engineMap = new Map<string, Map<string, Record<string, BrandPageEngineEntry>>>();
+  engineMap.set(brandId, new Map());
+  const catMap = engineMap.get(brandId)!;
+  for (const s of engineSnapshots) {
+    if (!catMap.has(s.category)) catMap.set(s.category, {});
+    catMap.get(s.category)![s.engine!] = { rank: s.rank, score: s.score };
+  }
+
+  return toBrandPage(week, slug, info, engineMap, new Map(), brandId);
+}
+
+export type BrandPageBundle = {
+  data: BrandPageData;
+  histories: BrandCategoryHistory[];
+  similarByCategory: Record<string, SimilarBrandCandidate[]>;
+  layerB: ReturnType<typeof evaluateLayerB>;
+};
+
+/**
+ * Brand shell in two DB waves (resolve+weeks, then brand snaps + overall Top 20).
+ * Similar engine rows are a third wave only when neighbors exist.
+ */
+export async function loadBrandPageBundle(
+  slug: string,
+  requestedWeek?: string
+): Promise<BrandPageBundle | null> {
+  const ref = await resolveBrandBySlug(slug);
+  if (!ref) return null;
+  const snaps = await prisma.snapshot.findMany({
+    where: { brandId: ref.id },
+    select: {
+      week: true,
+      category: true,
+      engine: true,
+      rank: true,
+      score: true,
+      appearanceRate: true,
+    },
+  });
+
+  const overallByWeek = snaps.filter((row) => row.engine == null);
+  const snapWeeks = [
+    ...new Set(overallByWeek.map((row) => row.week)),
+  ].sort((a, b) => b.localeCompare(a));
+
+  const requested =
+    requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
+      ? `Week of ${requestedWeek}`
+      : requestedWeek && snapWeeks.includes(requestedWeek)
+        ? requestedWeek
+        : snapWeeks[0]!;
+
+  let selectedWeek = requested;
+  if (!overallByWeek.some((row) => row.week === selectedWeek) && !requestedWeek) {
+    selectedWeek = snapWeeks[0] ?? "";
+  }
+  const overalls = overallByWeek.filter((row) => row.week === selectedWeek);
+  if (!selectedWeek || overalls.length === 0) return null;
+
+  const engineSnapshots = snaps.filter(
+    (row) => row.week === selectedWeek && row.engine != null
+  );
+  const info: BrandBuildInfo = {
+    canonicalName: ref.canonicalName,
+    parentCompany: getCompanyColumnName(ref.canonicalName, ref.parentCanonicalName),
+    aliases: [],
+    categories: overalls.map((row) => ({
+      category: row.category,
+      rank: row.rank,
+      score: row.score,
+      appearanceRate: row.appearanceRate,
+    })),
+  };
+  const engineMap = new Map<string, Map<string, Record<string, BrandPageEngineEntry>>>();
+  engineMap.set(ref.id, new Map());
+  const catMap = engineMap.get(ref.id)!;
+  for (const row of engineSnapshots) {
+    if (!catMap.has(row.category)) catMap.set(row.category, {});
+    catMap.get(row.category)![row.engine!] = { rank: row.rank, score: row.score };
+  }
+  const data = toBrandPage(selectedWeek, slug, info, engineMap, new Map(), ref.id);
+
+  const boardsByWeek: Record<
+    string,
+    Record<string, { brandSlug: string; rank: number; score: number }[]>
+  > = {};
+  const layerBoards: Record<string, Record<string, { brandSlug: string }[]>> = {};
+  for (const row of overallByWeek) {
+    const categorySlug = CATEGORY_TO_SLUG[row.category];
+    if (!categorySlug) continue;
+    boardsByWeek[row.week] ??= {};
+    boardsByWeek[row.week][categorySlug] ??= [];
+    boardsByWeek[row.week][categorySlug].push({
+      brandSlug: slug,
+      rank: row.rank,
+      score: row.score,
+    });
+    layerBoards[row.week] ??= {};
+    layerBoards[row.week][categorySlug] ??= [];
+    layerBoards[row.week][categorySlug].push({ brandSlug: slug });
+  }
+
+  const wantedNames = data.categories
+    .map((entry) => CATEGORY_SLUG_MAP[entry.slug])
+    .filter((name): name is string => Boolean(name));
+  const similarSnaps =
+    wantedNames.length === 0
+      ? []
+      : await prisma.snapshot.findMany({
+          where: {
+            week: selectedWeek,
+            category: { in: wantedNames },
+            rank: { lte: 20 },
+          },
+          select: {
+            category: true,
+            engine: true,
+            rank: true,
+            score: true,
+            brand: { select: { canonicalName: true } },
+          },
+        });
+
+  type SimilarBoard = {
+    snapshots: { brandSlug: string; brandName: string; rank: number; score: number }[];
+  };
+  const byCategory = new Map<
+    string,
+    { overall: SimilarBoard; engines: Record<string, SimilarBoard> }
+  >();
+  for (const name of wantedNames) {
+    byCategory.set(name, { overall: { snapshots: [] }, engines: {} });
+  }
+  for (const snap of similarSnaps) {
+    const bucket = byCategory.get(snap.category);
+    if (!bucket) continue;
+    const brandName = getProductDisplayName(snap.brand.canonicalName);
+    const row = {
+      brandSlug: toBrandSlug(brandName),
+      brandName,
+      rank: snap.rank,
+      score: snap.score,
+    };
+    if (!snap.engine) {
+      bucket.overall.snapshots.push(row);
+      continue;
+    }
+    bucket.engines[snap.engine] ??= { snapshots: [] };
+    bucket.engines[snap.engine].snapshots.push(row);
+  }
+
+  const similarByCategory: Record<string, SimilarBrandCandidate[]> = {};
+  for (const entry of data.categories) {
+    const name = CATEGORY_SLUG_MAP[entry.slug];
+    const bucket = name ? byCategory.get(name) : undefined;
+    similarByCategory[entry.slug] = bucket
+      ? selectSimilarBrands(slug, bucket.overall, bucket.engines)
+      : [];
+  }
+
+  const weeks = await getPublishedLeaderboardWeeks();
+  const histories = buildBrandCategoryHistories(
+    slug,
+    (weeks.length > 0 ? weeks : snapWeeks).slice().reverse(),
+    boardsByWeek
+  );
+  const layerB = evaluateLayerB(slug, weeks.length > 0 ? weeks : snapWeeks, layerBoards);
+
+  return { data, histories, similarByCategory, layerB };
+}
+
+export type BrandExcerptGroup = {
+  categorySlug: string;
+  engine: string;
+  text: string;
+};
+
+/** Slow path: a few rawText rows per engine. Stream behind Suspense. */
+export async function loadBrandExcerptsForPage(
+  week: string,
+  slug: string
+): Promise<BrandExcerptGroup[]> {
+  return ttlCache(`excerpts:${week}:${slug}`, 60_000, () =>
+    loadBrandExcerptsUncached(week, slug)
+  );
+}
+
+async function loadBrandExcerptsUncached(
+  week: string,
+  slug: string
+): Promise<BrandExcerptGroup[]> {
+  const brandId = await resolveBrandIdBySlug(slug);
+  if (!brandId) return [];
+
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: {
+      canonicalName: true,
+      aliases: { select: { alias: true } },
+    },
+  });
+  const overalls = await prisma.snapshot.findMany({
+    where: { week, brandId, engine: null },
+    select: { category: true },
+  });
+  if (!brand || overalls.length === 0) return [];
+
+  const categories = [...new Set(overalls.map((row) => row.category))];
+  const mentionRows =
+    categories.length === 0
+      ? []
+      : await prisma.$queryRaw<
+          Array<{
+            responseId: string;
+            position: number;
+            category: string;
+            engine: string;
+          }>
+        >(Prisma.sql`
+          SELECT rm.response_id AS "responseId", rm.position, r.category, r.engine
+          FROM resolved_mentions rm
+          INNER JOIN responses r ON r.id = rm.response_id
+          WHERE rm.brand_id = ${brandId}
+            AND r.week = ${week}
+            AND r.status = 'ok'
+            AND r.category IN (${Prisma.join(categories)})
+        `);
+
+  const responseMeta = mentionRows.map((row) => ({
+    id: row.responseId,
+    category: row.category,
+    engine: row.engine,
+  }));
+  const mentions = mentionRows.map((row) => ({
+    responseId: row.responseId,
+    position: row.position,
+  }));
+  const excerptIds = pickExcerptResponseIds(mentions, responseMeta, 3);
+  const responses =
+    excerptIds.length === 0
+      ? []
+      : await prisma.response.findMany({
+          where: { id: { in: excerptIds } },
+          select: { id: true, category: true, engine: true, rawText: true },
+        });
+
+  const displayName = getProductDisplayName(brand.canonicalName);
+  const matchNames = [displayName, brand.canonicalName, ...brand.aliases.map((a) => a.alias)];
+  const groups: BrandExcerptGroup[] = [];
+  const byCatEngine = new Map<string, { responseId: string; rawText: string; position: number }[]>();
+  const positionByResponse = new Map(mentions.map((m) => [m.responseId, m.position]));
+  for (const response of responses) {
+    if (!response.rawText) continue;
+    const key = `${response.category}::${response.engine}`;
+    const list = byCatEngine.get(key) ?? [];
+    list.push({
+      responseId: response.id,
+      rawText: response.rawText,
+      position: positionByResponse.get(response.id) ?? 99,
+    });
+    byCatEngine.set(key, list);
+  }
+  for (const [key, candidates] of byCatEngine) {
+    const [category, engine] = key.split("::");
+    const categorySlug = CATEGORY_TO_SLUG[category ?? ""];
+    if (!categorySlug || !engine) continue;
+    const selected = selectBrandExcerpts(candidates, matchNames);
+    if (selected[0]) {
+      groups.push({ categorySlug, engine, text: selected[0] });
+    }
+  }
+  groups.sort(
+    (a, b) =>
+      a.categorySlug.localeCompare(b.categorySlug) || a.engine.localeCompare(b.engine)
+  );
+  return groups;
+}
+
+function pickExcerptResponseIds(
+  mentions: { responseId: string; position: number }[],
+  responseMeta: { id: string; category: string; engine: string }[],
+  perEngine: number
+): string[] {
+  const meta = new Map(responseMeta.map((row) => [row.id, row]));
+  const buckets = new Map<string, { responseId: string; position: number }[]>();
+  for (const mention of mentions) {
+    const row = meta.get(mention.responseId);
+    if (!row) continue;
+    const key = `${row.category}::${row.engine}`;
+    const list = buckets.get(key) ?? [];
+    list.push({ responseId: mention.responseId, position: mention.position });
+    buckets.set(key, list);
+  }
+  const ids: string[] = [];
+  for (const list of buckets.values()) {
+    list.sort(
+      (a, b) => a.position - b.position || a.responseId.localeCompare(b.responseId)
+    );
+    for (const row of list.slice(0, perEngine)) ids.push(row.responseId);
+  }
+  return [...new Set(ids)];
 }
 
 /** Index only (no excerpts) — cheaper for Layer B / company child lookup. */

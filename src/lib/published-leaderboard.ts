@@ -1,9 +1,12 @@
+import { cache } from "react";
+import { ttlCache } from "@/lib/ttl-cache";
 import type { CategoryBoardsData, LeaderboardRow } from "@/lib/leaderboard-data";
-import { CATEGORY_SLUG_MAP } from "@/lib/categories";
+import { CATEGORY_SLUG_MAP, CATEGORY_TO_SLUG } from "@/lib/categories";
 import { prisma } from "@/lib/db";
 import { getAllCategoryLeaderboards } from "@/lib/leaderboard";
 import { getCurrentWeek } from "@/lib/week";
 import { toStoragePeriodKey, tryNormalizePeriodDate } from "@/lib/period";
+import { listPublishedOverallWeeks } from "@/lib/period-sequence";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
 import { toBrandSlug } from "@/lib/brand-slug";
 
@@ -48,8 +51,7 @@ function normalizeRow(row: LeaderboardRow): LeaderboardRow {
   };
 }
 
-/** Week list from snapshots (SoT). Blob index is not consulted. */
-export async function getPublishedLeaderboardWeeks(): Promise<string[]> {
+async function loadPublishedLeaderboardWeeks(): Promise<string[]> {
   const snapshotCounts = await prisma.snapshot.groupBy({
     by: ["week"],
     _count: { id: true },
@@ -63,6 +65,19 @@ export async function getPublishedLeaderboardWeeks(): Promise<string[]> {
     .filter((week): week is string => Boolean(week))
     .sort((a, b) => b.localeCompare(a))
     .slice(0, MAX_PUBLISHED_WEEKS);
+}
+
+/** Week list from snapshots (SoT). Request-deduped + 60s process cache. */
+export const getPublishedLeaderboardWeeks = cache(() =>
+  ttlCache("published-leaderboard-weeks", 60_000, loadPublishedLeaderboardWeeks)
+);
+
+/**
+ * Published periods that have an Overall board for this category (P0-7).
+ * 14-day categories must not list 7-day-only global weeks in the selector.
+ */
+export async function getPublishedWeeksForCategory(category: string): Promise<string[]> {
+  return listPublishedOverallWeeks(category);
 }
 
 /**
@@ -95,25 +110,67 @@ export async function getPublishedCategoryLeaderboards(
   slug: string,
   week = getCurrentWeek()
 ): Promise<CategoryBoardsData | null> {
-  const debug = process.env.LOG_PUBLISHED_LEADERBOARD === "1";
-  const logPrefix = "[PublishedLeaderboard]";
   const category = CATEGORY_SLUG_MAP[slug];
-  if (!category) {
-    if (debug) console.debug(`${logPrefix} unknown slug=${slug}`);
-    return null;
-  }
-
-  const data = await getAllCategoryLeaderboards(category, week);
-  if (!data || (data.boards.overall?.snapshots.length ?? 0) === 0) {
-    if (debug) {
-      console.debug(`${logPrefix} no DB snapshots for slug=${slug} week=${week}`);
+  if (!category) return null;
+  const weekKey = toStoragePeriodKey(week);
+  return ttlCache(`published-boards:${slug}:${weekKey}`, 60_000, async () => {
+    const debug = process.env.LOG_PUBLISHED_LEADERBOARD === "1";
+    const logPrefix = "[PublishedLeaderboard]";
+    const data = await getAllCategoryLeaderboards(category, weekKey);
+    if (!data || (data.boards.overall?.snapshots.length ?? 0) === 0) {
+      if (debug) {
+        console.debug(`${logPrefix} no DB snapshots for slug=${slug} week=${weekKey}`);
+      }
+      return null;
     }
-    return null;
-  }
+    for (const board of Object.values(data.boards)) {
+      board.snapshots = board.snapshots.map(normalizeRow);
+    }
+    if (debug) console.debug(`${logPrefix} using DB boards for slug=${slug} week=${weekKey}`);
+    return data;
+  });
+}
 
-  for (const board of Object.values(data.boards)) {
-    board.snapshots = board.snapshots.map(normalizeRow);
+/**
+ * Rankings index cards: #1 overall per category from that category's newest overall week.
+ * One snapshot query — not 13 full boards.
+ */
+export const getCategoryCardLeaders = cache(async (): Promise<
+  Record<string, { brandName: string } | null>
+> => {
+  return ttlCache("category-card-leaders", 60_000, loadCategoryCardLeaders);
+});
+
+async function loadCategoryCardLeaders(): Promise<
+  Record<string, { brandName: string } | null>
+> {
+  const snaps = await prisma.snapshot.findMany({
+    where: { engine: null, rank: 1 },
+    select: {
+      week: true,
+      category: true,
+      brand: { select: { canonicalName: true } },
+    },
+  });
+  const latest = new Map<string, { week: string; brandName: string }>();
+  for (const snap of snaps) {
+    const slug = CATEGORY_TO_SLUG[snap.category];
+    if (!slug) continue;
+    const date = tryNormalizePeriodDate(snap.week);
+    if (!date) continue;
+    const week = toStoragePeriodKey(date);
+    const prev = latest.get(slug);
+    if (!prev || week > prev.week) {
+      latest.set(slug, {
+        week,
+        brandName: getProductDisplayName(snap.brand.canonicalName),
+      });
+    }
   }
-  if (debug) console.debug(`${logPrefix} using DB boards for slug=${slug} week=${week}`);
-  return data;
+  return Object.fromEntries(
+    Object.keys(CATEGORY_SLUG_MAP).map((slug) => {
+      const hit = latest.get(slug);
+      return [slug, hit ? { brandName: hit.brandName } : null];
+    })
+  );
 }

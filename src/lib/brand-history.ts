@@ -1,50 +1,60 @@
-import { CATEGORY_CARDS } from "@/lib/category-cards";
+import { cache } from "react";
+import { CATEGORY_TO_SLUG } from "@/lib/categories";
+import { prisma } from "@/lib/db";
+import { resolveBrandIdBySlug } from "@/lib/brand-resolve";
 import {
   buildBrandCategoryHistories,
   type BrandCategoryHistory,
   type BrandHistoryPoint,
 } from "@/lib/brand-history-data";
-import { getPublishedCategoryLeaderboards, getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+import { ttlCache } from "@/lib/ttl-cache";
 
 export type { BrandCategoryHistory, BrandHistoryPoint };
 
 /**
- * Rank/score history for a brand across published weekly overall boards.
- * Uses DB published weeks + DB boards (same SoT as B1).
+ * Rank/score history for a brand across published overall boards.
+ * One snapshot query for this brandId — do not scan every category board.
  */
-export async function getBrandCategoryHistories(
-  slug: string
-): Promise<BrandCategoryHistory[]> {
-  const weeks = await getPublishedLeaderboardWeeks();
-  if (weeks.length === 0) return [];
+export const getBrandCategoryHistories = cache(
+  async (slug: string): Promise<BrandCategoryHistory[]> => {
+    return ttlCache(`brand-history:${slug}`, 60_000, () => loadBrandCategoryHistories(slug));
+  }
+);
 
+async function loadBrandCategoryHistories(slug: string): Promise<BrandCategoryHistory[]> {
+  const [weeks, brandId] = await Promise.all([
+    getPublishedLeaderboardWeeks(),
+    resolveBrandIdBySlug(slug),
+  ]);
+  if (weeks.length === 0 || !brandId) return [];
   const chronological = [...weeks].reverse();
-  const categorySlugs = CATEGORY_CARDS.map((category) => category.slug);
 
-  const boardsByWeek: Record<string, Record<string, { brandSlug: string; rank: number; score: number }[]>> =
-    {};
+  const snaps = await prisma.snapshot.findMany({
+    where: { engine: null, week: { in: weeks }, brandId },
+    select: {
+      week: true,
+      category: true,
+      rank: true,
+      score: true,
+    },
+  });
 
-  await Promise.all(
-    chronological.map(async (week) => {
-      const categoryBoards = await Promise.all(
-        categorySlugs.map(async (categorySlug) => {
-          const board = await getPublishedCategoryLeaderboards(categorySlug, week);
-          return {
-            categorySlug,
-            rows:
-              board?.boards.overall.snapshots.map((row) => ({
-                brandSlug: row.brandSlug,
-                rank: row.rank,
-                score: row.score,
-              })) ?? [],
-          };
-        })
-      );
-      boardsByWeek[week] = Object.fromEntries(
-        categoryBoards.map((entry) => [entry.categorySlug, entry.rows])
-      );
-    })
-  );
+  const boardsByWeek: Record<
+    string,
+    Record<string, { brandSlug: string; rank: number; score: number }[]>
+  > = {};
+  for (const s of snaps) {
+    const categorySlug = CATEGORY_TO_SLUG[s.category];
+    if (!categorySlug) continue;
+    boardsByWeek[s.week] ??= {};
+    boardsByWeek[s.week][categorySlug] ??= [];
+    boardsByWeek[s.week][categorySlug].push({
+      brandSlug: slug,
+      rank: s.rank,
+      score: s.score,
+    });
+  }
 
   return buildBrandCategoryHistories(slug, chronological, boardsByWeek);
 }

@@ -11,6 +11,7 @@ import {
   weeklyPromptCount,
 } from "@/lib/constants";
 import { buildCategoryBoardsFromDb } from "@/lib/leaderboard";
+import { buildAlsoMentioned } from "@/lib/also-mentioned";
 import { assessPublishedManifest, type PublicationResult } from "@/lib/pipeline-health";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
 import { publishBrandPages } from "@/pipeline/publish-brands";
@@ -66,8 +67,15 @@ export async function publishLeaderboards(
       });
       continue;
     }
+    const top20BrandIds = new Set(
+      (data.boards.overall?.snapshots ?? []).map((row) => row.brandId)
+    );
+    const alsoMentioned = await buildAlsoMentioned(category, week, top20BrandIds);
     for (const engine of data.scoringEngines ?? []) scoringEngineUnion.add(engine);
-    boardsBySlug[CATEGORY_TO_SLUG[category]!] = data;
+    boardsBySlug[CATEGORY_TO_SLUG[category]!] = {
+      ...data,
+      ...(alsoMentioned.length > 0 ? { alsoMentioned } : {}),
+    };
   }
 
   if (Object.keys(boardsBySlug).length === 0) {

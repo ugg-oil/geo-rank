@@ -1,10 +1,12 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isExcludedFromCategory } from "@/lib/entity-audit";
 import type { AlsoMentionedRow } from "@/lib/leaderboard-data";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
 import { toBrandSlug } from "@/lib/brand-slug";
-import { findPreviousPublishedPeriod } from "@/lib/period-sequence";
+import { listPublishedOverallWeeks } from "@/lib/period-sequence";
 import { toStoragePeriodKey } from "@/lib/period";
+import { ttlCache } from "@/lib/ttl-cache";
 
 export type { AlsoMentionedRow };
 
@@ -69,109 +71,114 @@ export function selectAlsoMentioned(args: {
   return rows.slice(0, limit);
 }
 
-async function appearancesForPeriod(
+async function appearancesForPeriods(
   category: string,
-  week: string,
-  rankableBrandIds: Set<string>
-): Promise<{ totalResponses: number; byBrand: Map<string, number> }> {
-  const responses = await prisma.response.findMany({
-    where: { week, category, status: "ok" },
-    select: { id: true },
-  });
-  if (responses.length === 0) {
-    return { totalResponses: 0, byBrand: new Map() };
+  periods: string[]
+): Promise<Map<string, { totalResponses: number; byBrand: Map<string, number> }>> {
+  const out = new Map<string, { totalResponses: number; byBrand: Map<string, number> }>();
+  for (const period of periods) {
+    out.set(period, { totalResponses: 0, byBrand: new Map() });
   }
-  const responseIds = responses.map((r) => r.id);
-  const mentions = await prisma.resolvedMention.findMany({
-    where: { responseId: { in: responseIds } },
-    select: { brandId: true, responseId: true },
-  });
+  if (periods.length === 0) return out;
 
-  const byBrandResponses = new Map<string, Set<string>>();
-  for (const m of mentions) {
-    if (!rankableBrandIds.has(m.brandId)) continue;
-    if (!byBrandResponses.has(m.brandId)) byBrandResponses.set(m.brandId, new Set());
-    byBrandResponses.get(m.brandId)!.add(m.responseId);
-  }
+  const totals = await prisma.$queryRaw<Array<{ week: string; total: number }>>(Prisma.sql`
+      SELECT week, COUNT(*)::int AS total
+      FROM responses
+      WHERE category = ${category}
+        AND status = 'ok'
+        AND week IN (${Prisma.join(periods)})
+      GROUP BY week
+    `);
+  const counts = await prisma.$queryRaw<Array<{ week: string; brandId: string; appearances: number }>>(Prisma.sql`
+      SELECT r.week, rm.brand_id AS "brandId", COUNT(DISTINCT rm.response_id)::int AS appearances
+      FROM responses r
+      INNER JOIN resolved_mentions rm ON rm.response_id = r.id
+      WHERE r.category = ${category}
+        AND r.status = 'ok'
+        AND r.week IN (${Prisma.join(periods)})
+      GROUP BY r.week, rm.brand_id
+    `);
 
-  const byBrand = new Map<string, number>();
-  for (const [brandId, set] of byBrandResponses) {
-    byBrand.set(brandId, set.size);
+  for (const row of totals) {
+    const bucket = out.get(row.week);
+    if (bucket) bucket.totalResponses = row.total;
   }
-  return { totalResponses: responses.length, byBrand };
+  for (const row of counts) {
+    const bucket = out.get(row.week);
+    if (bucket) bucket.byBrand.set(row.brandId, row.appearances);
+  }
+  return out;
 }
 
-async function lookbackPeriodKeys(category: string, week: string): Promise<string[]> {
-  const keys: string[] = [toStoragePeriodKey(week)];
-  let cursor = keys[0]!;
-  while (keys.length < ALSO_MENTIONED_LOOKBACK) {
-    const prev = await findPreviousPublishedPeriod(category, cursor);
-    if (!prev) break;
-    keys.push(prev);
-    cursor = prev;
-  }
-  return keys;
-}
-
-/**
- * Build Also mentioned rows for a category board (publish / DB fallback).
- */
-export async function buildAlsoMentioned(
+async function loadAlsoMentioned(
   category: string,
   week: string,
   top20BrandIds: Set<string>
 ): Promise<AlsoMentionedRow[]> {
+  const weeks = await listPublishedOverallWeeks(category);
+  const currentKey = toStoragePeriodKey(week);
+  const start = weeks.indexOf(currentKey);
+  const periods =
+    start >= 0
+      ? weeks.slice(start, start + ALSO_MENTIONED_LOOKBACK)
+      : [currentKey];
+
+  const byPeriod = await appearancesForPeriods(category, periods);
+  const current = byPeriod.get(currentKey);
+  if (!current) return [];
+
+  const candidateIds = [...current.byBrand.keys()].filter(
+    (brandId) => !top20BrandIds.has(brandId)
+  );
+  if (candidateIds.length === 0) return [];
+
   const brands = await prisma.brand.findMany({
-    where: { rankingEnabled: true, entityType: "product" },
+    where: { id: { in: candidateIds } },
     select: {
       id: true,
       canonicalName: true,
+      rankingEnabled: true,
+      entityType: true,
       parentBrand: { select: { canonicalName: true } },
     },
   });
-  const rankable = new Set(
-    brands
-      .filter((b) => !isExcludedFromCategory(b.canonicalName, category))
-      .map((b) => b.id)
-  );
+  const pageSnaps = await prisma.snapshot.findMany({
+    where: {
+      week: currentKey,
+      engine: null,
+      brandId: { in: candidateIds },
+    },
+    select: { brandId: true },
+    distinct: ["brandId"],
+  });
 
-  const periods = await lookbackPeriodKeys(category, week);
-  const currentWeek = periods[0]!;
-  const current = await appearancesForPeriod(category, currentWeek, rankable);
-  const priorByBrand = new Map<string, number>();
-
-  for (const period of periods.slice(1)) {
-    const prior = await appearancesForPeriod(category, period, rankable);
-    for (const [brandId, count] of prior.byBrand) {
-      priorByBrand.set(brandId, (priorByBrand.get(brandId) ?? 0) + count);
-    }
-  }
-
-  const pageBrandIds = new Set(
-    (
-      await prisma.snapshot.findMany({
-        where: { week: currentWeek, engine: null },
-        select: { brandId: true },
-        distinct: ["brandId"],
-      })
-    ).map((s) => s.brandId)
-  );
-
+  const pageBrandIds = new Set(pageSnaps.map((row) => row.brandId));
   const brandMeta = new Map<
     string,
     { name: string; parentCompanyName: string | null; hasBrandPage: boolean }
   >();
-  for (const b of brands) {
-    if (!rankable.has(b.id)) continue;
-    const name = getProductDisplayName(b.canonicalName);
-    brandMeta.set(b.id, {
+  for (const brand of brands) {
+    if (!brand.rankingEnabled || brand.entityType !== "product") continue;
+    if (isExcludedFromCategory(brand.canonicalName, category)) continue;
+    const name = getProductDisplayName(brand.canonicalName);
+    brandMeta.set(brand.id, {
       name,
       parentCompanyName: getCompanyColumnName(
-        b.canonicalName,
-        b.parentBrand?.canonicalName
+        brand.canonicalName,
+        brand.parentBrand?.canonicalName
       ),
-      hasBrandPage: pageBrandIds.has(b.id),
+      hasBrandPage: pageBrandIds.has(brand.id),
     });
+  }
+
+  const priorByBrand = new Map<string, number>();
+  for (const period of periods) {
+    if (period === currentKey) continue;
+    const prior = byPeriod.get(period);
+    if (!prior) continue;
+    for (const [brandId, count] of prior.byBrand) {
+      priorByBrand.set(brandId, (priorByBrand.get(brandId) ?? 0) + count);
+    }
   }
 
   const currentRows: PeriodAppearance[] = [...current.byBrand.entries()].map(
@@ -188,4 +195,18 @@ export async function buildAlsoMentioned(
     priorByBrand,
     brandMeta,
   });
+}
+
+/**
+ * Also-mentioned preview. Does not load the full brand table.
+ */
+export async function buildAlsoMentioned(
+  category: string,
+  week: string,
+  top20BrandIds: Set<string>
+): Promise<AlsoMentionedRow[]> {
+  const topKey = [...top20BrandIds].sort().join(",");
+  return ttlCache(`also-mentioned:${category}:${week}:${topKey}`, 60_000, () =>
+    loadAlsoMentioned(category, week, top20BrandIds)
+  );
 }

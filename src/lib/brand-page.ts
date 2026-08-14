@@ -1,9 +1,13 @@
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import {
   buildBrandIndexFromDb,
   buildBrandPages,
+  loadBrandPageBundle,
+  type BrandPageBundle,
 } from "@/lib/brand-page-build";
 import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+import { ttlCache } from "@/lib/ttl-cache";
 
 // ── Types (matching PRD data contract) ──────────────────────────────
 
@@ -54,7 +58,10 @@ export function toBrandSlug(name: string): string {
 
 // ── DB-first reads (Blob brands/* is optional mirror only) ───────────
 
-const REVALIDATE_SECONDS = process.env.NODE_ENV === "development" ? 0 : 300;
+/** Prod only. Dev skips `unstable_cache` — `revalidate: false` permanently poisons empty post-backfill reads. */
+const CACHE_REVALIDATE = 300;
+/** `fetch(..., { next.revalidate })` allows `0` (= always revalidate). */
+const FETCH_REVALIDATE_SECONDS = process.env.NODE_ENV === "development" ? 0 : 300;
 
 /**
  * Derive the Blob base from LEADERBOARD_MANIFEST_URL, which points at
@@ -77,24 +84,25 @@ function getBlobBaseUrl(): string | null {
 
 /** Cached full-week brand pages (DB SoT). Shared by brand + company reads. */
 export async function getBrandPagesForWeek(week: string) {
-  if (!process.env.NEXT_RUNTIME) {
+  // Scripts + local dev: always hit DB (backfill then click brand must not see stale empty cache).
+  if (!process.env.NEXT_RUNTIME || process.env.NODE_ENV === "development") {
     return buildBrandPages(week);
   }
   return unstable_cache(
     () => buildBrandPages(week),
     ["brand-pages-db", week],
-    { revalidate: REVALIDATE_SECONDS, tags: [`brand-pages-${week}`] }
+    { revalidate: CACHE_REVALIDATE, tags: [`brand-pages-${week}`] }
   )();
 }
 
 async function cachedBrandIndex(week: string) {
-  if (!process.env.NEXT_RUNTIME) {
+  if (!process.env.NEXT_RUNTIME || process.env.NODE_ENV === "development") {
     return buildBrandIndexFromDb(week);
   }
   return unstable_cache(
     () => buildBrandIndexFromDb(week),
     ["brand-index-db", week],
-    { revalidate: REVALIDATE_SECONDS, tags: [`brand-pages-${week}`] }
+    { revalidate: CACHE_REVALIDATE, tags: [`brand-pages-${week}`] }
   )();
 }
 
@@ -114,17 +122,24 @@ export async function getBrandIndex(week?: string): Promise<BrandIndex> {
   return cachedBrandIndex(target);
 }
 
+export const getBrandPageBundle = cache(
+  async (slug: string, requestedWeek?: string): Promise<BrandPageBundle | null> => {
+    return ttlCache(`brand-bundle:${slug}:${requestedWeek ?? "latest"}`, 60_000, () =>
+      loadBrandPageBundle(slug, requestedWeek)
+    );
+  }
+);
+
 /**
  * Single brand page for a published week — DB SoT (includes engineExcerpts when responses exist).
  * Optional Blob fetch is unused for primary reads.
  */
-export async function getPublishedBrandPage(
-  slug: string,
-  week: string
-): Promise<BrandPageData | null> {
-  const { brandPages } = await getBrandPagesForWeek(week);
-  return brandPages.find((page) => page.slug === slug) ?? null;
-}
+export const getPublishedBrandPage = cache(
+  async (slug: string, week: string): Promise<BrandPageData | null> => {
+    const bundle = await getBrandPageBundle(slug, week);
+    return bundle?.data ?? null;
+  }
+);
 
 /**
  * Optional Blob mirror read (debug only). Gated behind `PUBLISH_BLOB_MIRROR=1`.
@@ -140,7 +155,7 @@ export async function getBlobBrandPage(
   try {
     const response = await fetch(
       `${base}/${encodeURIComponent(slug)}/${encodeURIComponent(week)}.json`,
-      { next: { revalidate: REVALIDATE_SECONDS } }
+      { next: { revalidate: FETCH_REVALIDATE_SECONDS } }
     );
     if (!response.ok) return null;
     return (await response.json()) as BrandPageData;

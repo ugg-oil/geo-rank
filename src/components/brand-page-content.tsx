@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { BrandTrendCharts } from "@/components/brand-trend-charts";
 import type { BrandHistoryPoint } from "@/lib/brand-history-data";
 import type { BrandPageData } from "@/lib/brand-page";
@@ -14,6 +14,39 @@ import { toBrandSlug } from "@/lib/brand-slug";
 import { LeadForm } from "@/components/lead-form";
 
 type SortKey = "score" | "rank" | "mention";
+
+/**
+ * Badge list must never drop engines that have ranks (why-text uses `category.engines`).
+ * Union collectedEngines with ranked keys; ranked engines first so 暂无数据 doesn't hide them.
+ */
+function resolveCategoryEngineKeys(
+  collectedEngines: readonly string[],
+  engines: BrandPageData["categories"][number]["engines"]
+): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const engine of collectedEngines) {
+    if (seen.has(engine)) continue;
+    seen.add(engine);
+    ordered.push(engine);
+  }
+  for (const engine of Object.keys(engines)) {
+    if (seen.has(engine)) continue;
+    seen.add(engine);
+    ordered.push(engine);
+  }
+  const withData: string[] = [];
+  const withoutData: string[] = [];
+  for (const engine of ordered) {
+    if (engines[engine]) withData.push(engine);
+    else withoutData.push(engine);
+  }
+  withData.sort((a, b) => {
+    const rankDelta = engines[a]!.rank - engines[b]!.rank;
+    return rankDelta !== 0 ? rankDelta : a.localeCompare(b);
+  });
+  return [...withData, ...withoutData];
+}
 
 function EngineBadge({
   engine,
@@ -77,10 +110,12 @@ function CategoryCard({
 }) {
   const { m } = useI18n();
   const categoryName = getCategoryMessages(m, category.slug)?.name ?? category.slug;
-  const engineEntries = collectedEngines.map((engine) => ({
-    engine,
-    ...category.engines[engine],
-  }));
+  const engineEntries = resolveCategoryEngineKeys(collectedEngines, category.engines).map(
+    (engine) => ({
+      engine,
+      ...category.engines[engine],
+    })
+  );
   const trend = history ? computeTrendLabel(history) : null;
   const ring =
     highlight === "top"
@@ -162,6 +197,7 @@ function CategoryCard({
             {similar.map((item) => (
               <li key={item.slug}>
                 <Link
+                  prefetch={false}
                   href={`/brand/${item.slug}`}
                   className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-sm transition-colors hover:bg-[var(--card-hover)]"
                 >
@@ -197,6 +233,7 @@ type Props = {
   similarByCategory: Record<string, SimilarBrandCandidate[]>;
   backHref: string;
   backCategorySlug: string | null;
+  evidence?: ReactNode;
 };
 
 export function BrandPageContent({
@@ -205,6 +242,7 @@ export function BrandPageContent({
   similarByCategory,
   backHref,
   backCategorySlug,
+  evidence,
 }: Props) {
   const { m } = useI18n();
   const [sortKey, setSortKey] = useState<SortKey>("rank");
@@ -225,10 +263,14 @@ export function BrandPageContent({
   const worstRank = Math.max(...categoryList.map((c) => c.rank));
   const worstScore = Math.min(...categoryList.map((c) => c.score));
 
-  const topCategory = categoryList.reduce(
-    (best, c) => (c.rank < best.rank ? c : best),
-    categoryList[0]!
-  );
+  const topCategory =
+    (backCategorySlug
+      ? categoryList.find((c) => c.slug === backCategorySlug)
+      : undefined) ??
+    categoryList.reduce(
+      (best, c) => (c.rank < best.rank ? c : best),
+      categoryList[0]!
+    );
   const topCategoryName =
     getCategoryMessages(m, topCategory.slug)?.name ?? topCategory.slug;
   const parentPart = data.parentCompany ? m.brand.productOf(data.parentCompany) : "";
@@ -240,27 +282,14 @@ export function BrandPageContent({
         ? m.brand.otherCategoriesOne
         : m.brand.otherCategoriesMany(categoryList.length - 1)
       : "";
+  const rankedEngineDiffs = resolveCategoryEngineKeys(collectedEngines, topCategory.engines)
+    .filter((engine) => topCategory.engines[engine])
+    .map((engine) =>
+      m.brand.engineRanks(engineLabel(engine), topCategory.engines[engine]!.rank)
+    );
   const engineDiffs =
-    Object.keys(topCategory.engines).length > 0
-      ? m.brand.engineDiffs(
-          Object.entries(topCategory.engines)
-            .map(([engine, entry]) => m.brand.engineRanks(engineLabel(engine), entry.rank))
-            .join(", ")
-        )
-      : "";
-  const categorySummary =
-    categoryList.length > 1
-      ? m.brand.whyCategories(
-          categoryList
-            .map((c) =>
-              m.brand.whyCategoryPart(
-                getCategoryMessages(m, c.slug)?.name ?? c.slug,
-                c.rank,
-                c.score.toFixed(1)
-              )
-            )
-            .join("; ")
-        )
+    rankedEngineDiffs.length > 0
+      ? m.brand.engineDiffs(topCategoryName, rankedEngineDiffs.join(", "))
       : "";
   const topTrend = computeTrendLabel(historyByCategory[topCategory.slug] ?? []);
   const trendSentence = topTrend
@@ -296,6 +325,7 @@ export function BrandPageContent({
           {data.parentCompany && (
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
               <Link
+                prefetch={false}
                 href={`/company/${toBrandSlug(data.parentCompany)}`}
                 className="hover:text-[var(--text)] transition-colors"
               >
@@ -321,7 +351,7 @@ export function BrandPageContent({
               score: topCategory.score.toFixed(1),
               mention: (topCategory.mentionFrequency * 100).toFixed(0),
               otherCategories,
-              engineDescs: `${engineDiffs}${categorySummary}${trendSentence}`,
+              engineDescs: `${engineDiffs}${trendSentence}`,
             })}
           </p>
           <p className="mt-2 text-xs text-[var(--text-muted)]">{m.brand.basedOn(weekLabel)}</p>
@@ -385,73 +415,7 @@ export function BrandPageContent({
           </div>
         )}
 
-        {(() => {
-          const excerptGroups = categoryList.flatMap((cat) => {
-            const entries = Object.entries(cat.engineExcerpts ?? {}).filter(
-              ([, texts]) => texts.length > 0
-            );
-            if (entries.length === 0) return [];
-            const catName = getCategoryMessages(m, cat.slug)?.name ?? cat.slug;
-            return entries.map(([engine, texts]) => ({
-              key: `${cat.slug}-${engine}`,
-              catName,
-              engine,
-              text: texts[0]!,
-            }));
-          });
-          if (excerptGroups.length === 0) return null;
-          const engineCount = new Set(excerptGroups.map((g) => g.engine)).size;
-          return (
-            <details className="group border-t border-[var(--border)] pt-6">
-              <summary className="flex cursor-pointer list-none items-center gap-2 text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)] [&::-webkit-details-marker]:hidden">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  aria-hidden
-                  className="shrink-0 transition-transform duration-200 group-open:rotate-90"
-                >
-                  <path
-                    d="M4.5 2.5L8 6l-3.5 3.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="font-mono text-xs uppercase tracking-[0.18em]">
-                  {m.brand.evidenceTitle}
-                </span>
-                <span className="text-xs normal-case tracking-normal">
-                  · {m.brand.evidenceCount(engineCount)}
-                </span>
-              </summary>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <p className="text-xs text-[var(--text-muted)]">{m.brand.evidenceLead}</p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">{m.brand.basedOn(weekLabel)}</p>
-                </div>
-                <div className="space-y-5">
-                  {excerptGroups.map((group) => (
-                    <div key={group.key}>
-                      <p className="text-xs font-medium text-[var(--text-secondary)]">
-                        {engineLabel(group.engine)}
-                        <span className="font-normal text-[var(--text-muted)]"> · {group.catName}</span>
-                      </p>
-                      <p
-                        className="mt-2 border-l-2 border-[var(--border)] pl-3 text-sm leading-6 text-[var(--text-secondary)]"
-                        lang="en"
-                      >
-                        {group.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </details>
-          );
-        })()}
+        {evidence}
 
         <LeadForm sourcePath={`/brand/${data.slug}`} />
       </div>

@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { CategoryUnavailable, CategoryPageShell } from "@/components/category-page-content";
+import { AlsoMentionedSection } from "@/components/also-mentioned-section";
 import { CATEGORY_SLUG_MAP } from "@/lib/categories";
 import { inferCollectedEngines } from "@/lib/leaderboard-data";
-import { getPublishedCategoryLeaderboards, getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
+import {
+  getPublishedCategoryLeaderboards,
+  getPublishedWeeksForCategory,
+} from "@/lib/published-leaderboard";
 import { getCategorySeo, SITE_URL, stringifyJsonLd } from "@/lib/seo";
-import { getCurrentWeek } from "@/lib/week";
 import { notFound } from "next/navigation";
 import { CategoryBoard } from "./CategoryBoard";
 
@@ -57,31 +61,27 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const category = CATEGORY_SLUG_MAP[slug];
   if (!category) notFound();
 
-  const currentWeek = getCurrentWeek();
-  const availableWeeks = await getPublishedLeaderboardWeeks();
+  // P0-7: selector / default week are per-category (14-day boards ≠ global 7-day list).
+  const availableWeeks = await getPublishedWeeksForCategory(category);
   let selectedWeek =
     requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
       ? `Week of ${requestedWeek}`
-      : currentWeek;
+      : availableWeeks[0];
 
-  // DB-first: any week with snapshots (Blob not required).
-  let data = await getPublishedCategoryLeaderboards(slug, selectedWeek);
-  // P0: category may refresh on 14-day cadence — fall back to newest week that has this board.
-  if (!data && !requestedWeek) {
-    for (const week of availableWeeks) {
-      data = await getPublishedCategoryLeaderboards(slug, week);
-      if (data) {
-        selectedWeek = week;
-        break;
-      }
-    }
-  }
+  let data = selectedWeek
+    ? await getPublishedCategoryLeaderboards(slug, selectedWeek)
+    : null;
 
   const initialTab =
     data && engine && inferCollectedEngines(data).includes(engine) ? engine : "overall";
   const canonicalUrl = `${SITE_URL}/category/${slug}`;
-  if (!data) {
-    return <CategoryUnavailable slug={slug} selectedWeek={selectedWeek} />;
+  if (!data || !selectedWeek) {
+    return (
+      <CategoryUnavailable
+        slug={slug}
+        selectedWeek={selectedWeek ?? `Week of ${requestedWeek ?? "unknown"}`}
+      />
+    );
   }
   const weeks = availableWeeks.length > 0 ? availableWeeks : [data.week];
   const overall = data.boards.overall;
@@ -139,6 +139,20 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           data={data}
           initialTab={initialTab}
           availableWeeks={weeks}
+          alsoMentionedSlot={
+            <Suspense key={`also-mentioned-${slug}-${data.week}`} fallback={null}>
+              <AlsoMentionedSection
+                category={category}
+                week={data.week}
+                top20BrandIds={overall.snapshots.map((row) => row.brandId)}
+                sourcePath={`/category/${slug}${
+                  data.week !== weeks[0]
+                    ? `?week=${data.week.replace("Week of ", "")}`
+                    : ""
+                }`}
+              />
+            </Suspense>
+          }
         />
       </CategoryPageShell>
     </main>

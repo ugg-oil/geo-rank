@@ -16,7 +16,8 @@ P1  推荐理由原文证据             ✅
 P2  Also mentioned               ✅
 P3  周期看点                     ✅
 P4  竞争象限图                   ✅
-P5  品类扩展（8 个）         🔧 代码就绪 · 待采集回填
+P5  品类扩展（8 个）         ✅ 临近 4 档已齐（含当前）
+P6  OpenRouter 模型降档 / :floor ✅
 ```
 
 P5 按品类刷新、P2–P4 跨周期口径均依赖 P0。周期与 Prompt 以 category-selection 为准。
@@ -88,34 +89,79 @@ Overall 下、Top 20 正下方；同宽同栏。
 
 8 品类同一公开节点 + 首页入口。Prompt / 周期 / exclude → [category-selection.md](../category-selection.md)。上线门槛：≥30 有效候选、≥3 引擎达标（有效 response ≥ prompt 条数）、Top 20 无越界实体。校验：`npm run pipeline:launch-gate`。
 
-### 代码就绪（本仓已接线，尚未 live 发布）
+### 代码就绪（≠ 数据就绪）
 
 - [x] 注册 8 品类：`CATEGORIES` / slug / period days / homepage + rankings 入口 / i18n EN·ZH
 - [x] Prompt seed 已写入 `seed-prompts.ts`（需 `npm run seed` 入库存活）
 - [x] Exclude 种子写入 `entity-audit` `excludedCategories`（E-commerce / Meeting / Cyber / Recruiting）
 - [x] 回填脚本：`npm run backfill:categories`（`--execute` 才真正采；追加 ` as of YYYY-MM-DD`）
 - [x] 上线门槛脚本：`npm run pipeline:launch-gate`
-- [x] P5-9：Top 20 走现有 `publishBrandPages`；Also mentioned 仍 P2-5；exclude 仅本品类
-
-### 回填
-
-上线前倒推 **4** 个已发布周期：prompt 追加 ` as of {periodStartDate}`（`YYYY-MM-DD`）；不用 `Week of` / 月级锚定。回填当普通历史（Δ/NEW/看点/Also mentioned/Layer B/趋势照常）；前台不披露伪历史。之后按配置滚采；不覆盖已有快照除非显式重跑。
-
-### Ops 待办（未跑 API / 未发布 = 未勾）
-
+- [x] P5-9：**约束** Top 20 须有 Brand Page；Also mentioned 仍 P2-5；exclude 只限本品类
 - [x] `npm run seed`（8×8 prompts 已入库；其它环境需再跑）
-- [ ] `npm run backfill:categories -- --execute --all-new`（≈1.5k 请求；可先单品类试跑）
-- [ ] 各品类最新回填周期 launch-gate 通过后 `publish` / `--publish-latest`
-- [ ] category-selection 状态「代码就绪·待发布」→「已发布」
 
-### 条目
+### 回填口径（纠正）
 
-- [x] P5-1：**新增** VPN Services（14）。exclude 无种子；干跑按 watchlist 补。*(配置/seed 就绪；待采集发布)*
-- [x] P5-2：**新增** E-commerce Platforms（14）。开店平台；纯建站器 exclude。parent/alias 走现网，无品牌特例。*(配置/exclude/seed 就绪；待采集发布)*
-- [x] P5-3：**新增** Online Course Platforms（14）。MOOC / cohort；不做单课/讲师。*(配置/seed 就绪；待采集发布)*
-- [x] P5-4：**新增** Language Learning Apps（14）。允许与 Course 等双上榜；无跨品类互斥。*(配置/seed 就绪；待采集发布)*
-- [x] P5-5：**新增** Password Managers（14）。exclude 无种子；干跑按 watchlist 补。*(配置/seed 就绪；待采集发布)*
-- [x] P5-6：**新增** AI Meeting Assistants（7）。笔记/摘要/助手；视频会议大厂 exclude。*(配置/exclude/seed 就绪；待采集发布)*
-- [x] P5-7：**新增** AI Cybersecurity Tools（7）。AI 安全；传统杀毒 exclude。*(配置/exclude/seed 就绪；待采集发布)*
-- [x] P5-8：**新增** Recruiting Tools（14）。ATS + 招聘；**不拆** Job Board；泛 HRIS exclude。*(配置/exclude/seed 就绪；待采集发布)*
-- [x] P5-9：**约束** Top 20 须有 Brand Page；Also mentioned 仍 P2-5。exclude 只限本品类不计分；写入现网 `excludedCategories` 同类配置。
+上线要齐的是 **含当前周期在内的临近 4 档**（不是「剔掉当前再倒推 4 档」）。
+
+- 周期起点按品类 `periodDays` + epoch 对齐（见 `getPeriodStartDate`）。
+- prompt 追加 ` as of {periodStartDate}`（`YYYY-MM-DD`）；不用 `Week of` / 月级锚定。
+- 回填当普通历史（Δ/NEW/看点/Also mentioned/Layer B/趋势照常）；前台不披露伪历史。
+- 不覆盖已有快照除非显式重跑。更老于临近 4 档的历史可留库，但 **不算完成条件**。
+
+基准日：**2026-08-13**。当前周期起点（7 / 14 天）均为 **2026-08-10**。
+
+| 周期 | 临近 4 档（近→远，含当前） |
+|------|---------------------------|
+| 14 天 | `08-10` · `07-27` · `07-13` · `06-29` |
+| 7 天 | `08-10` · `08-03` · `07-27` · `07-20` |
+
+### 采集进度表（as of 2026-08-13 晚，Overall snap）
+
+「已采」= 该周期有 overall 快照；「未采」= 临近 4 档内缺失；「多余更老」= 库里有、但不在临近 4 档（不算完成）。
+
+| # | 品类 | slug | 天 | 临近 4 档目标 | 已采（库内） | 未采（须补） | 多余更老 | 数据状态 |
+|---|------|------|----|---------------|--------------|--------------|----------|----------|
+| P5-1 | VPN Services | `vpn-services` | 14 | 08-10 · 07-27 · 07-13 · 06-29 | 08-10 · 07-27 · 07-13 · 06-29 · 06-15 · 06-01 | — | 06-15 · 06-01 | ✅ |
+| P5-2 | E-commerce Platforms | `ecommerce-platforms` | 14 | 08-10 · 07-27 · 07-13 · 06-29 | 08-10 · 07-27 · 07-13 · 06-29 · 06-15 · 06-01 | — | 06-15 · 06-01 | ✅ |
+| P5-3 | Online Course Platforms | `online-course-platforms` | 14 | 08-10 · 07-27 · 07-13 · 06-29 | 08-10 · 07-27 · 07-13 · 06-29 · 06-15 | — | 06-15 | ✅ |
+| P5-4 | Language Learning Apps | `language-learning-apps` | 14 | 08-10 · 07-27 · 07-13 · 06-29 | 08-10 · 07-27 · 07-13 · 06-29 · 06-15 | — | 06-15 | ✅ |
+| P5-5 | Password Managers | `password-managers` | 14 | 08-10 · 07-27 · 07-13 · 06-29 | 08-10 · 07-27 · 07-13 · 06-29 · 06-15 | — | 06-15 | ✅ |
+| P5-6 | AI Meeting Assistants | `ai-meeting-assistants` | 7 | 08-10 · 08-03 · 07-27 · 07-20 | 08-10 · 08-03 · 07-27 · 07-20 · 07-13 | — | 07-13 | ✅ |
+| P5-7 | AI Cybersecurity Tools | `ai-cybersecurity-tools` | 7 | 08-10 · 08-03 · 07-27 · 07-20 | 08-10 · 08-03 · 07-27 · 07-20 · 07-13 | — | 07-13 | ✅ |
+| P5-8 | Recruiting Tools | `recruiting-tools` | 14 | 08-10 · 07-27 · 07-13 · 06-29 | 08-10 · 07-27 · 07-13 · 06-29 · 06-15 | — | 06-15 | ✅ |
+
+### Ops 待办（数据 / 发布）
+
+- [x] 按上表「未采」补齐各品类（VPN / E-commerce：`07-27` + `08-10`；其余：`08-10`）
+- [x] 各品类临近 4 档 launch-gate 通过（`08-10` `--all-new` + VPN/Ecom `07-27`）
+- [ ] `publish` / 确认 DB SoT 可读；category-selection 状态 →「已发布」
+
+### 条目（配置 vs 采集分开勾）
+
+- [x] P5-1 配置：**新增** VPN Services（14）。exclude 无种子。
+- [x] P5-1 采集：临近 4 档齐（含 `08-10` · `07-27`）
+- [x] P5-2 配置：**新增** E-commerce Platforms（14）。开店平台；纯建站器 exclude。
+- [x] P5-2 采集：临近 4 档齐（含 `08-10` · `07-27`）
+- [x] P5-3 配置：**新增** Online Course Platforms（14）。MOOC / cohort；不做单课/讲师。
+- [x] P5-3 采集：临近 4 档齐（含 `08-10`）
+- [x] P5-4 配置：**新增** Language Learning Apps（14）。允许与 Course 等双上榜。
+- [x] P5-4 采集：临近 4 档齐（含 `08-10`）
+- [x] P5-5 配置：**新增** Password Managers（14）。exclude 无种子。
+- [x] P5-5 采集：临近 4 档齐（含 `08-10`）
+- [x] P5-6 配置：**新增** AI Meeting Assistants（7）。笔记/摘要/助手；视频会议大厂 exclude。
+- [x] P5-6 采集：临近 4 档齐（含 `08-10`）
+- [x] P5-7 配置：**新增** AI Cybersecurity Tools（7）。AI 安全；传统杀毒 exclude。
+- [x] P5-7 采集：临近 4 档齐（含 `08-10`）
+- [x] P5-8 配置：**新增** Recruiting Tools（14）。ATS + 招聘；**不拆** Job Board；泛 HRIS exclude。
+- [x] P5-8 采集：临近 4 档齐（含 `08-10`）
+- [x] P5-9：**约束** Top 20 须有 Brand Page；Also mentioned 仍 P2-5。exclude 只限本品类不计分。
+
+## P6 · OpenRouter 模型降档 / `:floor` ✅
+
+为控制采集成本，更新 `ENGINE_MODEL_SLUGS` / `EXTRACTION_MODEL`；**已发布榜不变**，自下一轮采集起生效。活源以 `src/lib/constants.ts` 为准（覆盖 P3 technical 旧 slug）。
+
+- [x] P6-1：**变更** ChatGPT → `openai/gpt-4.1-mini:floor`（原 `openai/gpt-4o`）。
+- [x] P6-2：**变更** Grok → `x-ai/grok-4.3:floor`（原 `x-ai/grok-4.5`）。
+- [x] P6-3：**变更** Claude → `anthropic/claude-haiku-4.5:floor`（原 `anthropic/claude-sonnet-4.5`）。
+- [x] P6-4：**变更** Gemini / DeepSeek / 抽取模型加 `:floor`；Perplexity 仍 `perplexity/sonar`（单 provider，不加 floor）。
+- [x] P6-5：**约束** 不回填已发布周期；不因降档重算历史分数。

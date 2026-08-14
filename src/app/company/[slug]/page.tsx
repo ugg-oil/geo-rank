@@ -12,13 +12,13 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const [data, index] = await Promise.all([getCompanyPage(slug), getCompanyIndex()]);
-  const name = data?.name ?? index[slug]?.name;
+  const data = await getCompanyPage(slug);
+  const name = data?.name ?? (await getCompanyIndex())[slug]?.name;
   if (!name) {
     return { title: "Company not found", robots: { index: false, follow: false } };
   }
   const title = `${name} — Company`;
-  const description = `Products under ${name} and their weekly AI visibility rankings by category.`;
+  const description = `Products under ${name} and their AI visibility rankings by category.`;
   return {
     title,
     description,

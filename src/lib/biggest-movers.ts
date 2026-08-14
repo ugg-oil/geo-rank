@@ -1,13 +1,15 @@
 import { CATEGORY_SLUG_MAP } from "@/lib/categories";
+import { prisma } from "@/lib/db";
+import { toBrandSlug } from "@/lib/brand-slug";
+import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
+import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 import {
   collectCategoryMovers,
   pickBiggestMovers,
   type RankMover,
 } from "@/lib/rank-change";
-import {
-  getPublishedCategoryLeaderboards,
-  getPublishedLeaderboardWeeks,
-} from "@/lib/published-leaderboard";
+import { ttlCache } from "@/lib/ttl-cache";
+import { cache } from "react";
 
 export type BiggestMoversResult = {
   week: string;
@@ -16,52 +18,82 @@ export type BiggestMoversResult = {
   fallers: RankMover[];
 };
 
-/**
- * Biggest Movers from DB published overall boards: latest week vs previous week.
- * Week sequence matches getPublishedLeaderboardWeeks (snapshots SoT).
- */
-export async function getBiggestMovers(limit = 5): Promise<BiggestMoversResult | null> {
+type OverallRow = {
+  week: string;
+  category: string;
+  rank: number;
+  brandId: string;
+  canonicalName: string;
+  parentName: string | null;
+};
+
+function rowsToBoard(rows: OverallRow[]) {
+  const snapshots = rows
+    .slice()
+    .sort((a, b) => a.rank - b.rank)
+    .map((row) => {
+      const brandName = getProductDisplayName(row.canonicalName);
+      return {
+        brandId: row.brandId,
+        brandName,
+        brandSlug: toBrandSlug(brandName),
+        parentCompanyName: getCompanyColumnName(row.canonicalName, row.parentName),
+        rank: row.rank,
+      };
+    });
+  return snapshots;
+}
+
+async function loadBiggestMovers(limit: number): Promise<BiggestMoversResult | null> {
   const weeks = await getPublishedLeaderboardWeeks();
   if (weeks.length === 0) return null;
 
   const week = weeks[0]!;
-  // Prefer previous key in published index (sequence), not calendar -7.
   const previousWeek = weeks[1] ?? null;
+  const weekKeys = previousWeek ? [week, previousWeek] : [week];
 
-  const slugs = Object.keys(CATEGORY_SLUG_MAP);
-  const boards = await Promise.all(
-    slugs.map((slug) => getPublishedCategoryLeaderboards(slug, week))
-  );
+  const snaps = await prisma.snapshot.findMany({
+    where: { engine: null, week: { in: weekKeys } },
+    select: {
+      week: true,
+      category: true,
+      rank: true,
+      brandId: true,
+      brand: {
+        select: {
+          canonicalName: true,
+          parentBrand: { select: { canonicalName: true } },
+        },
+      },
+    },
+  });
 
-  // Optional: previous week names for OUT rows (publish JSON may not keep prev names).
-  const prevBoards = previousWeek
-    ? await Promise.all(
-        slugs.map((slug) => getPublishedCategoryLeaderboards(slug, previousWeek))
-      )
-    : [];
+  const byWeekCategory = new Map<string, OverallRow[]>();
+  for (const snap of snaps) {
+    const key = `${snap.week}::${snap.category}`;
+    const list = byWeekCategory.get(key) ?? [];
+    list.push({
+      week: snap.week,
+      category: snap.category,
+      rank: snap.rank,
+      brandId: snap.brandId,
+      canonicalName: snap.brand.canonicalName,
+      parentName: snap.brand.parentBrand?.canonicalName ?? null,
+    });
+    byWeekCategory.set(key, list);
+  }
 
   const allMovers: RankMover[] = [];
-  for (let i = 0; i < slugs.length; i++) {
-    const data = boards[i];
-    if (!data?.boards.overall) continue;
-    const overall = data.boards.overall;
-    let board = overall;
+  for (const [slug, categoryName] of Object.entries(CATEGORY_SLUG_MAP)) {
+    const current = rowsToBoard(byWeekCategory.get(`${week}::${categoryName}`) ?? []);
+    const previous = previousWeek
+      ? rowsToBoard(byWeekCategory.get(`${previousWeek}::${categoryName}`) ?? [])
+      : [];
+    if (current.length === 0 || previous.length === 0) continue;
 
-    // If publish-time prevRanks are empty but we have a previous published week,
-    // rebuild prevRanks from that board so movers still work.
-    if (!overall.hasPrevWeekData && prevBoards[i]?.boards.overall) {
-      const prevOverall = prevBoards[i]!.boards.overall;
-      board = {
-        ...overall,
-        prevRanks: Object.fromEntries(
-          prevOverall.snapshots.map((row) => [row.brandId, row.rank])
-        ),
-        hasPrevWeekData: prevOverall.snapshots.length > 0,
-      };
-    }
-
+    const prevRanks = Object.fromEntries(previous.map((row) => [row.brandId, row.rank]));
     const prevNames = Object.fromEntries(
-      (prevBoards[i]?.boards.overall.snapshots ?? []).map((row) => [
+      previous.map((row) => [
         row.brandId,
         {
           brandName: row.brandName,
@@ -70,12 +102,11 @@ export async function getBiggestMovers(limit = 5): Promise<BiggestMoversResult |
         },
       ])
     );
-
     allMovers.push(
       ...collectCategoryMovers(
-        board,
-        slugs[i],
-        CATEGORY_SLUG_MAP[slugs[i]],
+        { snapshots: current, prevRanks, hasPrevWeekData: true },
+        slug,
+        categoryName,
         prevNames
       )
     );
@@ -88,3 +119,11 @@ export async function getBiggestMovers(limit = 5): Promise<BiggestMoversResult |
   const { risers, fallers } = pickBiggestMovers(allMovers, limit);
   return { week, previousWeek, risers, fallers };
 }
+
+/**
+ * Homepage movers: overall snapshots for latest two published weeks only.
+ * Do not build full category boards (engines / also-mentioned / highlight).
+ */
+export const getBiggestMovers = cache(async (limit = 5): Promise<BiggestMoversResult | null> => {
+  return ttlCache(`biggest-movers:${limit}`, 60_000, () => loadBiggestMovers(limit));
+});

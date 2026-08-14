@@ -43,6 +43,38 @@ assert(
   "Workday excluded from Recruiting Tools"
 );
 assert(
+  isExcludedFromCategory("Netflix", "VPN Services"),
+  "Netflix excluded from VPN Services"
+);
+assert(
+  !isExcludedFromCategory("Netflix", "SaaS Software"),
+  "Netflix remains eligible outside VPN Services"
+);
+assert(
+  isExcludedFromCategory("BBC iPlayer", "VPN Services"),
+  "BBC iPlayer excluded from VPN Services"
+);
+assert(
+  approvedCanonicalName("ProtonVPN") === "Proton VPN",
+  "ProtonVPN merges into Proton VPN"
+);
+assert(
+  approvedCanonicalName("1Password Teams") === "1Password",
+  "1Password Teams merges into 1Password"
+);
+assert(
+  isExcludedFromCategory("Amazon Prime Video", "VPN Services"),
+  "Amazon Prime Video excluded from VPN Services"
+);
+assert(
+  isExcludedFromCategory("NordVPN", "Password Managers"),
+  "NordVPN excluded from Password Managers"
+);
+assert(
+  !isExcludedFromCategory("NordVPN", "VPN Services"),
+  "NordVPN remains eligible on VPN Services"
+);
+assert(
   !classifyEntity("Black Forest Labs").rankingEnabled,
   "Black Forest Labs classified as a non-ranked company"
 );

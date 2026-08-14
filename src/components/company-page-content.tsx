@@ -58,6 +58,7 @@ export function CompanyPageContent({ data }: Props) {
                 >
                   <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
                     <Link
+                      prefetch={false}
                       href={`/brand/${product.slug}`}
                       className="text-base font-semibold text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
                     >

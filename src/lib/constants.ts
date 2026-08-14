@@ -8,12 +8,12 @@ export const COLLECTION_ENGINES: readonly Engine[] = ENGINES;
 export const SCORING_ELIGIBLE_ENGINES: readonly Engine[] = ENGINES;
 
 export const ENGINE_MODEL_SLUGS: Record<Engine, string> = {
-  chatgpt: "openai/gpt-4o",
-  gemini: "google/gemini-2.5-flash",
-  grok: "x-ai/grok-4.5",
+  chatgpt: "openai/gpt-4.1-mini:floor",
+  gemini: "google/gemini-2.5-flash:floor",
+  grok: "x-ai/grok-4.3:floor",
   perplexity: "perplexity/sonar",
-  claude: "anthropic/claude-sonnet-4.5",
-  deepseek: "deepseek/deepseek-v4-flash",
+  claude: "anthropic/claude-haiku-4.5:floor",
+  deepseek: "deepseek/deepseek-v4-flash:floor",
 };
 
 export const ENGINE_LABELS: Record<Engine, string> = {
@@ -26,11 +26,11 @@ export const ENGINE_LABELS: Record<Engine, string> = {
 };
 
 export const ENGINE_MODEL_LABELS: Record<Engine, string> = {
-  chatgpt: "GPT-4o",
+  chatgpt: "GPT-4.1 Mini",
   gemini: "2.5 Flash",
-  grok: "Grok 4.5",
+  grok: "Grok 4.3",
   perplexity: "Sonar",
-  claude: "Sonnet 4.5",
+  claude: "Haiku 4.5",
   deepseek: "V4 Flash",
 };
 
@@ -56,7 +56,7 @@ export function formatEngineList(
 /** v1.2 published weeks had no collectedEngines field. Do not project today's set backward. */
 export const LEGACY_COLLECTION_ENGINES = ["chatgpt", "gemini", "grok"] as const;
 
-export const EXTRACTION_MODEL = "openai/gpt-4o-mini";
+export const EXTRACTION_MODEL = "openai/gpt-4o-mini:floor";
 
 export const CATEGORIES = [
   "AI Tools",

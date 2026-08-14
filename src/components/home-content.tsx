@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { BiggestMoversSection } from "@/components/biggest-movers";
-import {
-  CATEGORIES,
-  COLLECTION_ENGINES,
-  ENGINE_MODEL_LABELS,
-  engineLabel,
-} from "@/lib/constants";
+import { CATEGORIES } from "@/lib/constants";
 import { getCategoryMessages } from "@/lib/i18n/messages";
 import { useI18n } from "@/lib/i18n/use-i18n";
 import type { RankMover } from "@/lib/rank-change";
@@ -163,25 +158,6 @@ export function HomeContent({
           fallers={movers.fallers}
         />
       )}
-
-      <section className="border-y border-[var(--border)] bg-[var(--bg-elevated)]">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-6 py-8 sm:flex-row sm:items-center">
-          <p className="text-sm text-[var(--text-muted)]">{m.home.engineStrip}</p>
-          <div className="flex flex-wrap gap-3">
-            {COLLECTION_ENGINES.map((engine) => (
-              <div
-                key={engine}
-                className="flex items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3.5 py-2"
-              >
-                <span className="text-sm font-medium">{engineLabel(engine)}</span>
-                <span className="font-mono text-xs text-[var(--text-muted)]">
-                  {ENGINE_MODEL_LABELS[engine]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       <section className="border-t border-[var(--border)] bg-[var(--bg-elevated)]">
         <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">

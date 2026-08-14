@@ -29,7 +29,7 @@ const en = {
     appearance: "Appearance",
     avgRank: "Avg Rank",
     coverage: "Coverage",
-    delta: "Δ",
+    delta: "Change",
     noData: "No data",
     top20: "Top 20",
     new: "NEW",
@@ -163,7 +163,6 @@ const en = {
     statCategories: "Product categories",
     statPrompts: "Prompts per period",
     statTop20: "Products per board",
-    engineStrip: "Rankings built from real answers across AI engines",
     howTitle: "Ask AI. Extract the shortlist. Rank it.",
     how1Title: "Ask the engines",
     how1Desc: "Each collection period we run the same discovery prompts across leading AI engines.",
@@ -200,6 +199,7 @@ const en = {
     historicalUnavailable: "Historical period unavailable",
     historicalNone: (week: string) => `No published rankings are available for ${week}.`,
     backToLatest: "← Back to latest rankings",
+    periodUpdated: (week: string) => `Period start · ${week}`,
     alsoMentionedTitle: "Also mentioned",
     alsoMentionedLead: "Brands mentioned this period but outside the Top 20.",
     alsoMentionedMention: "Mention rate",
@@ -232,11 +232,12 @@ const en = {
       otherCategories: string;
       engineDescs: string;
     }) =>
-      `${args.name}${args.parentPart} ranks #${args.rank} in ${args.category} with a score of ${args.score} and a mention frequency of ${args.mention}% across the latest weekly collection.${args.otherCategories}${args.engineDescs}`,
+      `${args.name}${args.parentPart} ranks #${args.rank} in ${args.category} with a score of ${args.score} and a mention frequency of ${args.mention}% in this period.${args.otherCategories}${args.engineDescs}`,
     productOf: (company: string) => `, a product of ${company}`,
     otherCategoriesOne: " It also appears in 1 other category.",
     otherCategoriesMany: (n: number) => ` It also appears in ${n} other categories.`,
-    engineDiffs: (descs: string) => ` Engine differences: ${descs}.`,
+    engineDiffs: (category: string, descs: string) =>
+      ` Engine differences in ${category}: ${descs}.`,
     engineRanks: (engine: string, rank: number) => `${engine} ranks it #${rank}`,
     basedOn: (week: string) => `Based on data from ${week}.`,
     evidenceTitle: "Original recommendations",
@@ -258,7 +259,7 @@ const en = {
     trendStable: "Stable",
     trendDeclining: "Declining",
     similarBrands: "Similar Brands",
-    similarEmpty: "No similar brands in this category this week.",
+    similarEmpty: "No similar brands in this category this period.",
     categoryCompare: "Category comparison",
     vsBestRank: (delta: number) =>
       delta === 0 ? "Best rank among its categories" : `${delta} spots behind its best category rank`,
@@ -266,11 +267,8 @@ const en = {
       delta === "0.0" ? "Best score among its categories" : `${delta} below its best category score`,
     whyTrend: (label: string, category: string) =>
       ` Trend in ${category}: ${label}.`,
-    whyCategories: (parts: string) => ` Across categories: ${parts}.`,
-    whyCategoryPart: (category: string, rank: number, score: string) =>
-      `${category} #${rank} (${score})`,
     ctaTitle: "Track your brand's AI visibility",
-    ctaDesc: "Weekly updates on how your products appear across AI engines.",
+    ctaDesc: "Period updates on how your products appear across AI engines.",
     ctaButton: "Track Your Brand",
     comingSoon: "Coming soon",
   },
@@ -313,7 +311,7 @@ const en = {
   company: {
     lastUpdated: (week: string) => `Last updated · ${week}`,
     productsTitle: "Products",
-    emptyProducts: "No ranked products for this company in the latest week.",
+    emptyProducts: "No ranked products for this company in the latest period.",
     mentionFrequency: "Mention Frequency",
     viewBrand: "Brand page",
     category: "Category",
@@ -334,7 +332,7 @@ const en = {
       {
         title: "Data Collection",
         paragraphs: [
-          `Every week, we query AI engines — ${ENGINE_COPY} — using 8 category-specific prompts per engine. All data is collected via official APIs, not web interfaces. Scoring engines are equal-weight. An engine that misses the weekly validity threshold is excluded from that category's overall score and shown as No data.`,
+          `Each collection period, we query AI engines — ${ENGINE_COPY} — using 8 category-specific prompts per engine. All data is collected via official APIs, not web interfaces. Scoring engines are equal-weight. An engine that misses the period validity threshold is excluded from that category's overall score and shown as No data.`,
           "Responses are processed by a separate LLM to extract brand mentions and their order of appearance. Extracted brands are matched against a canonical brand database with alias support.",
         ],
       },
@@ -368,7 +366,7 @@ const en = {
       {
         title: "Dynamic Ranking",
         paragraphs: [
-          "Rankings are not based on a fixed list. Each week, brands are dynamically discovered from AI responses. New brands are automatically added and scored. A human review process ensures brand names are properly normalized and deduplicated.",
+          "Rankings are not based on a fixed list. Each collection period, brands are dynamically discovered from AI responses. New brands are automatically added and scored. A human review process ensures brand names are properly normalized and deduplicated.",
         ],
       },
       {
@@ -380,7 +378,7 @@ const en = {
       {
         title: "Historical Estimates",
         paragraphs: [
-          'Some early historical weeks may be labelled Backfilled estimate. These rankings are generated retrospectively using the current collection and scoring method; they are not observations collected during the labelled week. Regular weekly collection is labelled Observed.',
+          'Some early historical periods may be labelled Backfilled estimate. These rankings are generated retrospectively using the current collection and scoring method; they are not observations collected during the labelled period. Regular collection is labelled Observed.',
         ],
       },
     ],
@@ -414,7 +412,7 @@ const zh = {
     appearance: "出现率",
     avgRank: "平均名次",
     coverage: "覆盖率",
-    delta: "Δ",
+    delta: "变动",
     noData: "暂无数据",
     top20: "Top 20",
     new: "NEW",
@@ -548,7 +546,6 @@ const zh = {
     statCategories: "产品品类",
     statPrompts: "每周期 Prompt 数",
     statTop20: "每榜产品数",
-    engineStrip: "榜单基于各 AI 引擎的真实回答",
     howTitle: "问 AI。抽出短名单。再排名。",
     how1Title: "询问引擎",
     how1Desc: "每个采集周期我们在主流 AI 引擎上跑同一组发现型 prompt。",
@@ -580,11 +577,12 @@ const zh = {
     coverageExpansion: (engines: string) =>
       `本周期综合分已纳入 ${engines}，在上一周期引擎基础上扩展。`,
     emptyNone: "完成首次周度采集后将显示榜单。",
-    emptyOverall: "综合榜本周至少需要 3 个达标计分引擎。",
-    emptyEngine: "该引擎本周未达到有效回答门槛。",
-    historicalUnavailable: "历史周不可用",
+    emptyOverall: "综合榜本周期至少需要 3 个达标计分引擎。",
+    emptyEngine: "该引擎本周期未达到有效回答门槛。",
+    historicalUnavailable: "历史周期不可用",
     historicalNone: (week: string) => `${week} 暂无已发布榜单。`,
     backToLatest: "← 返回最新榜单",
+    periodUpdated: (week: string) => `周期起始 · ${week}`,
     alsoMentionedTitle: "Also mentioned",
     alsoMentionedLead: "本周期有提及但未进 Top 20 的品牌。",
     alsoMentionedMention: "提及率",
@@ -616,11 +614,12 @@ const zh = {
       otherCategories: string;
       engineDescs: string;
     }) =>
-      `${args.name}${args.parentPart} 在 ${args.category} 排名第 ${args.rank}，得分为 ${args.score}，在最近一周采集中的提及频率为 ${args.mention}%。${args.otherCategories}${args.engineDescs}`,
+      `${args.name}${args.parentPart} 在 ${args.category} 排名第 ${args.rank}，得分为 ${args.score}，在本周期中的提及频率为 ${args.mention}%。${args.otherCategories}${args.engineDescs}`,
     productOf: (company: string) => `（隶属于 ${company}）`,
     otherCategoriesOne: " 它还出现在另外 1 个品类中。",
     otherCategoriesMany: (n: number) => ` 它还出现在另外 ${n} 个品类中。`,
-    engineDiffs: (descs: string) => ` 引擎差异：${descs}。`,
+    engineDiffs: (category: string, descs: string) =>
+      ` ${category} 的引擎差异：${descs}。`,
     engineRanks: (engine: string, rank: number) => `${engine} 将其排在第 ${rank}`,
     basedOn: (week: string) => `基于 ${week} 的数据。`,
     evidenceTitle: "推荐原文",
@@ -642,18 +641,15 @@ const zh = {
     trendStable: "稳定",
     trendDeclining: "下降",
     similarBrands: "相似品牌",
-    similarEmpty: "本周该品类暂无相似品牌。",
+    similarEmpty: "本周期该品类暂无相似品牌。",
     categoryCompare: "品类对比",
     vsBestRank: (delta: number) =>
       delta === 0 ? "在其品类中名次最好" : `比其最好品类名次落后 ${delta} 位`,
     vsBestScore: (delta: string) =>
       delta === "0.0" ? "在其品类中得分最高" : `比其最高品类得分低 ${delta}`,
     whyTrend: (label: string, category: string) => ` ${category} 趋势：${label}。`,
-    whyCategories: (parts: string) => ` 跨品类：${parts}。`,
-    whyCategoryPart: (category: string, rank: number, score: string) =>
-      `${category} 第 ${rank}（${score}）`,
     ctaTitle: "追踪你品牌的 AI 可见度",
-    ctaDesc: "每周了解你的产品在各 AI 引擎中的出现情况。",
+    ctaDesc: "按采集周期了解你的产品在各 AI 引擎中的出现情况。",
     ctaButton: "追踪你的品牌",
     comingSoon: "即将推出",
   },
@@ -694,7 +690,7 @@ const zh = {
   company: {
     lastUpdated: (week: string) => `最近更新 · ${week}`,
     productsTitle: "产品",
-    emptyProducts: "该公司在最新一周暂无上榜产品。",
+    emptyProducts: "该公司在最新周期暂无上榜产品。",
     mentionFrequency: "提及频率",
     viewBrand: "品牌页",
     category: "品类",
@@ -715,7 +711,7 @@ const zh = {
       {
         title: "数据采集",
         paragraphs: [
-          `每周我们通过官方 API（而非网页界面）向 AI 引擎——${ENGINE_COPY}——各发送 8 条品类特定 prompt。计分引擎等权。未达到当周有效性门槛的引擎不计入该品类综合分，并显示为「暂无数据」。`,
+          `每个采集周期我们通过官方 API（而非网页界面）向 AI 引擎——${ENGINE_COPY}——各发送 8 条品类特定 prompt。计分引擎等权。未达到当周期有效性门槛的引擎不计入该品类综合分，并显示为「暂无数据」。`,
           "回答由另一个 LLM 处理，提取品牌提及及其出现顺序。提取结果会匹配到带别名支持的规范品牌库。",
         ],
       },
@@ -749,7 +745,7 @@ const zh = {
       {
         title: "动态发现排名",
         paragraphs: [
-          "榜单不基于固定名单。每周从 AI 回答中动态发现品牌，新品牌自动加入并计分。人工复核确保品牌名正确归一化与去重。",
+          "榜单不基于固定名单。每个采集周期从 AI 回答中动态发现品牌，新品牌自动加入并计分。人工复核确保品牌名正确归一化与去重。",
         ],
       },
       {
@@ -761,7 +757,7 @@ const zh = {
       {
         title: "历史估算",
         paragraphs: [
-          "部分早期历史周可能标注为「回填估算」。这些排名用当前采集与计分方法回溯生成，并非标注周当时的观测。常规周度采集标注为「观测」。",
+          "部分早期历史周期可能标注为「回填估算」。这些排名用当前采集与计分方法回溯生成，并非标注周期当时的观测。常规采集标注为「观测」。",
         ],
       },
     ],

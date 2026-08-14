@@ -3,7 +3,7 @@ import { RankingsContent } from "@/components/rankings-content";
 import { CATEGORY_CARDS } from "@/lib/category-cards";
 import type { CategorySlug } from "@/lib/i18n/messages";
 import {
-  getPublishedCategoryLeaderboards,
+  getCategoryCardLeaders,
   getPublishedLeaderboardManifest,
   getPublishedLeaderboardWeeks,
 } from "@/lib/published-leaderboard";
@@ -33,19 +33,16 @@ export const metadata: Metadata = {
 };
 
 export default async function RankingsPage() {
-  const [manifest, weeks, ...boards] = await Promise.all([
+  const [manifest, weeks, leaders] = await Promise.all([
     getPublishedLeaderboardManifest(),
     getPublishedLeaderboardWeeks(),
-    ...CATEGORY_CARDS.map((cat) => getPublishedCategoryLeaderboards(cat.slug)),
+    getCategoryCardLeaders(),
   ]);
 
-  const week =
-    manifest?.week ?? boards.find(Boolean)?.week ?? weeks[0] ?? null;
-  const cards = CATEGORY_CARDS.map((cat, index) => ({
+  const week = manifest?.week ?? weeks[0] ?? null;
+  const cards = CATEGORY_CARDS.map((cat) => ({
     slug: cat.slug as CategorySlug,
-    leader: boards[index]?.boards.overall.snapshots[0]
-      ? { brandName: boards[index]!.boards.overall.snapshots[0]!.brandName }
-      : null,
+    leader: leaders[cat.slug] ?? null,
   }));
 
   return (

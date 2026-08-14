@@ -11,7 +11,6 @@ import { getCurrentWeek } from "@/lib/week";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
 import { toBrandSlug } from "@/lib/brand-slug";
 import { findPreviousPublishedPeriod } from "@/lib/period-sequence";
-import { buildAlsoMentioned } from "@/lib/also-mentioned";
 import { selectPeriodHighlight } from "@/lib/period-highlight";
 
 export type { CategoryBoardsData, LeaderboardRow, LeaderboardView } from "@/lib/leaderboard-data";
@@ -27,27 +26,22 @@ export async function buildCategoryBoardsFromDb(
   category: string,
   week: string
 ): Promise<CategoryBoardsData | null> {
-  const prevWeek = (await findPreviousPublishedPeriod(category, week)) ?? "__none__";
-  const [current, previous] = await Promise.all([
-    prisma.snapshot.findMany({
-      where: { week, category },
-      orderBy: { rank: "asc" },
-      include: {
-        brand: {
-          select: {
-            canonicalName: true,
-            parentBrand: { select: { canonicalName: true } },
-          },
+  const prevWeek = await findPreviousPublishedPeriod(category, week);
+  const weekKeys = prevWeek ? [week, prevWeek] : [week];
+  const all = await prisma.snapshot.findMany({
+    where: { week: { in: weekKeys }, category },
+    orderBy: { rank: "asc" },
+    include: {
+      brand: {
+        select: {
+          canonicalName: true,
+          parentBrand: { select: { canonicalName: true } },
         },
       },
-    }),
-    prevWeek === "__none__"
-      ? Promise.resolve([])
-      : prisma.snapshot.findMany({
-          where: { week: prevWeek, category },
-          select: { engine: true, brandId: true, rank: true },
-        }),
-  ]);
+    },
+  });
+  const current = all.filter((row) => row.week === week);
+  const previous = all.filter((row) => row.week === prevWeek);
 
   if (current.length === 0) return null;
 
@@ -93,7 +87,6 @@ export async function buildCategoryBoardsFromDb(
   const top20BrandIds = new Set(
     (boards.overall?.snapshots ?? []).map((row) => row.brandId)
   );
-  const alsoMentioned = await buildAlsoMentioned(category, week, top20BrandIds);
   const periodHighlight = boards.overall
     ? selectPeriodHighlight({
         overall: boards.overall,
@@ -108,7 +101,6 @@ export async function buildCategoryBoardsFromDb(
     scoringEngines,
     coverageExpansion: coverageExpansionEngines(scoringEngines, previousScoringEngines),
     boards,
-    ...(alsoMentioned.length > 0 ? { alsoMentioned } : {}),
     ...(periodHighlight ? { periodHighlight } : {}),
   };
 }
@@ -178,11 +170,9 @@ export async function getAllCategoryLeaderboards(
     return buildCategoryBoardsFromDb(category, week);
   }
 
-  const prevWeek = (await findPreviousPublishedPeriod(category, week)) ?? "__none__";
-
   return unstable_cache(
     () => buildCategoryBoardsFromDb(category, week),
-    ["category-all-boards", week, prevWeek, category],
+    ["category-all-boards", week, category],
     { revalidate: REVALIDATE_SECONDS, tags: [`leaderboard-${week}`] }
   )();
 }

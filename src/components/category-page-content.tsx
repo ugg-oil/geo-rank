@@ -50,6 +50,9 @@ export function CategoryPageShell({
             />
           </div>
         </div>
+        <p className="mt-1.5 font-mono text-xs text-[var(--text-muted)]">
+          {m.category.periodUpdated(formatWeekLabel(m, week))}
+        </p>
         {cat && (
           <div className="mt-2.5 max-w-3xl">
             <p className="text-sm leading-6 text-[var(--text-secondary)]">{cat.lead}</p>

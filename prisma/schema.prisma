@@ -32,6 +32,7 @@ model Response {
   extractedMentions ExtractedMention[]
   prompt            Prompt             @relation(fields: [promptId], references: [id])
 
+  @@index([week, category, status])
   @@map("responses")
 }
 
@@ -59,6 +60,7 @@ model Brand {
   resolvedMentions ResolvedMention[]
   snapshots        Snapshot[]
 
+  @@index([parentBrandId])
   @@map("brands")
 }
 
@@ -102,6 +104,8 @@ model ResolvedMention {
   rawBrand   String @map("raw_brand")
   brand      Brand  @relation(fields: [brandId], references: [id])
 
+  @@index([responseId])
+  @@index([brandId])
   @@map("resolved_mentions")
 }
 
@@ -119,6 +123,9 @@ model Snapshot {
   brand          Brand   @relation(fields: [brandId], references: [id])
 
   @@index([week, category, engine])
+  @@index([week, brandId])
+  @@index([brandId, week])
+  @@index([engine, rank])
   @@map("snapshots")
 }
 
