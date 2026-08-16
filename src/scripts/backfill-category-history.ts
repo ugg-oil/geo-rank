@@ -5,8 +5,12 @@
  *   npm run backfill:categories
  *   npm run backfill:categories -- --periods=4 "VPN Services"
  *
- * Execute (API cost — 8 cats × 4 periods × 6 engines × 8 prompts ≈ 1.5k requests):
+ * Execute (API cost — 11 cats × 4 periods × 6 engines × 8 prompts ≈ 2.1k requests):
  *   npm run backfill:categories -- --execute --all-new
+ * Skip a hung engine (e.g. deepseek):
+ *   npm run backfill:categories -- --execute --all-new --skip-engines=deepseek
+ * Fill a missing engine on already-scored periods (e.g. DeepSeek only):
+ *   npm run backfill:categories -- --execute --all-new --force --skip-engines=chatgpt,gemini,grok,perplexity,claude
  *
  * Does not update latest unless --publish-latest is passed after all periods succeed.
  * Prefer publishing historical periods with updateLatest=false, then one final publish of
@@ -19,9 +23,9 @@ if ((process.env.OPENROUTER_API_KEY?.length ?? 0) < 40 && baseEnv?.OPENROUTER_AP
   process.env.OPENROUTER_API_KEY = baseEnv.OPENROUTER_API_KEY;
 }
 
-import { BACKFILL_DATA_SOURCE, getDefaultBackfillPeriodKeys } from "@/lib/backfill";
+import { BACKFILL_DATA_SOURCE, getLaunchBackfillPeriodKeys } from "@/lib/backfill";
 import { getCategoryPeriodDays } from "@/lib/category-period";
-import { CATEGORIES, COLLECTION_ENGINES, PROMPTS_PER_CATEGORY } from "@/lib/constants";
+import { CATEGORIES, COLLECTION_ENGINES, PROMPTS_PER_CATEGORY, isEngine } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { P5_CATEGORIES } from "@/lib/p5-categories";
 import { backfillPromptSuffix } from "@/lib/period";
@@ -39,8 +43,20 @@ import {
 const execute = process.argv.includes("--execute");
 const publishLatest = process.argv.includes("--publish-latest");
 const allNew = process.argv.includes("--all-new");
+const force = process.argv.includes("--force");
 const periodsArg = process.argv.find((arg) => arg.startsWith("--periods="));
 const periodCount = periodsArg ? Number(periodsArg.split("=")[1]) : 4;
+const skipEnginesArg = process.argv.find((arg) => arg.startsWith("--skip-engines="));
+const skipEngines = new Set(
+  (skipEnginesArg?.split("=")[1] ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+);
+for (const name of skipEngines) {
+  if (!isEngine(name)) throw new Error(`Unknown engine in --skip-engines: ${name}`);
+}
+const engines = COLLECTION_ENGINES.filter((e) => !skipEngines.has(e));
 
 const named = process.argv
   .slice(2)
@@ -56,6 +72,32 @@ function resolveCategories(): string[] {
   return named;
 }
 
+function isTransientDbError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /Connection terminated|ECONNRESET|connection timeout|Server has closed the connection|Can't reach database/i.test(
+    msg
+  );
+}
+
+async function withDbRetry<T>(label: string, fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      last = error;
+      if (!isTransientDbError(error) || i === attempts) throw error;
+      const waitMs = i * 5_000;
+      console.warn(
+        `[BackfillCat] transient DB error on ${label} (attempt ${i}/${attempts}), retry in ${waitMs}ms:`,
+        error instanceof Error ? error.message : error
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+  throw last;
+}
+
 async function runCategoryPeriod(category: string, week: string) {
   const suffix = backfillPromptSuffix(week);
   const options = {
@@ -64,7 +106,7 @@ async function runCategoryPeriod(category: string, week: string) {
     forceCategories: true,
   } as const;
 
-  for (const engine of COLLECTION_ENGINES) {
+  for (const engine of engines) {
     const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
     console.log(`[BackfillCat] collect ${engine} / ${category} / ${week}${suffix}`);
     await collectEngine(week, engine, deadline, options);
@@ -89,17 +131,20 @@ async function main() {
   if (!Number.isFinite(periodCount) || periodCount < 1) {
     throw new Error("--periods must be a positive number");
   }
+  if (engines.length === 0) {
+    throw new Error("No engines left after --skip-engines");
+  }
 
   const categories = resolveCategories();
   const plan = categories.map((category) => {
     const periodDays = getCategoryPeriodDays(category);
-    const periods = getDefaultBackfillPeriodKeys(periodDays, periodCount);
+    const periods = getLaunchBackfillPeriodKeys(periodDays, periodCount);
     return {
       category,
       periodDays,
       periods,
       estimatedRequests:
-        periods.length * COLLECTION_ENGINES.length * PROMPTS_PER_CATEGORY,
+        periods.length * engines.length * PROMPTS_PER_CATEGORY,
     };
   });
 
@@ -111,7 +156,10 @@ async function main() {
         dataSource: BACKFILL_DATA_SOURCE,
         execute,
         publishLatest,
+        force,
         periodCount,
+        engines,
+        skipEngines: [...skipEngines],
         categories,
         totalEstimatedRequests: totalRequests,
         plan,
@@ -129,25 +177,33 @@ async function main() {
 
   for (const row of plan) {
     for (const week of row.periods) {
-      const existing = await prisma.snapshot.count({
-        where: { week, category: row.category },
-      });
-      if (existing > 0) {
+      await withDbRetry(`${row.category}/${week}`, async () => {
+        const existing = await prisma.snapshot.count({
+          where: { week, category: row.category },
+        });
+        if (existing > 0 && !force) {
+          // Do not republish on skip — that walks every category for the week and
+          // was terminating long backfill runs (idle DB disconnect).
+          console.log(
+            `[BackfillCat] skip ${row.category} / ${week} (already has ${existing} snapshots)`
+          );
+          return;
+        }
+        if (existing > 0 && force) {
+          console.log(
+            `[BackfillCat] force ${row.category} / ${week} (had ${existing} snapshots; engines=${engines.join(",")})`
+          );
+        }
+        const snapshots = await runCategoryPeriod(row.category, week);
         console.log(
-          `[BackfillCat] skip ${row.category} / ${week} (already has ${existing} snapshots)`
+          JSON.stringify({
+            category: row.category,
+            week,
+            snapshots,
+            status: BACKFILL_DATA_SOURCE,
+          })
         );
-        await publishLeaderboards(week, { updateLatest: false });
-        continue;
-      }
-      const snapshots = await runCategoryPeriod(row.category, week);
-      console.log(
-        JSON.stringify({
-          category: row.category,
-          week,
-          snapshots,
-          status: BACKFILL_DATA_SOURCE,
-        })
-      );
+      });
     }
   }
 

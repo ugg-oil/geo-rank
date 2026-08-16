@@ -7,6 +7,12 @@ import {
   buildCompanyPagesFromBrandPages,
   mergeCompanyIndex,
 } from "@/lib/company-data";
+import {
+  buildCompanySummary,
+  buildPrevRankLookup,
+  enrichProductsWithPreviousRanks,
+  type CompanySummary,
+} from "@/lib/company-page-view";
 import { SCORING_VERSION } from "@/lib/constants";
 import {
   getCompanyColumnName,
@@ -21,6 +27,8 @@ export interface CompanyProductCategoryEntry {
   rank: number;
   score: number;
   mentionFrequency: number;
+  /** Present only when previous published week had this product×category. */
+  previousRank?: number;
 }
 
 export interface CompanyProductEntry {
@@ -37,6 +45,9 @@ export interface CompanyPageData {
   name: string;
   updatedAt: string;
   products: CompanyProductEntry[];
+  hasPrevWeekData: boolean;
+  /** null when products.length === 0 */
+  summary: CompanySummary | null;
 }
 
 export interface CompanyIndexEntry {
@@ -44,6 +55,8 @@ export interface CompanyIndexEntry {
 }
 
 export type CompanyIndex = Record<string, CompanyIndexEntry>;
+
+export type { CompanySummary };
 
 async function loadOverallBrandPages(week: string): Promise<BrandPageData[]> {
   const snaps = await prisma.snapshot.findMany({
@@ -99,16 +112,44 @@ async function loadOverallBrandPages(week: string): Promise<BrandPageData[]> {
     });
   }
 
+  // Same display slug can absorb multiple brand rows (e.g. iCloud vs iCloud+
+  // before slug rules diverge). Keep one entry per category — best rank.
+  for (const page of bySlug.values()) {
+    const best = new Map<string, (typeof page.categories)[number]>();
+    for (const entry of page.categories) {
+      const prev = best.get(entry.slug);
+      if (!prev || entry.rank < prev.rank) best.set(entry.slug, entry);
+    }
+    page.categories = [...best.values()].sort((a, b) => a.slug.localeCompare(b.slug));
+  }
+
   return [...bySlug.values()];
 }
 
-async function loadCompanyPagesBySlug(week: string): Promise<Map<string, CompanyPageData>> {
+type RawCompanyPage = Omit<CompanyPageData, "hasPrevWeekData" | "summary">;
+
+async function loadCompanyPagesBySlug(week: string): Promise<Map<string, RawCompanyPage>> {
   const brandPages = await loadOverallBrandPages(week);
   const { companyPages } = buildCompanyPagesFromBrandPages(brandPages, {
     week,
     scoringVersion: SCORING_VERSION,
   });
   return new Map(companyPages.map((page) => [page.slug, page]));
+}
+
+function finalizeCompanyPage(
+  page: RawCompanyPage,
+  prevPage: RawCompanyPage | null
+): CompanyPageData {
+  const hasPrevWeekData = Boolean(prevPage);
+  const prevLookup = prevPage ? buildPrevRankLookup(prevPage.products) : null;
+  const products = enrichProductsWithPreviousRanks(page.products, prevLookup);
+  return {
+    ...page,
+    products,
+    hasPrevWeekData,
+    summary: buildCompanySummary(products, hasPrevWeekData),
+  };
 }
 
 async function buildCompanyIndexFromDb(): Promise<CompanyIndex> {
@@ -141,31 +182,65 @@ export const getCompanyIndex = cache(async (): Promise<CompanyIndex> => {
 
 /**
  * Company page for a published week. Overall snapshots for the week are cached
- * once and reused across company slugs.
+ * once and reused across company slugs. Attaches previous-week ranks when a
+ * prior published week exists.
  */
 export async function getPublishedCompanyPage(
   slug: string,
-  week: string
+  week: string,
+  previousWeek?: string | null
 ): Promise<CompanyPageData | null> {
   const pages = await ttlCache(`company-pages:${week}`, 60_000, () =>
     loadCompanyPagesBySlug(week)
   );
-  return pages.get(slug) ?? null;
+  const page = pages.get(slug);
+  if (!page) return null;
+
+  let prevPage: RawCompanyPage | null = null;
+  if (previousWeek) {
+    const prevPages = await ttlCache(`company-pages:${previousWeek}`, 60_000, () =>
+      loadCompanyPagesBySlug(previousWeek)
+    );
+    prevPage = prevPages.get(slug) ?? null;
+  }
+
+  return finalizeCompanyPage(page, prevPage);
 }
 
 export async function getFallbackCompanyPage(
   slug: string,
   week?: string
 ): Promise<CompanyPageData | null> {
-  const weeks = week ? [week] : await getPublishedLeaderboardWeeks();
-  const targetWeek = weeks[0];
+  const weeks = await getPublishedLeaderboardWeeks();
+  const targetWeek = week ?? weeks[0];
   if (!targetWeek) return null;
-  return getPublishedCompanyPage(slug, targetWeek);
+  const weekIndex = weeks.indexOf(targetWeek);
+  const previousWeek = weekIndex >= 0 ? (weeks[weekIndex + 1] ?? null) : null;
+  return getPublishedCompanyPage(slug, targetWeek, previousWeek);
 }
 
 export const getCompanyPage = cache(async (slug: string): Promise<CompanyPageData | null> => {
   const weeks = await getPublishedLeaderboardWeeks();
   const latest = weeks[0];
   if (!latest) return null;
-  return getPublishedCompanyPage(slug, latest);
+  return getPublishedCompanyPage(slug, latest, weeks[1] ?? null);
 });
+
+/** Empty shell for indexed companies with no ranked products this period. */
+export function emptyCompanyPageData(
+  slug: string,
+  name: string,
+  week: string
+): CompanyPageData {
+  return {
+    schemaVersion: 1,
+    scoringVersion: SCORING_VERSION,
+    week,
+    slug,
+    name,
+    updatedAt: new Date().toISOString().split("T")[0]!,
+    products: [],
+    hasPrevWeekData: false,
+    summary: null,
+  };
+}

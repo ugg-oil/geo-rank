@@ -102,28 +102,28 @@ Modal 并排表
 
 ### 5.1 Why（P3-1～P3-2）
 
-- `<details open>` 或受控；`basedOn` 同品类页日期格式。
-- 替换 `whyBody` 为三卡：
-  - 锚定 = `from` ∩ categories，否则 min(rank)；可选一行摘要。
+- `<details open>`；旁注 `basedOn` = `基于 {YYYY-MM-DD}` / `Based on {YYYY-MM-DD}`。
+- `buildWhyCards`（`src/lib/brand-why.ts`）替换 `whyBody`：
+  - 锚定 = `from` ∩ categories，否则 min(rank)；一行 rank/score/mention 摘要。
   - 优势：engines rank 前 1–2，或优于 overall ≥2 位。
   - 弱点：collected 无 snapshot →「几乎不提」；有则最差 1–2。接近：max−min ≤2 且无缺失 →「各引擎接近」。
   - 趋势：`computeTrendLabel`；无点隐藏。
 
 ### 5.2 推荐原文（P3-3）
 
-- 外层默认展开；默认第一个有摘录引擎；全部展开/收起；`groups.length === 0` 不渲染。
+- 外层默认展开；按引擎分组；默认第一个有摘录引擎；全部展开/收起；`groups.length === 0` 不渲染。
 
 ### 5.3 品类卡（P3-4）
 
-- `from` 置顶；上期 Δ；引擎徽章 → `?engine=`。
+- `from` 置顶；`prevRank`/`hasPrevPeriod` 来自 `findPreviousPublishedPeriod`；引擎徽章 → `?engine=`。
 
 ### 5.4 Similar / CTA / 空态（P3-5）
 
-- Similar 标题+`#rank`；Lead 文案改监测可见度；`categories.length === 0` → `/rankings`。
+- Similar 标题「同品类相近排名」+`#rank`；无邻居隐藏；Lead 文案监测可见度；`categories.length === 0` → `/rankings`。
 
 ### 5.5 历史图（P3-6）
 
-- 起止 `<select>`；默认全范围；两图共用；过滤后 0 点空态。
+- 起止 `<select>`；默认全范围；起晚于止则钳制；两图共用；过滤后不足 2 点空态。
 
 ## 6. 验收清单（工程）
 
@@ -132,15 +132,16 @@ Modal 并排表
 - [ ] 表排序不破坏 Δ；coverage 仅 Overall；对比 2–3 限制
 - [ ] Also mentioned / Why 日期与页头周期一致
 - [ ] 象限位移跟页头周期；无上期隐藏
-- [ ] Brand：Why/原文默认展开；三卡；from 置顶；Δ；引擎链；空态；历史起止
-- [ ] Company：摘要；排序+from 置顶；品类行 Δ；空态
-- [ ] P5：按 `P5-n / P5-n-1 / P5-n-p / P5-n-p-e` 勾完；临近 4 档×6 引擎；launch-gate；边界不串
+- [x] Brand：Why/原文默认展开；三卡；from 置顶；Δ；引擎链；空态；历史起止
+- [x] Company：摘要；排序+from 置顶；品类行 Δ；空态
+- [x] P5：`P5-n` / `P5-n-1` + 临近 4 档×6 引擎已齐（含 DeepSeek `*-6`）；P5-12 launch-gate 四档全绿（2026-08-16）；边界见 §8.5
 
 ## 7. P4 · 公司页
 
-- 触点：`company-page-content.tsx` / `loadCompanyPage`（或等价）。
+- 触点：`company-page-content.tsx` / `company-page.ts` / `company-page-view.ts`。
 - P4-1：摘要（产品数 / 品类去重 / 最佳名次 / 可选最大上升）；0 产品不渲染 + `/rankings` 空态。
 - P4-2：`sortKey: "rank" | "score" | "category"`；from brand 置顶；品类行 Δ。
+- 验收：`npm run pipeline:company-page`。
 
 ## 8. P5 · 品类扩展（11）
 
@@ -165,11 +166,16 @@ P5-12         全局约束：Brand Page / exclude 本品类 / 列表同源 / lau
 | 品类注册 | `src/lib/constants.ts`（`CATEGORIES`）、`categories.ts` / slug map、`category-period.ts`、`category-cards.ts`、i18n EN·ZH |
 | Prompt | `src/scripts/seed-prompts.ts` → `npm run seed`；正文同步 [category-selection.md](../category-selection.md) |
 | exclude | `entity-audit` `excludedCategories`（仅本品类） |
-| 回填 | `npm run backfill:categories`（`--execute` 才采；追加 ` as of YYYY-MM-DD`） |
+| 回填 | `npm run backfill:categories`（`--execute` 才采；追加 ` as of YYYY-MM-DD`；本批曾 `--skip-engines=deepseek`） |
+| Company 列 | `src/lib/parent-company.ts` curated map（P5 产品已扩） |
 | 门槛 | `npm run pipeline:launch-gate` |
 | 发布 | publish；category-selection 状态 →「已发布」；首页/rankings 只改配置源一处 |
 
 ### 8.3 回填口径
+
+> **2026-08-15**：本批先执行 `backfill:categories --execute --all-new --periods=4 --skip-engines=deepseek`；Company 列 curated map 已扩至 P5 产品（`src/lib/parent-company.ts`）。
+>
+> **2026-08-16**：DeepSeek 单引擎补跑完成（`--force --periods=4 --skip-engines=chatgpt,gemini,grok,perplexity,claude`）；`P5-n-*-6` 已勾。
 
 上线要齐的是 **含当前周期在内的临近 4 档**（不是「剔掉当前再倒推 4 档」）。
 
@@ -196,7 +202,11 @@ P5-12         全局约束：Brand Page / exclude 本品类 / 列表同源 / lau
 
 ### 8.5 边界实现注意
 
-- **HR（P5-10）**：口径 = HRIS/人事主数据；Recruiting = ATS；两侧 exclude 互斥母名，避免双榜互吞。
+- **HR（P5-10）**：口径 = HRIS/人事主数据；Recruiting = ATS；两侧 exclude 互斥母名，避免双榜互吞。Recruiting 侧已 exclude Workday/BambooHR/ADP/SAP SuccessFactors/UKG；HR 侧已 exclude Greenhouse/Lever/Ashby/Workable/Jobvite/SmartRecruiters/iCIMS（`entity-audit.ts`）。
 - **Email Marketing（P5-9）**：Prompt 钉邮件/生命周期，避免飘回 Marketing Tools。
 - **Design（P5-7）**：排除纯 AI image/video 生成器（归 AI Image/Video）。
 - **SEO（P5-5）**：排除泛 Marketing 套件母名（无独立 SEO 产品时）。
+
+### 8.6 launch-gate（P5-12）
+
+> **2026-08-16**：`yarn pipeline:launch-gate -- --all-new` 对 `08-10` · `07-27` · `07-13` · `06-29` 均为 `allOk: true`（≥30 候选、≥3 引擎、Top20 无越界）。列表同源：`CATEGORIES.length === CATEGORY_CARDS.length`（24）。Brand Page：overall snapshot → `getBrandPageBundle` 可读。

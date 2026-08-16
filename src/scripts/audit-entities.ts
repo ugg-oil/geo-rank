@@ -43,6 +43,18 @@ assert(
   "Workday excluded from Recruiting Tools"
 );
 assert(
+  isExcludedFromCategory("Greenhouse", "HR Software"),
+  "Greenhouse excluded from HR Software"
+);
+assert(
+  !isExcludedFromCategory("Greenhouse", "Recruiting Tools"),
+  "Greenhouse remains eligible on Recruiting Tools"
+);
+assert(
+  isExcludedFromCategory("Ashby", "HR Software"),
+  "Ashby excluded from HR Software"
+);
+assert(
   isExcludedFromCategory("Netflix", "VPN Services"),
   "Netflix excluded from VPN Services"
 );

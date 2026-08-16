@@ -72,6 +72,12 @@ export async function buildCategoryBoardsFromDb(
       snapshots,
       prevRanks: Object.fromEntries(previousRows.map((row) => [row.brandId, row.rank])),
       hasPrevWeekData: previous.some((row) => row.engine === engine),
+      prevMetrics: Object.fromEntries(
+        previousRows.map((row) => [
+          row.brandId,
+          { appearanceRate: row.appearanceRate, avgRank: row.avgRank },
+        ])
+      ),
     };
   }
 

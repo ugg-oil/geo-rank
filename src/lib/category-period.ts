@@ -15,6 +15,17 @@ const CATEGORY_PERIOD_DAYS: Record<string, number> = {
   "Password Managers": 14,
   "E-commerce Platforms": 14,
   "Recruiting Tools": 14,
+  "Project Management Tools": 14,
+  "CRM Platforms": 14,
+  "Customer Support / Helpdesk": 14,
+  "Accounting & Invoicing Software": 14,
+  "SEO / Content Tools": 14,
+  "Cloud Storage": 14,
+  "Design & Prototyping Tools": 14,
+  "Note-taking & Knowledge Base": 14,
+  "Email Marketing Tools": 14,
+  "HR Software": 14,
+  "Workflow Automation": 14,
 };
 
 export const DEFAULT_PERIOD_DAYS = 7;

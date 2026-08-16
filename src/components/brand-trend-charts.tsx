@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import type { BrandHistoryPoint } from "@/lib/brand-history-data";
-import { formatShortUtcDate } from "@/lib/i18n/messages";
+import { filterHistoryByRange } from "@/lib/brand-why";
+import { formatShortUtcDate, formatWeekLabel } from "@/lib/i18n/messages";
 import { useI18n } from "@/lib/i18n/use-i18n";
 
 type ChartPoint = { label: string; value: number };
@@ -185,39 +187,106 @@ function TrendLineChart({
   );
 }
 
+function periodDate(point: BrandHistoryPoint): string {
+  return point.weekDate.replace(/^Week of\s+/i, "");
+}
+
 export function BrandTrendCharts({ points }: { points: BrandHistoryPoint[] }) {
   const { locale, m } = useI18n();
+  const dates = useMemo(
+    () => points.map(periodDate),
+    [points]
+  );
+
+  const defaultStart = dates[0] ?? "";
+  const defaultEnd = dates[dates.length - 1] ?? "";
+  const [start, setStart] = useState(defaultStart);
+  const [end, setEnd] = useState(defaultEnd);
+
   if (points.length < 2) return null;
 
-  const weekCountLabel = m.brand.historyWeeks(points.length);
-  const rankPoints = points.map((p) => ({
+  const clampedStart = start <= end ? start : end;
+  const clampedEnd = start <= end ? end : start;
+
+  const filtered = filterHistoryByRange(points, clampedStart, clampedEnd);
+  const weekCountLabel = m.brand.historyWeeks(filtered.length);
+  const rankPoints = filtered.map((p) => ({
     label: formatShortUtcDate(locale, p.weekDate),
     value: p.rank,
   }));
-  const scorePoints = points.map((p) => ({
+  const scorePoints = filtered.map((p) => ({
     label: formatShortUtcDate(locale, p.weekDate),
     value: p.score,
   }));
 
+  function onStartChange(value: string) {
+    setStart(value);
+    if (value > end) setEnd(value);
+  }
+
+  function onEndChange(value: string) {
+    setEnd(value);
+    if (value < start) setStart(value);
+  }
+
   return (
-    <div className="mt-4 grid grid-cols-1 gap-4 border-t border-[var(--border)] pt-4 sm:grid-cols-2 sm:gap-x-4">
-      <TrendLineChart
-        title={m.brand.rankHistory}
-        points={rankPoints}
-        weekCountLabel={weekCountLabel}
-        invertY
-        formatValue={(v) => `#${v}`}
-        domainFloor={1}
-        domainCeil={20}
-      />
-      <TrendLineChart
-        title={m.brand.scoreHistory}
-        points={scorePoints}
-        weekCountLabel={weekCountLabel}
-        formatValue={(v) => v.toFixed(1)}
-        domainFloor={0}
-        domainCeil={100}
-      />
+    <div className="mt-4 border-t border-[var(--border)] pt-4">
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
+        <label className="flex items-center gap-1.5">
+          <span>{m.brand.historyRangeFrom}</span>
+          <select
+            value={clampedStart}
+            onChange={(e) => onStartChange(e.target.value)}
+            className="rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-1 font-mono text-[11px] text-[var(--text)]"
+          >
+            {dates.map((d) => (
+              <option key={`from-${d}`} value={d}>
+                {formatWeekLabel(m, d)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span>{m.brand.historyRangeTo}</span>
+          <select
+            value={clampedEnd}
+            onChange={(e) => onEndChange(e.target.value)}
+            className="rounded-md border border-[var(--border)] bg-[var(--card)] px-2 py-1 font-mono text-[11px] text-[var(--text)]"
+          >
+            {dates.map((d) => (
+              <option key={`to-${d}`} value={d}>
+                {formatWeekLabel(m, d)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-xs text-[var(--text-muted)]">{m.brand.historyRangeEmpty}</p>
+      ) : filtered.length < 2 ? (
+        <p className="text-xs text-[var(--text-muted)]">{m.brand.historyRangeEmpty}</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-x-4">
+          <TrendLineChart
+            title={m.brand.rankHistory}
+            points={rankPoints}
+            weekCountLabel={weekCountLabel}
+            invertY
+            formatValue={(v) => `#${v}`}
+            domainFloor={1}
+            domainCeil={20}
+          />
+          <TrendLineChart
+            title={m.brand.scoreHistory}
+            points={scorePoints}
+            weekCountLabel={weekCountLabel}
+            formatValue={(v) => v.toFixed(1)}
+            domainFloor={0}
+            domainCeil={100}
+          />
+        </div>
+      )}
     </div>
   );
 }

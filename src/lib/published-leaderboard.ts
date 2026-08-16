@@ -131,46 +131,71 @@ export async function getPublishedCategoryLeaderboards(
   });
 }
 
+export type CategoryCardLeader = {
+  rank: number;
+  brandName: string;
+  brandSlug: string;
+  score: number;
+};
+
+export type CategoryCardLeaders = Record<string, CategoryCardLeader[] | null>;
+
 /**
- * Rankings index cards: #1 overall per category from that category's newest overall week.
+ * Rankings index cards: overall Top 3 per category from that category's newest overall week.
  * One snapshot query — not 13 full boards.
  */
-export const getCategoryCardLeaders = cache(async (): Promise<
-  Record<string, { brandName: string } | null>
-> => {
-  return ttlCache("category-card-leaders", 60_000, loadCategoryCardLeaders);
+export const getCategoryCardLeaders = cache(async (): Promise<CategoryCardLeaders> => {
+  return ttlCache("category-card-leaders-v2", 60_000, loadCategoryCardLeaders);
 });
 
-async function loadCategoryCardLeaders(): Promise<
-  Record<string, { brandName: string } | null>
-> {
+async function loadCategoryCardLeaders(): Promise<CategoryCardLeaders> {
   const snaps = await prisma.snapshot.findMany({
-    where: { engine: null, rank: 1 },
+    where: { engine: null, rank: { in: [1, 2, 3] } },
     select: {
       week: true,
       category: true,
+      rank: true,
+      score: true,
       brand: { select: { canonicalName: true } },
     },
   });
-  const latest = new Map<string, { week: string; brandName: string }>();
+
+  const latestWeek = new Map<string, string>();
   for (const snap of snaps) {
     const slug = CATEGORY_TO_SLUG[snap.category];
     if (!slug) continue;
     const date = tryNormalizePeriodDate(snap.week);
     if (!date) continue;
     const week = toStoragePeriodKey(date);
-    const prev = latest.get(slug);
-    if (!prev || week > prev.week) {
-      latest.set(slug, {
-        week,
-        brandName: getProductDisplayName(snap.brand.canonicalName),
-      });
-    }
+    const prev = latestWeek.get(slug);
+    if (!prev || week > prev) latestWeek.set(slug, week);
   }
+
+  const bySlug = new Map<string, Map<number, CategoryCardLeader>>();
+  for (const snap of snaps) {
+    const slug = CATEGORY_TO_SLUG[snap.category];
+    if (!slug) continue;
+    const date = tryNormalizePeriodDate(snap.week);
+    if (!date) continue;
+    const week = toStoragePeriodKey(date);
+    if (week !== latestWeek.get(slug)) continue;
+
+    const brandName = getProductDisplayName(snap.brand.canonicalName);
+    const ranks = bySlug.get(slug) ?? new Map<number, CategoryCardLeader>();
+    ranks.set(snap.rank, {
+      rank: snap.rank,
+      brandName,
+      brandSlug: toBrandSlug(brandName),
+      score: snap.score,
+    });
+    bySlug.set(slug, ranks);
+  }
+
   return Object.fromEntries(
     Object.keys(CATEGORY_SLUG_MAP).map((slug) => {
-      const hit = latest.get(slug);
-      return [slug, hit ? { brandName: hit.brandName } : null];
+      const ranks = bySlug.get(slug);
+      if (!ranks || ranks.size === 0) return [slug, null];
+      return [slug, [...ranks.values()].sort((a, b) => a.rank - b.rank)];
     })
   );
 }

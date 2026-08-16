@@ -35,3 +35,19 @@ export function getDefaultBackfillPeriodKeys(
     return toStoragePeriodKey(addDays(start, -periodsAgo * periodDays));
   });
 }
+
+/**
+ * Launch / phase-5 window: `count` periods **including current** (oldest → newest).
+ * Matches PRD「含当前周期在内的临近 4 档」— e.g. 14d → 06-29 · 07-13 · 07-27 · 08-10.
+ */
+export function getLaunchBackfillPeriodKeys(
+  periodDays: number,
+  count = 4,
+  currentPeriodStart = getPeriodStartDate(periodDays)
+) {
+  const start = normalizePeriodDate(currentPeriodStart);
+  return Array.from({ length: count }, (_, index) => {
+    const periodsAgo = count - 1 - index;
+    return toStoragePeriodKey(addDays(start, -periodsAgo * periodDays));
+  });
+}

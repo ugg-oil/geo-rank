@@ -7,9 +7,12 @@ import { useI18n } from "@/lib/i18n/use-i18n";
 export function AlsoMentionedTable({
   rows,
   sourcePath,
+  periodStart,
 }: {
   rows: AlsoMentionedRow[];
   sourcePath: string;
+  /** Period start date (YYYY-MM-DD) of the board currently on screen. */
+  periodStart: string;
 }) {
   const { m } = useI18n();
   if (rows.length === 0) return null;
@@ -20,7 +23,9 @@ export function AlsoMentionedTable({
         <h2 className="text-sm font-semibold text-[var(--text)]">
           {m.category.alsoMentionedTitle}
         </h2>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">{m.category.alsoMentionedLead}</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {m.category.alsoMentionedLead(periodStart)}
+        </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

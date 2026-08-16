@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 import { COLLECTION_ENGINES, engineLabel } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/use-i18n";
 
@@ -11,6 +12,10 @@ export function SiteFooter() {
     <footer className="border-t border-[var(--border)]">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 sm:flex-row">
         <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+          <BrandMark
+            size={20}
+            className="shrink-0 rounded-[5px] ring-1 ring-[color-mix(in_srgb,var(--text)_14%,transparent)]"
+          />
           <span className="font-medium text-[var(--text-secondary)]">GEO Radar</span>
           <span>·</span>
           <span>{m.footer.dataVia}</span>

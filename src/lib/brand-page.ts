@@ -22,6 +22,10 @@ export interface BrandPageCategoryEntry {
   score: number;
   mentionFrequency: number;
   engines: Record<string, BrandPageEngineEntry>;
+  /** Previous published overall rank in this category; null if absent last period. */
+  prevRank?: number | null;
+  /** Whether a previous published period exists for this category. */
+  hasPrevPeriod?: boolean;
   /** P1: raw AI excerpts per engine (English, unpublished translation). */
   engineExcerpts?: Record<string, string[]>;
 }

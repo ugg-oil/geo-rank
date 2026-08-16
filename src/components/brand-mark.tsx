@@ -3,7 +3,7 @@ type BrandMarkProps = {
   className?: string;
 };
 
-export function BrandMark({ size = 14, className }: BrandMarkProps) {
+export function BrandMark({ size = 28, className }: BrandMarkProps) {
   return (
     <svg
       width={size}
@@ -13,22 +13,19 @@ export function BrandMark({ size = 14, className }: BrandMarkProps) {
       className={className}
       aria-hidden
     >
-      <circle cx="16" cy="16" r="11.5" stroke="var(--border-hover)" strokeWidth="1" />
-      <circle cx="16" cy="16" r="7.5" stroke="var(--border-hover)" strokeWidth="1" />
+      <rect width="32" height="32" rx="7.5" fill="#F4F1EA" />
       <path
-        d="M16 16 L16 4.5"
-        stroke="var(--text)"
-        strokeWidth="1.5"
+        d="M13 8.58 A8 8 0 1 0 23.42 19"
+        stroke="#1C1B19"
+        strokeWidth="5"
         strokeLinecap="round"
       />
       <path
-        d="M16 16 L26.2 10.8 A11.5 11.5 0 0 0 16 4.5 Z"
-        fill="var(--text)"
-        fillOpacity="0.12"
+        d="M16 16 L22.69 9.98"
+        stroke="#1C1B19"
+        strokeWidth="5"
+        strokeLinecap="round"
       />
-      <circle cx="16" cy="16" r="2.25" fill="var(--text)" />
-      <circle cx="22.5" cy="11" r="1.5" fill="var(--text)" />
-      <circle cx="19.5" cy="20" r="1" fill="var(--text-secondary)" />
     </svg>
   );
 }

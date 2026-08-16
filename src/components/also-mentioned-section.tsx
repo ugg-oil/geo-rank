@@ -1,5 +1,6 @@
 import { buildAlsoMentioned } from "@/lib/also-mentioned";
 import { AlsoMentionedTable } from "@/components/also-mentioned-table";
+import { normalizePeriodDate } from "@/lib/period";
 
 export async function AlsoMentionedSection({
   category,
@@ -13,5 +14,11 @@ export async function AlsoMentionedSection({
   sourcePath: string;
 }) {
   const rows = await buildAlsoMentioned(category, week, new Set(top20BrandIds));
-  return <AlsoMentionedTable rows={rows} sourcePath={sourcePath} />;
+  return (
+    <AlsoMentionedTable
+      rows={rows}
+      sourcePath={sourcePath}
+      periodStart={normalizePeriodDate(week)}
+    />
+  );
 }

@@ -1,13 +1,16 @@
-/** Phase 4 P5 categories — same public node when launched. */
+/** Phase 5 P5 categories — registered, prompted, backfilled (6 engines), launch-gate passed. */
 export const P5_CATEGORIES = [
-  "VPN Services",
-  "E-commerce Platforms",
-  "Online Course Platforms",
-  "Language Learning Apps",
-  "Password Managers",
-  "AI Meeting Assistants",
-  "AI Cybersecurity Tools",
-  "Recruiting Tools",
+  "Project Management Tools",
+  "CRM Platforms",
+  "Customer Support / Helpdesk",
+  "Accounting & Invoicing Software",
+  "SEO / Content Tools",
+  "Cloud Storage",
+  "Design & Prototyping Tools",
+  "Note-taking & Knowledge Base",
+  "Email Marketing Tools",
+  "HR Software",
+  "Workflow Automation",
 ] as const;
 
 export type P5Category = (typeof P5_CATEGORIES)[number];
