@@ -112,7 +112,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
         backHref={backHref}
         backCategorySlug={backCategorySlug}
         evidence={
-          <Suspense fallback={null}>
+          <Suspense key="brand-evidence" fallback={null}>
             <BrandEvidenceSection slug={slug} week={data.week} />
           </Suspense>
         }

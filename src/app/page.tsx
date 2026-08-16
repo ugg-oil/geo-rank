@@ -5,6 +5,7 @@ import {
   COLLECTION_ENGINES,
   weeklyPromptCount,
 } from "@/lib/constants";
+import { getHomePageBundle } from "@/lib/home-page-data";
 import { getPublishedLeaderboardManifest } from "@/lib/published-leaderboard";
 import { SITE_URL, stringifyJsonLd } from "@/lib/seo";
 
@@ -51,6 +52,7 @@ export default async function Home() {
     getPublishedLeaderboardManifest(),
     getBiggestMovers(5),
   ]);
+  const bundle = await getHomePageBundle(movers);
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -81,6 +83,7 @@ export default async function Home() {
         scoringEngineCount={manifest?.scoringEngineUnion?.length ?? COLLECTION_ENGINES.length}
         promptCount={manifest?.promptCount ?? weeklyPromptCount()}
         movers={movers}
+        bundle={bundle}
       />
     </main>
   );

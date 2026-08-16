@@ -63,12 +63,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   // P0-7: selector / default week are per-category (14-day boards ≠ global 7-day list).
   const availableWeeks = await getPublishedWeeksForCategory(category);
-  let selectedWeek =
+  const selectedWeek =
     requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
       ? `Week of ${requestedWeek}`
       : availableWeeks[0];
 
-  let data = selectedWeek
+  const data = selectedWeek
     ? await getPublishedCategoryLeaderboards(slug, selectedWeek)
     : null;
 

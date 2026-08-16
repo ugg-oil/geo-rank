@@ -73,6 +73,8 @@ export function buildCompanyPagesFromBrandPages(
       products: [...info.products.values()].sort((a, b) =>
         a.slug.localeCompare(b.slug)
       ),
+      hasPrevWeekData: false,
+      summary: null,
     }))
     .sort((a, b) => a.slug.localeCompare(b.slug));
 

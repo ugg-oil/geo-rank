@@ -44,6 +44,41 @@ export type CompetitionQuadrantModel = {
   medianAvgRank: number;
 };
 
+export type PeriodMetrics = {
+  appearanceRate: number;
+  avgRank: number;
+};
+
+export type QuadrantMovement = {
+  point: QuadrantPoint;
+  prev: PeriodMetrics;
+};
+
+/**
+ * P2-5: pair each current point with its prior published period position.
+ * Only brands present in both periods qualify, and unchanged positions are
+ * dropped so the chart doesn't draw zero-length arrows.
+ */
+export function selectQuadrantMovements(
+  points: readonly QuadrantPoint[],
+  prevMetrics: Record<string, PeriodMetrics> | undefined
+): QuadrantMovement[] {
+  if (!prevMetrics) return [];
+  const movements: QuadrantMovement[] = [];
+  for (const point of points) {
+    const prev = prevMetrics[point.brandId];
+    if (!prev) continue;
+    if (
+      prev.appearanceRate === point.appearanceRate &&
+      prev.avgRank === point.avgRank
+    ) {
+      continue;
+    }
+    movements.push({ point, prev });
+  }
+  return movements;
+}
+
 /** Standard median; even length → average of two middle values. */
 export function median(values: number[]): number | null {
   if (values.length === 0) return null;

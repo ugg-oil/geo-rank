@@ -10,7 +10,7 @@ import {
   toStoragePeriodKey,
 } from "@/lib/period";
 import { getCategoryPeriodDays } from "@/lib/category-period";
-import { getDefaultBackfillPeriodKeys } from "@/lib/backfill";
+import { getDefaultBackfillPeriodKeys, getLaunchBackfillPeriodKeys } from "@/lib/backfill";
 
 assert.equal(normalizePeriodDate("Week of 2026-07-27"), "2026-07-27");
 assert.equal(normalizePeriodDate("2026-07-27"), "2026-07-27");
@@ -53,5 +53,13 @@ const backfill14 = getDefaultBackfillPeriodKeys(14, 4, "2026-07-28");
 assert.equal(backfill14.length, 4);
 assert.equal(backfill14[0], "Week of 2026-06-02");
 assert.equal(backfill14[3], "Week of 2026-07-14");
+
+const launch14 = getLaunchBackfillPeriodKeys(14, 4, "2026-08-10");
+assert.deepEqual(launch14, [
+  "Week of 2026-06-29",
+  "Week of 2026-07-13",
+  "Week of 2026-07-27",
+  "Week of 2026-08-10",
+]);
 
 console.log("period fixtures ok");

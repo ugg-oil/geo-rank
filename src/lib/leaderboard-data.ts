@@ -18,10 +18,17 @@ export type LeaderboardRow = {
   modelCoverage: number | null;
 };
 
+export type PrevMetrics = {
+  appearanceRate: number;
+  avgRank: number;
+};
+
 export type LeaderboardView = {
   snapshots: LeaderboardRow[];
   prevRanks: Record<string, number>;
   hasPrevWeekData: boolean;
+  /** P2-5: prior published period metrics per brand, for the movement overlay. */
+  prevMetrics?: Record<string, PrevMetrics>;
 };
 
 export type AlsoMentionedRow = {

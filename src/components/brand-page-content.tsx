@@ -5,12 +5,14 @@ import { useMemo, useState, type ReactNode } from "react";
 import { BrandTrendCharts } from "@/components/brand-trend-charts";
 import type { BrandHistoryPoint } from "@/lib/brand-history-data";
 import type { BrandPageData } from "@/lib/brand-page";
+import { buildWhyCards } from "@/lib/brand-why";
 import { computeTrendLabel, type TrendLabel } from "@/lib/brand-trend-label";
 import { engineLabel } from "@/lib/constants";
 import { formatWeekLabel, getCategoryMessages } from "@/lib/i18n/messages";
 import { useI18n } from "@/lib/i18n/use-i18n";
 import type { SimilarBrandCandidate } from "@/lib/similar-brands";
 import { toBrandSlug } from "@/lib/brand-slug";
+import { getRankDelta, type RankDelta } from "@/lib/rank-change";
 import { LeadForm } from "@/components/lead-form";
 
 type SortKey = "score" | "rank" | "mention";
@@ -48,23 +50,43 @@ function resolveCategoryEngineKeys(
   return [...withData, ...withoutData];
 }
 
+function DeltaBadge({ delta }: { delta: RankDelta }) {
+  const { m } = useI18n();
+  if (delta.kind === "new")
+    return (
+      <span className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--card-hover)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
+        {m.common.new}
+      </span>
+    );
+  if (delta.kind === "up")
+    return <span className="font-mono text-sm font-medium text-[var(--green)]">↑{delta.spots}</span>;
+  if (delta.kind === "down")
+    return <span className="font-mono text-sm font-medium text-[var(--red)]">↓{delta.spots}</span>;
+  return <span className="font-mono text-sm text-[var(--text-muted)]">—</span>;
+}
+
 function EngineBadge({
   engine,
   rank,
   score,
+  href,
 }: {
   engine: string;
   rank?: number;
   score?: number;
+  href: string;
 }) {
   const { m } = useI18n();
   return (
-    <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 transition-colors hover:bg-[var(--card-hover)]"
+    >
       <span className="text-xs font-medium text-[var(--text-secondary)]">{engineLabel(engine)}</span>
       <span className="font-mono text-xs text-[var(--text-muted)]">
         {rank != null && score != null ? `#${rank} · ${score.toFixed(1)}` : m.common.noData}
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -83,9 +105,7 @@ function TrendBadge({ label }: { label: TrendLabel }) {
         ? "text-[var(--red)] border-[var(--red)]/30"
         : "text-[var(--text-secondary)] border-[var(--border)]";
   return (
-    <span
-      className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${color}`}
-    >
+    <span className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${color}`}>
       {text}
     </span>
   );
@@ -99,6 +119,7 @@ function CategoryCard({
   highlight,
   compare,
   showCompare,
+  periodWeek,
 }: {
   category: BrandPageData["categories"][number];
   history?: BrandHistoryPoint[];
@@ -107,6 +128,7 @@ function CategoryCard({
   highlight: "top" | "bottom" | null;
   compare: { rankDelta: number; scoreDelta: number; bestRank: number; bestScore: number };
   showCompare: boolean;
+  periodWeek: string;
 }) {
   const { m } = useI18n();
   const categoryName = getCategoryMessages(m, category.slug)?.name ?? category.slug;
@@ -124,17 +146,31 @@ function CategoryCard({
         ? "ring-1 ring-[var(--red)]/30"
         : "";
 
+  const prevRanks =
+    category.prevRank != null ? { self: category.prevRank } : ({} as Record<string, number>);
+  const delta = getRankDelta(
+    category.rank,
+    prevRanks,
+    "self",
+    Boolean(category.hasPrevPeriod)
+  );
+
+  const periodDate = formatWeekLabel(m, periodWeek);
+  const engineHref = (engine: string) =>
+    `/category/${category.slug}?engine=${encodeURIComponent(engine)}&week=${encodeURIComponent(periodDate)}`;
+
   return (
     <div className={`rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-6 ${ring}`}>
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href={`/category/${category.slug}`}
-            className="text-base font-semibold text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+            href={`/category/${category.slug}?week=${encodeURIComponent(periodDate)}`}
+            className="text-base font-semibold text-[var(--text)] transition-colors hover:text-[var(--text-secondary)]"
           >
             {categoryName}
           </Link>
           {trend && <TrendBadge label={trend} />}
+          <DeltaBadge delta={delta} />
         </div>
         <span className="font-mono text-lg font-semibold text-[var(--text)]">#{category.rank}</span>
       </div>
@@ -181,6 +217,7 @@ function CategoryCard({
               engine={entry.engine}
               rank={entry.rank}
               score={entry.score}
+              href={engineHref(entry.engine)}
             />
           ))}
         </div>
@@ -188,11 +225,9 @@ function CategoryCard({
 
       {history && <BrandTrendCharts points={history} />}
 
-      <div className="mt-4 border-t border-[var(--border)] pt-4">
-        <p className="mb-2 text-xs text-[var(--text-muted)]">{m.brand.similarBrands}</p>
-        {similar.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)]">{m.brand.similarEmpty}</p>
-        ) : (
+      {similar.length > 0 && (
+        <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <p className="mb-2 text-xs text-[var(--text-muted)]">{m.brand.similarBrands}</p>
           <ul className="space-y-1.5">
             {similar.map((item) => (
               <li key={item.slug}>
@@ -202,15 +237,13 @@ function CategoryCard({
                   className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-sm transition-colors hover:bg-[var(--card-hover)]"
                 >
                   <span className="font-medium text-[var(--text)]">{item.name}</span>
-                  <span className="font-mono text-xs text-[var(--text-muted)]">
-                    #{item.rank} · {item.score.toFixed(1)}
-                  </span>
+                  <span className="font-mono text-xs text-[var(--text-muted)]">#{item.rank}</span>
                 </Link>
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,66 +288,69 @@ export function BrandPageContent({
       if (sortKey === "mention") return b.mentionFrequency - a.mentionFrequency;
       return a.rank - b.rank;
     });
+    if (backCategorySlug) {
+      const pinned = rows.findIndex((c) => c.slug === backCategorySlug);
+      if (pinned > 0) {
+        const [card] = rows.splice(pinned, 1);
+        rows.unshift(card!);
+      }
+    }
     return rows;
-  }, [categoryList, sortKey]);
+  }, [categoryList, sortKey, backCategorySlug]);
 
-  const bestRank = Math.min(...categoryList.map((c) => c.rank));
-  const bestScore = Math.max(...categoryList.map((c) => c.score));
-  const worstRank = Math.max(...categoryList.map((c) => c.rank));
-  const worstScore = Math.min(...categoryList.map((c) => c.score));
+  const bestRank = categoryList.length > 0 ? Math.min(...categoryList.map((c) => c.rank)) : 0;
+  const bestScore = categoryList.length > 0 ? Math.max(...categoryList.map((c) => c.score)) : 0;
+  const worstRank = categoryList.length > 0 ? Math.max(...categoryList.map((c) => c.rank)) : 0;
+  const worstScore = categoryList.length > 0 ? Math.min(...categoryList.map((c) => c.score)) : 0;
 
   const topCategory =
-    (backCategorySlug
-      ? categoryList.find((c) => c.slug === backCategorySlug)
-      : undefined) ??
-    categoryList.reduce(
-      (best, c) => (c.rank < best.rank ? c : best),
-      categoryList[0]!
-    );
-  const topCategoryName =
-    getCategoryMessages(m, topCategory.slug)?.name ?? topCategory.slug;
-  const parentPart = data.parentCompany ? m.brand.productOf(data.parentCompany) : "";
+    categoryList.length === 0
+      ? null
+      : ((backCategorySlug
+          ? categoryList.find((c) => c.slug === backCategorySlug)
+          : undefined) ??
+        categoryList.reduce((best, c) => (c.rank < best.rank ? c : best), categoryList[0]!));
+
+  const topCategoryName = topCategory
+    ? (getCategoryMessages(m, topCategory.slug)?.name ?? topCategory.slug)
+    : "";
   const collectedEngines = data.collectedEngines ?? [];
   const weekLabel = formatWeekLabel(m, data.week);
-  const otherCategories =
-    categoryList.length > 1
-      ? categoryList.length === 2
-        ? m.brand.otherCategoriesOne
-        : m.brand.otherCategoriesMany(categoryList.length - 1)
-      : "";
-  const rankedEngineDiffs = resolveCategoryEngineKeys(collectedEngines, topCategory.engines)
-    .filter((engine) => topCategory.engines[engine])
-    .map((engine) =>
-      m.brand.engineRanks(engineLabel(engine), topCategory.engines[engine]!.rank)
-    );
-  const engineDiffs =
-    rankedEngineDiffs.length > 0
-      ? m.brand.engineDiffs(topCategoryName, rankedEngineDiffs.join(", "))
-      : "";
-  const topTrend = computeTrendLabel(historyByCategory[topCategory.slug] ?? []);
-  const trendSentence = topTrend
-    ? m.brand.whyTrend(
-        topTrend === "Rising"
-          ? m.brand.trendRising
-          : topTrend === "Declining"
-            ? m.brand.trendDeclining
-            : m.brand.trendStable,
-        topCategoryName
-      )
-    : "";
+
+  const whyCards = topCategory
+    ? buildWhyCards({
+        overallRank: topCategory.rank,
+        engines: topCategory.engines,
+        collectedEngines,
+        history: historyByCategory[topCategory.slug] ?? [],
+      })
+    : null;
+
+  const trendLabelText = (label: TrendLabel) =>
+    label === "Rising"
+      ? m.brand.trendRising
+      : label === "Declining"
+        ? m.brand.trendDeclining
+        : m.brand.trendStable;
 
   const backLabel = backCategorySlug
-    ? getCategoryMessages(m, backCategorySlug)?.name ?? m.common.categoryRankings
+    ? (getCategoryMessages(m, backCategorySlug)?.name ?? m.common.categoryRankings)
     : m.common.allRankings;
 
   return (
     <>
       <Link
         href={backHref}
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-          <path d="M9 3L4 7l5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M9 3L4 7l5 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
         {backLabel}
       </Link>
@@ -326,8 +362,8 @@ export function BrandPageContent({
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
               <Link
                 prefetch={false}
-                href={`/company/${toBrandSlug(data.parentCompany)}`}
-                className="hover:text-[var(--text)] transition-colors"
+                href={`/company/${toBrandSlug(data.parentCompany)}?from=${encodeURIComponent(`/brand/${data.slug}`)}`}
+                className="transition-colors hover:text-[var(--text)]"
               >
                 {data.parentCompany}
               </Link>
@@ -338,26 +374,117 @@ export function BrandPageContent({
           </p>
         </div>
 
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 sm:p-6">
-          <h2 className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            {m.brand.whyTitle(data.name)}
-          </h2>
-          <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-            {m.brand.whyBody({
-              name: data.name,
-              parentPart,
-              rank: topCategory.rank,
-              category: topCategoryName,
-              score: topCategory.score.toFixed(1),
-              mention: (topCategory.mentionFrequency * 100).toFixed(0),
-              otherCategories,
-              engineDescs: `${engineDiffs}${trendSentence}`,
-            })}
-          </p>
-          <p className="mt-2 text-xs text-[var(--text-muted)]">{m.brand.basedOn(weekLabel)}</p>
-        </div>
+        {topCategory && whyCards && (
+          <details
+            open
+            className="group rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)]"
+          >
+            <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-4 sm:px-6 [&::-webkit-details-marker]:hidden">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden
+                className="shrink-0 text-[var(--text-muted)] transition-transform duration-200 group-open:rotate-90"
+              >
+                <path
+                  d="M4.5 2.5L8 6l-3.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <h2 className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                {m.brand.whyTitle(data.name)}
+              </h2>
+              <span className="text-xs text-[var(--text-muted)]">{m.brand.basedOn(weekLabel)}</span>
+            </summary>
+            <div className="space-y-4 border-t border-[var(--border)] px-5 py-4 sm:px-6 sm:py-5">
+              <p className="text-sm text-[var(--text-secondary)]">
+                {m.brand.whySummary({
+                  rank: topCategory.rank,
+                  category: topCategoryName,
+                  score: topCategory.score.toFixed(1),
+                  mention: (topCategory.mentionFrequency * 100).toFixed(0),
+                })}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                    {m.brand.whyStrengths}
+                  </p>
+                  {whyCards.enginesClose ? (
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                      {m.brand.whyEnginesClose}
+                    </p>
+                  ) : whyCards.strengths.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">—</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+                      {whyCards.strengths.map((row) => (
+                        <li key={row.engine}>
+                          {row.reason === "beats_overall"
+                            ? m.brand.whyStrengthBeatsOverall(
+                                engineLabel(row.engine),
+                                row.rank,
+                                topCategory.rank
+                              )
+                            : m.brand.whyStrengthBest(engineLabel(row.engine), row.rank)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                    {m.brand.whyWeaknesses}
+                  </p>
+                  {whyCards.enginesClose ? (
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                      {m.brand.whyEnginesClose}
+                    </p>
+                  ) : whyCards.weaknesses.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">—</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+                      {whyCards.weaknesses.map((row) => (
+                        <li key={`${row.kind}-${row.engine}`}>
+                          {row.kind === "absent"
+                            ? m.brand.whyWeakAbsent(engineLabel(row.engine))
+                            : m.brand.whyWeakRank(engineLabel(row.engine), row.rank)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {whyCards.trend && (
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+                    <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                      {m.brand.whyTrendTitle}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                      {m.brand.whyTrendCard(trendLabelText(whyCards.trend), topCategoryName)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </details>
+        )}
 
-        {categoryList.length > 0 && (
+        {categoryList.length === 0 ? (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-5 py-8 text-center">
+            <p className="text-sm text-[var(--text-secondary)]">{m.brand.rankingsEmpty}</p>
+            <Link
+              href="/rankings"
+              className="mt-3 inline-block text-sm font-medium text-[var(--text)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:decoration-[var(--text-muted)]"
+            >
+              {m.brand.rankingsEmptyLink}
+            </Link>
+          </div>
+        ) : (
           <div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-[var(--text)]">
@@ -402,6 +529,7 @@ export function BrandPageContent({
                     similar={similarByCategory[cat.slug] ?? []}
                     highlight={highlight}
                     showCompare={categoryList.length > 1}
+                    periodWeek={data.week}
                     compare={{
                       rankDelta: cat.rank - bestRank,
                       scoreDelta: bestScore - cat.score,

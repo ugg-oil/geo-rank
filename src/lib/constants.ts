@@ -72,6 +72,17 @@ export const CATEGORIES = [
   "AI Meeting Assistants",
   "AI Cybersecurity Tools",
   "Recruiting Tools",
+  "Project Management Tools",
+  "CRM Platforms",
+  "Customer Support / Helpdesk",
+  "Accounting & Invoicing Software",
+  "SEO / Content Tools",
+  "Cloud Storage",
+  "Design & Prototyping Tools",
+  "Note-taking & Knowledge Base",
+  "Email Marketing Tools",
+  "HR Software",
+  "Workflow Automation",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 

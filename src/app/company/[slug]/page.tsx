@@ -1,14 +1,32 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CompanyPageContent } from "@/components/company-page-content";
-import { getCompanyIndex, getCompanyPage } from "@/lib/company-page";
-import { SCORING_VERSION } from "@/lib/constants";
+import {
+  emptyCompanyPageData,
+  getCompanyIndex,
+  getCompanyPage,
+} from "@/lib/company-page";
 import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 import { getSiteUrl, stringifyJsonLd } from "@/lib/seo";
 
 type Props = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ from?: string }>;
 };
+
+/** Valid `from=/brand/{slug}` → brand slug for product pin. */
+function brandSlugFromFromParam(from?: string): string | null {
+  if (!from) return null;
+  try {
+    const target = new URL(from, "http://localhost");
+    const parts = target.pathname.split("/").filter(Boolean);
+    if (parts.length !== 2 || parts[0] !== "brand") return null;
+    const brandSlug = parts[1]!;
+    return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(brandSlug) ? brandSlug : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -41,8 +59,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function CompanyPage({ params }: Props) {
+export default async function CompanyPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { from } = await searchParams;
+  const fromBrandSlug = brandSlugFromFromParam(from);
   const data = await getCompanyPage(slug);
   if (!data) {
     const [index, weeks] = await Promise.all([getCompanyIndex(), getPublishedLeaderboardWeeks()]);
@@ -50,15 +70,8 @@ export default async function CompanyPage({ params }: Props) {
     return (
       <main className="mx-auto max-w-6xl px-6 pt-4 pb-10 sm:pt-5 sm:pb-14">
         <CompanyPageContent
-          data={{
-            schemaVersion: 1,
-            scoringVersion: SCORING_VERSION,
-            week: weeks[0] ?? "",
-            slug,
-            name: index[slug]!.name,
-            updatedAt: new Date().toISOString().split("T")[0]!,
-            products: [],
-          }}
+          data={emptyCompanyPageData(slug, index[slug]!.name, weeks[0] ?? "")}
+          fromBrandSlug={fromBrandSlug}
         />
       </main>
     );
@@ -84,7 +97,7 @@ export default async function CompanyPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(breadcrumbJsonLd) }}
       />
-      <CompanyPageContent data={data} />
+      <CompanyPageContent data={data} fromBrandSlug={fromBrandSlug} />
     </main>
   );
 }

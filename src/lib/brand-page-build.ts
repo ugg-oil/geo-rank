@@ -11,6 +11,7 @@ import {
   type BrandCategoryHistory,
 } from "@/lib/brand-history-data";
 import { getCompanyColumnName, getProductDisplayName } from "@/lib/parent-company";
+import { findPreviousPublishedPeriod } from "@/lib/period-sequence";
 import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
 import { selectSimilarBrands, type SimilarBrandCandidate } from "@/lib/similar-brands";
 import { ttlCache } from "@/lib/ttl-cache";
@@ -377,6 +378,29 @@ export async function loadBrandPageBundle(
     catMap.get(row.category)![row.engine!] = { rank: row.rank, score: row.score };
   }
   const data = toBrandPage(selectedWeek, slug, info, engineMap, new Map(), ref.id);
+
+  // P3-4: previous-period overall rank per category for Δ badges.
+  await Promise.all(
+    data.categories.map(async (entry) => {
+      const categoryName = CATEGORY_SLUG_MAP[entry.slug];
+      if (!categoryName) {
+        entry.hasPrevPeriod = false;
+        entry.prevRank = null;
+        return;
+      }
+      const prevWeek = await findPreviousPublishedPeriod(categoryName, selectedWeek);
+      if (!prevWeek) {
+        entry.hasPrevPeriod = false;
+        entry.prevRank = null;
+        return;
+      }
+      entry.hasPrevPeriod = true;
+      const prevSnap = overallByWeek.find(
+        (row) => row.week === prevWeek && row.category === categoryName
+      );
+      entry.prevRank = prevSnap?.rank ?? null;
+    })
+  );
 
   const boardsByWeek: Record<
     string,
