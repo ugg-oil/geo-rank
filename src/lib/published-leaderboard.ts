@@ -2,7 +2,7 @@ import { cache } from "react";
 import { ttlCache } from "@/lib/ttl-cache";
 import type { CategoryBoardsData, LeaderboardRow } from "@/lib/leaderboard-data";
 import { CATEGORY_SLUG_MAP, CATEGORY_TO_SLUG } from "@/lib/categories";
-import { prisma } from "@/lib/db";
+import { prisma, withPgRetry } from "@/lib/db";
 import { getAllCategoryLeaderboards } from "@/lib/leaderboard";
 import { getCurrentWeek } from "@/lib/week";
 import { toStoragePeriodKey, tryNormalizePeriodDate } from "@/lib/period";
@@ -52,10 +52,12 @@ function normalizeRow(row: LeaderboardRow): LeaderboardRow {
 }
 
 async function loadPublishedLeaderboardWeeks(): Promise<string[]> {
-  const snapshotCounts = await prisma.snapshot.groupBy({
-    by: ["week"],
-    _count: { id: true },
-  });
+  const snapshotCounts = await withPgRetry(() =>
+    prisma.snapshot.groupBy({
+      by: ["week"],
+      _count: { id: true },
+    })
+  );
   return snapshotCounts
     .filter((row) => row._count.id >= MIN_SNAPSHOTS_PER_WEEK)
     .map((row) => {

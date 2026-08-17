@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, withPgRetry } from "@/lib/db";
 import { normalizePeriodDate, toStoragePeriodKey, tryNormalizePeriodDate } from "@/lib/period";
 import { ttlCache } from "@/lib/ttl-cache";
 
@@ -10,11 +10,13 @@ const MAX_PUBLISHED_WEEKS = 12;
  */
 export async function listPublishedOverallWeeks(category: string): Promise<string[]> {
   return ttlCache(`overall-weeks:${category}`, 60_000, async () => {
-    const snapshotCounts = await prisma.snapshot.groupBy({
-      by: ["week"],
-      where: { category, engine: null },
-      _count: { id: true },
-    });
+    const snapshotCounts = await withPgRetry(() =>
+      prisma.snapshot.groupBy({
+        by: ["week"],
+        where: { category, engine: null },
+        _count: { id: true },
+      })
+    );
     return snapshotCounts
       .filter((row) => row._count.id > 0)
       .map((row) => {
