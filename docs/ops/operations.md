@@ -13,7 +13,17 @@ Pipeline 完成后默认**不**写 Vercel Blob。仅当显式设置 `PUBLISH_BLO
 
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进错误发布。
 
-**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次只跑一个单位（一个引擎采集，或 extract/normalize/…/publish 之一），写回 `pipeline_runs.current_step` 并刷新 `updated_at` 心跳。同一请求可用 `after()` 自链式续跑（深度上限 12）；同时 `vercel.json` 在周一 UTC 02:00–04:30 每 15–30 分钟再触发，覆盖自链失败的情况。本地 `npm run pipeline` 仍是一次性跑完全流程。
+**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次只跑一个单位（一个引擎采集，或 extract/normalize/…/publish 之一），写回 `pipeline_runs.current_step` 并刷新 `updated_at` 心跳。同一请求可用 `after()` 自链式续跑（深度上限 24）；同时 `vercel.json` 在周一 UTC 02:00–04:30 每 15–30 分钟再触发，覆盖自链失败的情况。本地 `npm run pipeline` 仍是一次性跑完全流程。
+
+**每小时补跑兜底（`/api/cron/catchup`，`:07`）：** 周一主窗口只有 2.5h；DB/平台故障盖住窗口时不能干等到下周一。入口策略见 `src/lib/cron-catchup-policy.ts`：
+
+1. `getPipelineHealth` 已健康 → `already_published`（零成本）
+2. 最新 run 心跳 < 5 分钟 → `already_running`（不与活自链打架）
+3. 心跳 5 分钟–90 分钟的 `running` → **续跑**（避免干等到 90 分钟才 stale）
+4. 将新建/重挂 run 时，若本周 `pipeline_runs` 已 ≥ 6 → `circuit_open`，发告警后停手（防结构性缺口无限烧 API）
+5. 否则 tick + 自链
+
+健康门禁：最新 run `success`、`snapshotCount > 0`、本周期应跑品类均有 Overall Top20，且每品类至少 3 个引擎完成全部 active prompts；Blob 缺失只 warning。周一 `/api/cron` **不走**熔断（主跑优先）。自链 `x-pipeline-chain-depth > 0` 跳过入口闸门。周中 period 与周一等价；`collectOne` 对已 `ok` response skip。
 
 陈旧 `running` 判定看 **心跳**（`updated_at`），默认 **90 分钟**无更新即标 failed（可用 `PIPELINE_RUN_STALE_TIMEOUT_MS` 覆盖；不再用 30 小时）。
 每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与运行状态；缺 Blob manifest 记为 warning，不以之为硬失败。若配置完整的 Resend 邮件变量，会直发告警邮件；可选 webhook 是邮件不可用时的备用通道。
@@ -71,6 +81,17 @@ curl "https://georadar.website/api/cron" \
 
 鉴权失败返回 `401 Unauthorized`。
 
+### Cron 补跑（catchup）
+
+每小时第 7 分钟自动触发。策略摘要：健康 / 5 分钟内活租约 → no-op；冷 `running` → 续跑；将新建且本周 run ≥ 6 → `circuit_open`；否则等同 `/api/cron` tick + 自链。手动跑法：
+
+```bash
+curl "https://georadar.website/api/cron/catchup" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+可能返回：`skipped: "already_published" | "already_running" | "circuit_open"`。
+
 ### 健康检查
 
 ```bash
@@ -78,7 +99,7 @@ curl "https://georadar.website/api/pipeline-health?week=Week%20of%202026-08-03" 
   -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-健康状态要求：最新运行成功、`snapshot_count > 0`。Blob `manifest_url` / `latest_manifest_url` 为可选镜像元数据；缺失时健康检查仍可返回 `200`（响应可带 `warnings`）。运行失败或无快照时返回 `503`。
+健康要求：最新 run `success`、`snapshot_count > 0`、本周期应跑品类 Overall Top20 齐全、每品类 ≥3 个完整引擎。Blob manifest 缺失只 `warnings`。不健康返回 `503`（可带 `coverage`）。
 
 ### 邮件告警测试
 
