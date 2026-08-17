@@ -13,6 +13,7 @@ import {
   PIPELINE_COLLECTION_TIMEOUT_MS,
   PIPELINE_RUN_STALE_TIMEOUT_MS,
   PIPELINE_STAGE_TIMEOUT_MS,
+  PIPELINE_TICK_BUDGET_MS,
 } from "@/lib/pipeline-timeouts";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
 import { verifyPublicCategoryPage } from "@/lib/pipeline-health";
@@ -118,19 +119,29 @@ export async function runPipelineTick(
 
     const collectEngineName = parseCollectEngine(step);
     if (collectEngineName) {
-      const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
-      const batch = await runStage(`collecting:${collectEngineName}`, collectEngine(w, collectEngineName, deadline), PIPELINE_COLLECTION_TIMEOUT_MS);
+      // Soft budget under serverless maxDuration; unfinished engines stay on this step.
+      const deadline = Date.now() + PIPELINE_TICK_BUDGET_MS;
+      const batch = await collectEngine(w, collectEngineName, deadline, {
+        softDeadline: true,
+        onCategoryComplete: async () => {
+          await touchRun(run.id, {});
+        },
+      });
       const collectedCount = await prisma.response.count({
         where: { week: w, status: "ok" },
       });
-      const next = nextStepAfterCollect(collectEngineName);
+      const next = batch.engineComplete
+        ? nextStepAfterCollect(collectEngineName)
+        : collectStepFor(collectEngineName);
       await touchRun(run.id, { collectedCount, currentStep: next });
       logPipelineEvent({
         event: "tick_completed",
         week: w,
         runId: run.id,
         stage: step,
-        attemptedCount: batch.length,
+        attemptedCount: batch.results.length,
+        categoriesAttempted: batch.categoriesAttempted,
+        engineComplete: batch.engineComplete,
         nextStep: next,
       });
       return {
@@ -277,7 +288,7 @@ export async function runFullPipeline(
     for (const engine of COLLECTION_ENGINES) {
       const batch = await timedStage(`collecting:${engine}`, () => {
         const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
-        return collectEngine(w, engine, deadline);
+        return collectEngine(w, engine, deadline).then((r) => r.results);
       });
       collectResults.push(...batch);
       const collectedCount = await prisma.response.count({
