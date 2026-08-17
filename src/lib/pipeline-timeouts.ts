@@ -13,6 +13,17 @@ export const PIPELINE_COLLECTION_TIMEOUT_MS = readPositiveInt(
   20 * 60_000
 );
 
+/**
+ * Soft wall-clock budget for one serverless cron tick (route maxDuration = 300s).
+ * Collection stops between categories when this elapses and keeps the same
+ * `collecting:<engine>` step so the next tick/chain continues without failing
+ * the whole run. Leave headroom under the platform kill for response + after().
+ */
+export const PIPELINE_TICK_BUDGET_MS = readPositiveInt(
+  "PIPELINE_TICK_BUDGET_MS",
+  240_000
+);
+
 export const PIPELINE_EXTRACTION_TIMEOUT_MS = readPositiveInt(
   "PIPELINE_EXTRACTION_TIMEOUT_MS",
   20 * 60_000

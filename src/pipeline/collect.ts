@@ -4,6 +4,7 @@ import { COLLECTION_ENGINES, ENGINE_MODEL_SLUGS, type Engine } from "@/lib/const
 import { getCurrentWeek } from "@/lib/week";
 import {
   assertBeforeDeadline,
+  PipelineTimeoutError,
   PIPELINE_COLLECTION_TIMEOUT_MS,
 } from "@/lib/pipeline-timeouts";
 
@@ -105,6 +106,17 @@ export type CollectOptions = {
    * Default false — cron still uses shouldCollectCategoryInPeriod.
    */
   forceCategories?: boolean;
+  /** Soft stop: return between categories instead of throwing when budget is spent. */
+  softDeadline?: boolean;
+  /** Heartbeat after each category (serverless stale detection). */
+  onCategoryComplete?: (category: string) => Promise<void> | void;
+};
+
+export type CollectEngineResult = {
+  results: string[];
+  /** False when soft deadline stopped before all due categories finished. */
+  engineComplete: boolean;
+  categoriesAttempted: string[];
 };
 
 export async function collectCategory(
@@ -153,12 +165,15 @@ export async function collectEngine(
   engine: Engine,
   deadline?: number,
   options: CollectOptions = {}
-) {
+): Promise<CollectEngineResult> {
   const { CATEGORIES } = await import("@/lib/constants");
   const { getCategoryPeriodDays } = await import("@/lib/category-period");
   const { shouldCollectCategoryInPeriod } = await import("@/lib/period");
   const categories = options.categories ?? CATEGORIES;
   const allResults: string[] = [];
+  const categoriesAttempted: string[] = [];
+  const soft = options.softDeadline === true;
+
   for (const category of categories) {
     if (
       !options.forceCategories &&
@@ -166,10 +181,26 @@ export async function collectEngine(
     ) {
       continue;
     }
-    if (deadline) assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
-    allResults.push(...(await collectCategory(category, week, deadline, engine, options)));
+
+    if (deadline && Date.now() >= deadline) {
+      if (soft) {
+        return { results: allResults, engineComplete: false, categoriesAttempted };
+      }
+      assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
+    }
+
+    try {
+      categoriesAttempted.push(category);
+      allResults.push(...(await collectCategory(category, week, deadline, engine, options)));
+      await options.onCategoryComplete?.(category);
+    } catch (error) {
+      if (soft && error instanceof PipelineTimeoutError) {
+        return { results: allResults, engineComplete: false, categoriesAttempted };
+      }
+      throw error;
+    }
   }
-  return allResults;
+  return { results: allResults, engineComplete: true, categoriesAttempted };
 }
 
 export async function collectAll(week?: string, options: CollectOptions = {}) {
@@ -177,7 +208,8 @@ export async function collectAll(week?: string, options: CollectOptions = {}) {
   const allResults: string[] = [];
   for (const engine of COLLECTION_ENGINES) {
     const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
-    allResults.push(...(await collectEngine(w, engine, deadline, options)));
+    const batch = await collectEngine(w, engine, deadline, options);
+    allResults.push(...batch.results);
   }
   return allResults;
 }

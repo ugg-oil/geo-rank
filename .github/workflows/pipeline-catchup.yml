@@ -10,36 +10,40 @@ on:
 jobs:
   catchup:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2
     steps:
       - name: Trigger /api/cron/catchup
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          set -euo pipefail
+          set -u
           if [ -z "${CRON_SECRET:-}" ]; then
             echo "Missing repo secret CRON_SECRET (must match Vercel CRON_SECRET)." >&2
             exit 1
           fi
           url="${SITE_URL:-https://georadar.website}/api/cron/catchup"
-          echo "POST/GET $url"
-          # Route is GET (Vercel cron style); follow redirects; fail on HTTP errors.
+          echo "GET $url (fire-and-forget; do not wait for full tick)"
           body="$(mktemp)"
+          # Actions only needs to poke the endpoint. The serverless tick + after()
+          # chain continues on Vercel; waiting for collection causes 504 noise.
+          set +e
           code="$(curl -sS -o "$body" -w '%{http_code}' \
+            --max-time 25 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "$url")"
-          echo "HTTP $code"
-          cat "$body"
-          echo
-          case "$code" in
-            200) exit 0 ;;
-            500)
-              # Unhealthy finish / pipeline error — surface in Actions, still alerted by app.
-              exit 1
-              ;;
-            *)
-              echo "Unexpected status $code" >&2
-              exit 1
-              ;;
-          esac
+          curl_exit=$?
+          set -e
+          echo "curl_exit=$curl_exit HTTP ${code:-000}"
+          if [ -s "$body" ]; then
+            head -c 2000 "$body"
+            echo
+          fi
+          if [ "$curl_exit" -eq 0 ] && [ "$code" = "401" ]; then
+            echo "Unauthorized — CRON_SECRET mismatch." >&2
+            exit 1
+          fi
+          # 200 = tick finished quickly / skipped
+          # 000 / 28 = curl timed out after poke (tick still running on Vercel)
+          # 504 / 502 / 500 = platform timeout or mid-run error; next hourly resume picks up
+          exit 0

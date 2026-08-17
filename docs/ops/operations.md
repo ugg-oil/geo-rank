@@ -13,12 +13,12 @@ Pipeline 完成后默认**不**写 Vercel Blob。仅当显式设置 `PUBLISH_BLO
 
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进错误发布。
 
-**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次只跑一个单位（一个引擎采集，或 extract/normalize/…/publish 之一），写回 `pipeline_runs.current_step` 并刷新 `updated_at` 心跳。同一请求可用 `after()` 自链式续跑（深度上限 24）；同时 `vercel.json` 在周一 UTC 02:00–04:30 每 15–30 分钟再触发，覆盖自链失败的情况。本地 `npm run pipeline` 仍是一次性跑完全流程。
+**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次推进一个单位。采集阶段按**品类软截止**：单个 tick 预算默认 240s（`PIPELINE_TICK_BUDGET_MS`，低于路由 `maxDuration=300`），超时后留在同一 `collecting:<engine>`，下一枪/自链继续，而不是把整次 run 标 failed。后处理（extract→publish）仍各占一 tick。写回 `current_step` 并在每个品类后刷新 `updated_at` 心跳。同一请求可用 `after()` 自链式续跑（深度上限 24）；`vercel.json` 周一 UTC 02:00–04:30 错峰再触发。本地 `npm run pipeline` 仍是一次性跑完全流程（采集用 20 分钟硬超时）。
 
 **补跑兜底（`/api/cron/catchup`）：** 周一主窗口只有 2.5h；DB/平台故障盖住窗口时不能干等到下周一。Hobby 套餐 Vercel Cron **不能按小时调度**（会直接让部署失败），因此拆成两层：
 
 - **Vercel**：每天 UTC `06:00` 打一次 catchup（Hobby 合规的日级兜底）
-- **GitHub Actions**（`.github/workflows/pipeline-catchup.yml`）：每小时 UTC `:07` 调同一路由；仓库需配置 secret `CRON_SECRET`（与 Vercel 相同），可选 variable `SITE_URL`（默认 `https://georadar.website`）
+- **GitHub Actions**（`.github/workflows/pipeline-catchup.yml`）：每小时 UTC `:07` **短请求触发**同一路由（`curl --max-time 25`，不等待 tick 跑完；504/超时也算触发成功）。仓库需配置 secret `CRON_SECRET`（与 Vercel 相同），可选 variable `SITE_URL`（默认 `https://georadar.website`）
 
 入口策略见 `src/lib/cron-catchup-policy.ts`：
 
@@ -89,7 +89,7 @@ curl "https://georadar.website/api/cron" \
 ### Cron 补跑（catchup）
 
 - Vercel：每天 UTC `06:00`
-- GitHub Actions：每小时 UTC `:07`（`Pipeline catchup` workflow；可在 Actions 页手动 `workflow_dispatch`）
+- GitHub Actions：每小时 UTC `:07`（`Pipeline catchup` workflow；可在 Actions 页手动 `workflow_dispatch`）。workflow **只负责触发**（25s curl 上限），不等待 Vercel 跑完；平台 504 不算配置失败。
 
 策略摘要：健康 / 5 分钟内活租约 → no-op；冷 `running` → 续跑；将新建且本周 run ≥ 6 → `circuit_open`；否则等同 `/api/cron` tick + 自链。手动跑法：
 
