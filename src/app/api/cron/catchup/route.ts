@@ -5,7 +5,8 @@ import { handleCronTick } from "@/lib/cron-tick";
 export const maxDuration = 300;
 
 /**
- * Hourly safety net for the Monday schedule.
+ * Safety net for the Monday schedule.
+ * Invoked daily by Vercel Cron (Hobby-safe) and hourly by GitHub Actions.
  *
  * Gates (see `cron-catchup-policy.ts`):
  * - healthy → no-op

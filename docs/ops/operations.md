@@ -15,7 +15,12 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 
 **生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次只跑一个单位（一个引擎采集，或 extract/normalize/…/publish 之一），写回 `pipeline_runs.current_step` 并刷新 `updated_at` 心跳。同一请求可用 `after()` 自链式续跑（深度上限 24）；同时 `vercel.json` 在周一 UTC 02:00–04:30 每 15–30 分钟再触发，覆盖自链失败的情况。本地 `npm run pipeline` 仍是一次性跑完全流程。
 
-**每小时补跑兜底（`/api/cron/catchup`，`:07`）：** 周一主窗口只有 2.5h；DB/平台故障盖住窗口时不能干等到下周一。入口策略见 `src/lib/cron-catchup-policy.ts`：
+**补跑兜底（`/api/cron/catchup`）：** 周一主窗口只有 2.5h；DB/平台故障盖住窗口时不能干等到下周一。Hobby 套餐 Vercel Cron **不能按小时调度**（会直接让部署失败），因此拆成两层：
+
+- **Vercel**：每天 UTC `06:00` 打一次 catchup（Hobby 合规的日级兜底）
+- **GitHub Actions**（`.github/workflows/pipeline-catchup.yml`）：每小时 UTC `:07` 调同一路由；仓库需配置 secret `CRON_SECRET`（与 Vercel 相同），可选 variable `SITE_URL`（默认 `https://georadar.website`）
+
+入口策略见 `src/lib/cron-catchup-policy.ts`：
 
 1. `getPipelineHealth` 已健康 → `already_published`（零成本）
 2. 最新 run 心跳 < 5 分钟 → `already_running`（不与活自链打架）
@@ -83,7 +88,10 @@ curl "https://georadar.website/api/cron" \
 
 ### Cron 补跑（catchup）
 
-每小时第 7 分钟自动触发。策略摘要：健康 / 5 分钟内活租约 → no-op；冷 `running` → 续跑；将新建且本周 run ≥ 6 → `circuit_open`；否则等同 `/api/cron` tick + 自链。手动跑法：
+- Vercel：每天 UTC `06:00`
+- GitHub Actions：每小时 UTC `:07`（`Pipeline catchup` workflow；可在 Actions 页手动 `workflow_dispatch`）
+
+策略摘要：健康 / 5 分钟内活租约 → no-op；冷 `running` → 续跑；将新建且本周 run ≥ 6 → `circuit_open`；否则等同 `/api/cron` tick + 自链。手动跑法：
 
 ```bash
 curl "https://georadar.website/api/cron/catchup" \
@@ -91,6 +99,8 @@ curl "https://georadar.website/api/cron/catchup" \
 ```
 
 可能返回：`skipped: "already_published" | "already_running" | "circuit_open"`。
+
+**GitHub 配置（一次性）：** Settings → Secrets and variables → Actions → New repository secret：`CRON_SECRET` = 与 Vercel 环境变量同名同值。可选 Variables：`SITE_URL=https://georadar.website`。
 
 ### 健康检查
 

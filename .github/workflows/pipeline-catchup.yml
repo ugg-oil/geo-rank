@@ -1,0 +1,45 @@
+# Hobby Vercel only allows one cron fire per day. Hourly recovery lives here.
+name: Pipeline catchup
+
+on:
+  schedule:
+    # Every hour at :07 UTC — same intent as the rejected Vercel hourly cron.
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+jobs:
+  catchup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger /api/cron/catchup
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing repo secret CRON_SECRET (must match Vercel CRON_SECRET)." >&2
+            exit 1
+          fi
+          url="${SITE_URL:-https://georadar.website}/api/cron/catchup"
+          echo "POST/GET $url"
+          # Route is GET (Vercel cron style); follow redirects; fail on HTTP errors.
+          body="$(mktemp)"
+          code="$(curl -sS -o "$body" -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "$url")"
+          echo "HTTP $code"
+          cat "$body"
+          echo
+          case "$code" in
+            200) exit 0 ;;
+            500)
+              # Unhealthy finish / pipeline error — surface in Actions, still alerted by app.
+              exit 1
+              ;;
+            *)
+              echo "Unexpected status $code" >&2
+              exit 1
+              ;;
+          esac

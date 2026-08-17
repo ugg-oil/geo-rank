@@ -14,7 +14,7 @@ cp .env.example .env
 | `DATABASE_URL` | PostgreSQL 连接串 |
 | `OPENROUTER_API_KEY` | OpenRouter API Key |
 | `PIPELINE_SECRET` | `/api/pipeline`、`/api/publish` 鉴权 |
-| `CRON_SECRET` | `/api/cron` 鉴权（可与 `PIPELINE_SECRET` 相同） |
+| `CRON_SECRET` | `/api/cron`、`/api/cron/catchup` 鉴权（可与 `PIPELINE_SECRET` 相同）。**GitHub Actions** 小时补跑也读同名 repo secret，须与 Vercel 一致。 |
 | `RESEND_API_KEY` | Resend API Key。与下两项同时配置时，Cron/健康检查失败会直发邮件。 |
 | `PIPELINE_ALERT_EMAIL_TO` | 接收告警的邮箱。 |
 | `PIPELINE_ALERT_EMAIL_FROM` | 已在 Resend 验证的发件人，例如 `GEO Radar Alerts <alerts@alerts.georadar.website>`。 |
