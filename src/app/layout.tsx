@@ -57,11 +57,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
+      <body className="min-h-screen antialiased flex flex-col">
         <ThemeScript />
         <LocaleScript />
-      </head>
-      <body className="min-h-screen antialiased flex flex-col">
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <SiteFooter />
