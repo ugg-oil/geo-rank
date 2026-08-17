@@ -1,5 +1,6 @@
-export function LocaleScript() {
-  const script = `
+import Script from "next/script";
+
+const LOCALE_BOOTSTRAP = `
 (() => {
   try {
     const key = "geo-radar-locale";
@@ -14,5 +15,10 @@ export function LocaleScript() {
 })();
 `;
 
-  return <script dangerouslySetInnerHTML={{ __html: script }} />;
+export function LocaleScript() {
+  return (
+    <Script id="geo-radar-locale" strategy="beforeInteractive">
+      {LOCALE_BOOTSTRAP}
+    </Script>
+  );
 }

@@ -1,5 +1,6 @@
-export function ThemeScript() {
-  const script = `
+import Script from "next/script";
+
+const THEME_BOOTSTRAP = `
 (() => {
   try {
     const key = "geo-radar-theme";
@@ -17,5 +18,10 @@ export function ThemeScript() {
 })();
 `;
 
-  return <script dangerouslySetInnerHTML={{ __html: script }} />;
+export function ThemeScript() {
+  return (
+    <Script id="geo-radar-theme" strategy="beforeInteractive">
+      {THEME_BOOTSTRAP}
+    </Script>
+  );
 }

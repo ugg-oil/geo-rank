@@ -17,24 +17,33 @@ export function AlsoMentionedTable({
   const { m } = useI18n();
   if (rows.length === 0) return null;
 
+  // Widest rate in the tail sets the bar scale — these are all small numbers, so
+  // scaling to 100% would render 20 identical stubs.
+  const maxRate = Math.max(...rows.map((row) => row.mentionRate), 0.01);
+
   return (
-    <div className="mt-8 overflow-hidden rounded-xl border border-[var(--border)]">
-      <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3">
-        <h2 className="text-sm font-semibold text-[var(--text)]">
-          {m.category.alsoMentionedTitle}
-        </h2>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
-          {m.category.alsoMentionedLead(periodStart)}
-        </p>
+    <div className="surface mt-6 overflow-hidden">
+      <div className="surface-head flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="panel-title text-sm font-semibold text-[var(--text)]">
+            {m.category.alsoMentionedTitle}
+          </h2>
+          <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
+            {m.category.alsoMentionedLead(periodStart)}
+          </p>
+        </div>
+        <span className="num rounded-full border border-[var(--border)] bg-[var(--card)] px-2 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">
+          {rows.length}
+        </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[var(--border)] bg-[var(--bg-elevated)]">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+            <tr className="border-b border-[var(--border)] bg-[var(--card)]">
+              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 {m.common.product}
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 {m.category.alsoMentionedMention}
               </th>
             </tr>
@@ -50,7 +59,7 @@ export function AlsoMentionedTable({
                     <Link
                       prefetch={false}
                       href={`/brand/${row.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
-                      className="font-medium text-[var(--text)] underline decoration-[var(--border)] underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)] group-hover:decoration-[var(--border-hover)]"
+                      className="font-medium text-[var(--text)] underline decoration-transparent decoration-2 underline-offset-[4px] transition-colors hover:decoration-[var(--brand)] group-hover:decoration-[var(--brand-line)]"
                     >
                       {row.brandName}
                     </Link>
@@ -58,8 +67,23 @@ export function AlsoMentionedTable({
                     <span className="font-medium text-[var(--text)]">{row.brandName}</span>
                   )}
                 </td>
-                <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">
-                  {(row.mentionRate * 100).toFixed(0)}%
+                <td className="px-4 py-3.5 text-right">
+                  <span className="inline-flex items-center justify-end gap-2.5">
+                    <span
+                      aria-hidden
+                      className="hidden h-[3px] w-20 overflow-hidden rounded-full bg-[var(--border)] sm:block"
+                    >
+                      <span
+                        className="block h-full rounded-full bg-[var(--brand-line)] transition-colors group-hover:bg-[var(--brand)]"
+                        style={{
+                          width: `${Math.min(100, Math.max(4, (row.mentionRate / maxRate) * 100))}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="num font-mono text-[var(--text-secondary)]">
+                      {(row.mentionRate * 100).toFixed(0)}%
+                    </span>
+                  </span>
                 </td>
               </tr>
             ))}

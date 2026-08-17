@@ -1,5 +1,14 @@
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
+import { getCategoryPeriodDays } from "@/lib/category-period";
+import {
+  CATEGORIES,
+  COLLECTION_ENGINES,
+  MIN_SCORING_ENGINES_FOR_OVERALL,
+  PROMPTS_PER_CATEGORY,
+  TOP_N,
+} from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { shouldCollectCategoryInPeriod } from "@/lib/period";
 import { getSiteUrl } from "@/lib/seo";
 
 type ManifestLike = { week?: string; boards?: Record<string, string> };
@@ -51,17 +60,86 @@ export async function recordPublicationFailure(week: string, error: string) {
 }
 
 /**
- * Health = DB publish readiness: successful run + snapshots.
- * Blob manifest URLs are optional mirror metadata (warning only via reason text when absent).
+ * Health = current-period publish readiness for catch-up / monitoring.
+ * Requires successful run, non-zero snapshots, overall Top20 for every
+ * category due this period, and ≥ MIN_SCORING_ENGINES complete engines each.
+ * Blob manifests remain optional warnings only.
  */
 export async function getPipelineHealth(week: string) {
   const run = await prisma.pipelineRun.findFirst({ where: { week }, orderBy: { startedAt: "desc" }, select: {
-    id: true, status: true, currentStep: true, startedAt: true, finishedAt: true, snapshotCount: true,
+    id: true, status: true, currentStep: true, startedAt: true, updatedAt: true, finishedAt: true, snapshotCount: true,
     manifestUrl: true, latestManifestUrl: true, publishStatus: true, publishedAt: true, publishError: true, errorMessage: true,
   }});
   if (!run) return { ok: false as const, week, reason: "no pipeline run found", run: null };
   if (run.status !== "success") return { ok: false as const, week, reason: `run status is ${run.status}`, run };
   if (!run.snapshotCount || run.snapshotCount <= 0) return { ok: false as const, week, reason: "snapshot count is zero", run };
+
+  const expectedCategories = CATEGORIES.filter((category) =>
+    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+  );
+  const [activePrompts, okResponses, overallBoards] = await Promise.all([
+    prisma.prompt.findMany({
+      where: { category: { in: [...expectedCategories] }, active: true },
+      select: { id: true, category: true },
+    }),
+    prisma.response.findMany({
+      where: {
+        week,
+        category: { in: [...expectedCategories] },
+        engine: { in: [...COLLECTION_ENGINES] },
+        status: "ok",
+      },
+      select: { category: true, engine: true, promptId: true },
+    }),
+    prisma.snapshot.findMany({
+      where: {
+        week,
+        category: { in: [...expectedCategories] },
+        engine: null,
+        rank: { lte: TOP_N },
+      },
+      select: { category: true },
+      distinct: ["category"],
+    }),
+  ]);
+
+  const promptCounts = new Map<string, number>();
+  for (const prompt of activePrompts) {
+    promptCounts.set(prompt.category, (promptCounts.get(prompt.category) ?? 0) + 1);
+  }
+  const promptIdsByCategoryEngine = new Map<string, Set<string>>();
+  for (const response of okResponses) {
+    const key = `${response.category}\0${response.engine}`;
+    const promptIds = promptIdsByCategoryEngine.get(key) ?? new Set<string>();
+    promptIds.add(response.promptId);
+    promptIdsByCategoryEngine.set(key, promptIds);
+  }
+  const publishedCategories = new Set(overallBoards.map((row) => row.category));
+  const missingBoards = expectedCategories.filter((category) => !publishedCategories.has(category));
+  const undercoveredCategories = expectedCategories.flatMap((category) => {
+    const expectedPrompts = promptCounts.get(category) ?? PROMPTS_PER_CATEGORY;
+    const completeEngines = COLLECTION_ENGINES.filter(
+      (engine) =>
+        (promptIdsByCategoryEngine.get(`${category}\0${engine}`)?.size ?? 0) >= expectedPrompts
+    );
+    return completeEngines.length >= MIN_SCORING_ENGINES_FOR_OVERALL
+      ? []
+      : [{ category, completeEngines: completeEngines.length, expectedPrompts }];
+  });
+
+  if (missingBoards.length > 0 || undercoveredCategories.length > 0) {
+    return {
+      ok: false as const,
+      week,
+      reason: "published coverage is incomplete",
+      run,
+      coverage: {
+        expectedCategories: expectedCategories.length,
+        missingBoards,
+        undercoveredCategories,
+      },
+    };
+  }
 
   const warnings: string[] = [];
   if (!run.manifestUrl || !run.latestManifestUrl) {

@@ -30,6 +30,15 @@
   --podium-3: rgba(205, 127, 50, 0.16);
   --selection: rgba(255, 255, 255, 0.15);
   --shine: rgba(255, 255, 255, 0.03);
+  /* One accent for data emphasis across board, quadrant and charts. Matches
+     --q-leaders so the table and the quadrant read as the same system. */
+  --brand: #34d399;
+  --brand-soft: rgba(52, 211, 153, 0.12);
+  --brand-line: rgba(52, 211, 153, 0.4);
+  --brand-contrast: #062018;
+  --grid: rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+  --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.55), 0 20px 48px -24px rgba(0, 0, 0, 0.9);
 }
 
 [data-theme="light"] {
@@ -60,6 +69,13 @@
   --podium-3: rgba(146, 64, 14, 0.14);
   --selection: rgba(20, 20, 20, 0.12);
   --shine: rgba(20, 20, 20, 0.02);
+  --brand: #059669;
+  --brand-soft: rgba(5, 150, 105, 0.1);
+  --brand-line: rgba(5, 150, 105, 0.35);
+  --brand-contrast: #ffffff;
+  --grid: rgba(20, 20, 20, 0.075);
+  --shadow-card: 0 1px 2px rgba(28, 25, 18, 0.06), 0 10px 28px -16px rgba(28, 25, 18, 0.18);
+  --shadow-raised: 0 2px 6px rgba(28, 25, 18, 0.08), 0 22px 48px -22px rgba(28, 25, 18, 0.26);
 }
 
 @theme inline {
@@ -104,6 +120,43 @@ select {
 
 .btn-primary:hover {
   background: var(--cta-hover);
+}
+
+/* Every top-level block on a board page sits on one of these, so the page reads
+   as stacked panels instead of one flat wall of text. */
+.surface {
+  border-radius: 0.875rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+/* Section eyebrow: a short accent rule left of a panel title. */
+.panel-title {
+  position: relative;
+  padding-left: 0.625rem;
+}
+
+.panel-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  bottom: 0.15em;
+  width: 3px;
+  border-radius: 9999px;
+  background: var(--brand);
+}
+
+/* Metric columns only line up while digits share an advance width. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .card-shine {
