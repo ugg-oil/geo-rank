@@ -374,6 +374,10 @@ const en = {
     quadrantMovementToggle: "Show movement",
     quadrantMovementHint:
       "Faded dot = prior published period, arrow points to this period. Median lines use this period.",
+    aboutMore: "About this ranking",
+    aboutLess: "Hide details",
+    boardTitle: "Top 20 this period",
+    quadrantPointHint: "Hover or tap a dot for its metrics.",
   },
   brand: {
     lastUpdated: (week: string) => `Last updated · ${week}`,
@@ -941,6 +945,10 @@ const zh = {
     quadrantMovementToggle: "显示位移",
     quadrantMovementHint:
       "淡点 = 上一已发布周期，箭头指向本周期。中位线按本周期计算。",
+    aboutMore: "关于这个榜单",
+    aboutLess: "收起说明",
+    boardTitle: "本周期 Top 20",
+    quadrantPointHint: "悬停或点击圆点查看指标。",
   },
   brand: {
     lastUpdated: (week: string) => `最近更新 · ${week}`,

@@ -57,7 +57,18 @@ function CheckboxGlyph() {
 
 /** Shared look for every header cell, so plain and interactive ones line up. */
 const HEAD_CELL =
-  "px-4 py-2.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-muted)]";
+  "px-4 py-3 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]";
+
+/**
+ * Top 3 get an accent tint plus a left rail — one hue, not gold/silver/bronze,
+ * which fought the accent colour everywhere else on the page. Tailwind classes
+ * (not inline styles) so `hover:` still wins over the tint.
+ */
+function podiumRail(rank: number): string {
+  if (rank === 1) return "shadow-[inset_3px_0_0_var(--brand)]";
+  if (rank <= 3) return "shadow-[inset_3px_0_0_var(--brand-line)]";
+  return "";
+}
 
 /**
  * One button per metric column doing both jobs: click sorts, hover/focus/tap
@@ -159,7 +170,7 @@ function MetricHeader({
       {active && (
         <span
           aria-hidden
-          className="absolute inset-x-0 -bottom-px h-[2px] bg-[var(--yellow)]"
+          className="absolute inset-x-0 -bottom-px h-[2px] bg-[var(--brand)]"
         />
       )}
       {/* whitespace-normal / normal-case: the header cell is uppercase + nowrap
@@ -186,9 +197,19 @@ function DeltaBadge({ delta }: { delta: RankDelta }) {
       </span>
     );
   if (delta.kind === "up")
-    return <span className="font-mono text-sm font-medium text-[var(--green)]">↑{delta.spots}</span>;
+    return (
+      <span className="num inline-flex items-baseline gap-0.5 font-mono text-sm font-semibold text-[var(--green)]">
+        <span aria-hidden>↑</span>
+        {delta.spots}
+      </span>
+    );
   if (delta.kind === "down")
-    return <span className="font-mono text-sm font-medium text-[var(--red)]">↓{delta.spots}</span>;
+    return (
+      <span className="num inline-flex items-baseline gap-0.5 font-mono text-sm font-semibold text-[var(--red)]">
+        <span aria-hidden>↓</span>
+        {delta.spots}
+      </span>
+    );
   return <span className="font-mono text-sm text-[var(--text-muted)]">—</span>;
 }
 
@@ -222,6 +243,10 @@ function PeriodHighlightLine({
 
   return (
     <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+      <span
+        aria-hidden
+        className="mr-2 inline-block h-1.5 w-1.5 -translate-y-[2px] rounded-full bg-[var(--brand)]"
+      />
       {brand}
       {suffix}
     </p>
@@ -305,7 +330,7 @@ export function CategoryBoard({
   return (
     <div>
       {periodHighlight && (
-        <div className="mb-4 border-b border-[var(--border)] pb-3">
+        <div className="mb-4 rounded-xl border border-[var(--brand-line)] bg-[var(--brand-soft)] px-4 py-3">
           <PeriodHighlightLine
             highlight={periodHighlight}
             categoryName={categoryName}
@@ -319,8 +344,8 @@ export function CategoryBoard({
       )}
 
       <div
-        className={`flex flex-wrap gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] p-1 ${
-          data.coverageExpansion && data.coverageExpansion.length > 0 ? "mb-1.5" : "mb-4"
+        className={`surface flex flex-wrap gap-1 p-1.5 ${
+          data.coverageExpansion && data.coverageExpansion.length > 0 ? "mb-2" : "mb-4"
         }`}
       >
         {tabs.map((tabItem) => (
@@ -328,10 +353,10 @@ export function CategoryBoard({
             key={tabItem.key}
             type="button"
             onClick={() => selectTab(tabItem.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               tab === tabItem.key
-                ? "bg-[var(--cta-bg)] text-[var(--cta-text)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                ? "bg-[var(--brand)] text-[var(--brand-contrast)]"
+                : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text)]"
             }`}
           >
             {tabItem.label}
@@ -340,13 +365,13 @@ export function CategoryBoard({
       </div>
 
       {data.coverageExpansion && data.coverageExpansion.length > 0 && (
-        <p className="mb-3 text-xs leading-relaxed text-[var(--text-muted)]">
+        <p className="mb-4 text-xs leading-relaxed text-[var(--text-muted)]">
           {m.category.coverageExpansion(formatEngineList(data.coverageExpansion))}
         </p>
       )}
 
       {view.snapshots.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] py-24 text-center">
+        <div className="surface py-24 text-center">
           <p className="text-base font-medium text-[var(--text-secondary)]">{m.common.noData}</p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">
             {!hasAnyBoardData
@@ -357,28 +382,34 @@ export function CategoryBoard({
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+        <div className="surface overflow-hidden">
           {/* P2-2: the checkbox column alone never told anyone this existed, so
-              the entry point is stated before any row is ticked. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-xs">
-            <CheckboxGlyph />
-            <span className="font-medium text-[var(--text-secondary)]">
-              {m.category.compareLead}
-            </span>
-            {selectedIds.length > 0 ? (
-              <span className="font-mono text-[var(--text)]">
-                {m.category.compareSelected(selectedIds.length, COMPARE_MAX)}
+              the entry point is stated before any row is ticked. It shares the
+              panel header with the board title instead of looking bolted on. */}
+          <div className="surface-head flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+            <h2 className="panel-title text-sm font-semibold text-[var(--text)]">
+              {m.category.boardTitle}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-medium text-[var(--text-secondary)]">
+                <CheckboxGlyph />
+                {m.category.compareLead}
               </span>
-            ) : (
-              <span className="text-[var(--text-muted)]">
-                {m.category.compareHint(COMPARE_MAX)}
-              </span>
-            )}
+              {selectedIds.length > 0 ? (
+                <span className="num rounded-full border border-[var(--brand-line)] bg-[var(--brand-soft)] px-2 py-0.5 font-mono font-medium text-[var(--text)]">
+                  {m.category.compareSelected(selectedIds.length, COMPARE_MAX)}
+                </span>
+              ) : (
+                <span className="text-[var(--text-muted)]">
+                  {m.category.compareHint(COMPARE_MAX)}
+                </span>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--card)]">
                   <th scope="col" className="w-9 py-2.5 pl-4 pr-0">
                     <span className="sr-only">{m.category.compareOpen}</span>
                   </th>
@@ -435,81 +466,105 @@ export function CategoryBoard({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((s) => (
-                  <tr
-                    key={s.brandId || s.id}
-                    className={`group border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)] ${
-                      selectedIds.includes(s.brandId)
-                        ? "bg-[var(--card-hover)]"
-                        : "bg-[var(--card)]"
-                    }`}
-                  >
-                    <td className="w-9 py-0 pl-4 pr-0">
-                      {/* Label wrapper: a 16px box is a poor tap target on its own. */}
-                      <label className="flex cursor-pointer items-center py-3.5 pr-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(s.brandId)}
-                          onChange={() => toggleSelected(s.brandId)}
-                          disabled={
-                            !selectedIds.includes(s.brandId) &&
-                            selectedIds.length >= COMPARE_MAX
-                          }
-                          aria-label={m.category.compareSelect(s.brandName)}
-                          className="h-4 w-4 cursor-pointer accent-[var(--yellow)] disabled:cursor-not-allowed disabled:opacity-40"
-                        />
-                      </label>
-                    </td>
-                    <td
-                      className={`px-4 py-3.5 font-mono ${
-                        s.rank <= 3
-                          ? "font-semibold text-[var(--text)]"
-                          : "text-[var(--text-muted)]"
-                      }`}
+                {rows.map((s) => {
+                  const selected = selectedIds.includes(s.brandId);
+                  const podium = s.rank <= 3;
+                  return (
+                    <tr
+                      key={s.brandId || s.id}
+                      className={`group border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)] ${
+                        selected
+                          ? "bg-[var(--card-hover)]"
+                          : podium
+                            ? "bg-[var(--brand-soft)]"
+                            : "bg-[var(--card)]"
+                      } ${podiumRail(s.rank)}`}
                     >
-                      {s.rank}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Link
-                        prefetch={false}
-                        href={`/brand/${s.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
-                        className="font-medium text-[var(--text)] underline decoration-[var(--border)] underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)] group-hover:decoration-[var(--border-hover)]"
-                      >
-                        {s.brandName}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {s.parentCompanyName ? (
+                      <td className="w-9 py-0 pl-4 pr-0">
+                        {/* Label wrapper: a 16px box is a poor tap target on its own. */}
+                        <label className="flex cursor-pointer items-center py-4 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleSelected(s.brandId)}
+                            disabled={!selected && selectedIds.length >= COMPARE_MAX}
+                            aria-label={m.category.compareSelect(s.brandName)}
+                            className="h-4 w-4 cursor-pointer accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        </label>
+                      </td>
+                      <td className="py-4 pl-4 pr-2">
+                        {s.rank <= 3 ? (
+                          <span className="num inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--card)] font-mono text-sm font-semibold text-[var(--text)]">
+                            {s.rank}
+                          </span>
+                        ) : (
+                          <span className="num inline-flex h-7 w-7 items-center justify-center font-mono text-sm text-[var(--text-muted)]">
+                            {s.rank}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
                         <Link
                           prefetch={false}
-                          href={`/company/${toBrandSlug(s.parentCompanyName)}`}
-                          className="text-[var(--text-secondary)] underline decoration-transparent underline-offset-[3px] transition-colors hover:text-[var(--text)] hover:decoration-[var(--text-muted)] group-hover:text-[var(--text)] group-hover:decoration-[var(--border-hover)]"
+                          href={`/brand/${s.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
+                          className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text)] underline decoration-transparent decoration-2 underline-offset-[4px] transition-colors hover:decoration-[var(--brand)] group-hover:decoration-[var(--brand-line)]"
                         >
-                          {s.parentCompanyName}
+                          {s.brandName}
                         </Link>
-                      ) : (
-                        <span className="text-[var(--text-secondary)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-mono font-medium">{s.score.toFixed(1)}</td>
-                    <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">
-                      {(s.appearanceRate * 100).toFixed(0)}%
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">
-                      {s.avgRank.toFixed(1)}
-                    </td>
-                    {isOverall && (
-                      <td className="px-4 py-3.5 text-right font-mono text-[var(--text-secondary)]">
-                        {s.modelCoverage !== null
-                          ? `${(s.modelCoverage * 100).toFixed(0)}%`
-                          : "—"}
                       </td>
-                    )}
-                    <td className="px-4 py-3.5 text-right">
-                      <DeltaBadge delta={deltaFor(s.brandId, s.rank)} />
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-4">
+                        {s.parentCompanyName ? (
+                          <Link
+                            prefetch={false}
+                            href={`/company/${toBrandSlug(s.parentCompanyName)}`}
+                            className="text-[13px] text-[var(--text-muted)] underline decoration-transparent underline-offset-[3px] transition-colors hover:text-[var(--text)] hover:decoration-[var(--text-muted)]"
+                          >
+                            {s.parentCompanyName}
+                          </Link>
+                        ) : (
+                          <span className="text-[13px] text-[var(--text-muted)]">—</span>
+                        )}
+                      </td>
+                      <td className="num px-4 py-4 text-right font-mono text-[15px] font-semibold text-[var(--text)]">
+                        {s.score.toFixed(1)}
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        {/* A rail beside the number turns this column into a shape
+                            you can scan without reading all 20 values. */}
+                        <span className="inline-flex items-center justify-end gap-2.5">
+                          <span
+                            aria-hidden
+                            className="hidden h-[3px] w-14 overflow-hidden rounded-full bg-[var(--border)] sm:block"
+                          >
+                            <span
+                              className="block h-full rounded-full bg-[var(--brand-line)] transition-colors group-hover:bg-[var(--brand)]"
+                              style={{
+                                width: `${Math.min(100, Math.max(3, s.appearanceRate * 100))}%`,
+                              }}
+                            />
+                          </span>
+                          <span className="num font-mono text-[var(--text-secondary)]">
+                            {(s.appearanceRate * 100).toFixed(0)}%
+                          </span>
+                        </span>
+                      </td>
+                      <td className="num px-4 py-4 text-right font-mono text-[var(--text-secondary)]">
+                        {s.avgRank.toFixed(1)}
+                      </td>
+                      {isOverall && (
+                        <td className="num px-4 py-4 text-right font-mono text-[var(--text-secondary)]">
+                          {s.modelCoverage !== null
+                            ? `${(s.modelCoverage * 100).toFixed(0)}%`
+                            : "—"}
+                        </td>
+                      )}
+                      <td className="px-4 py-4 text-right">
+                        <DeltaBadge delta={deltaFor(s.brandId, s.rank)} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -532,8 +587,8 @@ export function CategoryBoard({
       {/* P2-2: selection tray. Sticky so it survives scrolling a long board. */}
       {selectedIds.length > 0 && (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-[var(--border-hover)] bg-[var(--card)] px-4 py-2 shadow-xl">
-            <span className="font-mono text-xs text-[var(--text-secondary)]">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-[var(--border-hover)] bg-[var(--card)] px-4 py-2 shadow-[var(--shadow-raised)]">
+            <span className="num font-mono text-xs text-[var(--text-secondary)]">
               {m.category.compareSelected(selectedIds.length, COMPARE_MAX)}
             </span>
             {!canCompare && (
@@ -545,7 +600,7 @@ export function CategoryBoard({
               type="button"
               onClick={() => setCompareOpen(true)}
               disabled={!canCompare}
-              className="rounded-full bg-[var(--cta-bg)] px-3.5 py-1.5 text-xs font-semibold text-[var(--cta-text)] transition-colors hover:bg-[var(--cta-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-[var(--brand)] px-3.5 py-1.5 text-xs font-semibold text-[var(--brand-contrast)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {m.category.compareOpen}
             </button>

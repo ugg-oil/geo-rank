@@ -191,17 +191,16 @@ export function CompetitionQuadrantChart({
   }
 
   return (
-    <div
-      ref={rootRef}
-      className="mt-8 overflow-hidden rounded-xl border border-[var(--border)]"
-      aria-labelledby={titleId}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3">
+    <div ref={rootRef} className="surface mt-6 overflow-hidden" aria-labelledby={titleId}>
+      <div className="surface-head flex flex-wrap items-start justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
-          <h2 id={titleId} className="text-sm font-semibold text-[var(--text)]">
+          <h2
+            id={titleId}
+            className="panel-title text-sm font-semibold text-[var(--text)]"
+          >
             {m.category.quadrantTitle}
           </h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
+          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)]">
             {m.category.quadrantLead}
           </p>
         </div>
@@ -210,12 +209,21 @@ export function CompetitionQuadrantChart({
             type="button"
             onClick={() => setShowMovement((v) => !v)}
             aria-pressed={movementOn}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               movementOn
-                ? "border-transparent bg-[var(--text)] text-[var(--bg)]"
-                : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text)]"
+                ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--brand-contrast)]"
+                : "border-[var(--border)] bg-[var(--card)] text-[var(--text-secondary)] hover:border-[var(--brand-line)] hover:text-[var(--text)]"
             }`}
           >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+              <path
+                d="M1.5 8.5 4.5 5l2 2L10.5 3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
             {m.category.quadrantMovementToggle}
           </button>
         )}
@@ -224,13 +232,50 @@ export function CompetitionQuadrantChart({
       {/* Cap the width so a wide card doesn't scale the whole plot (and its
           fonts) up — full-bleed 16:9 was taller than the fold on desktop. The
           legend/metrics line share the frame so they stay aligned. */}
-      <div className="mx-auto max-w-3xl bg-[var(--card)] px-2 py-3 sm:px-4">
+      <div className="mx-auto max-w-4xl bg-[var(--card)] px-2 py-4 sm:px-4">
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           className="block h-auto w-full"
           role="img"
           aria-label={m.category.quadrantTitle}
         >
+          {/* One faint rule per tick plus a frame: without them the dots float in
+              white space and nobody can read a value off the plot. */}
+          <g aria-hidden>
+            {freqTicks.map((f) => (
+              <line
+                key={`gx-${f}`}
+                x1={xOf(f)}
+                y1={plotTop}
+                x2={xOf(f)}
+                y2={plotBottom}
+                stroke="var(--grid)"
+                strokeWidth={1}
+              />
+            ))}
+            {rankTicks.map((r) => (
+              <line
+                key={`gy-${r}`}
+                x1={plotLeft}
+                y1={yOf(r)}
+                x2={plotRight}
+                y2={yOf(r)}
+                stroke="var(--grid)"
+                strokeWidth={1}
+              />
+            ))}
+            <rect
+              x={plotLeft}
+              y={plotTop}
+              width={plotRight - plotLeft}
+              height={plotBottom - plotTop}
+              rx={10}
+              fill="none"
+              stroke="var(--border-hover)"
+              strokeWidth={1.25}
+            />
+          </g>
+
           {/* Median crosshairs. No quadrant fills: 20 dots over four tinted
               blocks turns the card into a colour swatch. */}
           <line
@@ -238,18 +283,18 @@ export function CompetitionQuadrantChart({
             y1={plotTop}
             x2={mx}
             y2={plotBottom}
-            stroke="var(--border)"
+            stroke="var(--border-hover)"
             strokeWidth={1.5}
-            strokeDasharray="4 7"
+            strokeDasharray="5 6"
           />
           <line
             x1={plotLeft}
             y1={my}
             x2={plotRight}
             y2={my}
-            stroke="var(--border)"
+            stroke="var(--border-hover)"
             strokeWidth={1.5}
-            strokeDasharray="4 7"
+            strokeDasharray="5 6"
           />
 
           {/* Quadrant corner names */}
@@ -281,8 +326,8 @@ export function CompetitionQuadrantChart({
             x={(plotLeft + plotRight) / 2}
             y={plotBottom + FOOT_OFFSET}
             textAnchor="middle"
-            className="fill-[var(--text-muted)]"
-            style={{ fontSize: 11 }}
+            className="fill-[var(--text-secondary)]"
+            style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.4 }}
           >
             {m.category.quadrantAxisX}
           </text>
@@ -291,8 +336,8 @@ export function CompetitionQuadrantChart({
             y={(plotTop + plotBottom) / 2}
             textAnchor="middle"
             transform={`rotate(-90 19 ${(plotTop + plotBottom) / 2})`}
-            className="fill-[var(--text-muted)]"
-            style={{ fontSize: 11 }}
+            className="fill-[var(--text-secondary)]"
+            style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.4 }}
           >
             {m.category.quadrantAxisY}
           </text>
@@ -410,19 +455,19 @@ export function CompetitionQuadrantChart({
                     <circle
                       cx={cx}
                       cy={cy}
-                      r={16}
+                      r={18}
                       fill={QUADRANT_COLOR[p.quadrant]}
-                      opacity={0.16}
+                      opacity={0.18}
                     />
                   )}
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={isActive ? 8 : 6}
+                    r={isActive ? 9.5 : 7}
                     fill={QUADRANT_COLOR[p.quadrant]}
                     stroke="var(--card)"
-                    strokeWidth={2}
-                    opacity={isActive ? 1 : 0.9}
+                    strokeWidth={2.5}
+                    opacity={isActive ? 1 : 0.92}
                     className="cursor-pointer transition-[r] duration-150"
                   />
                   {/* Larger invisible hit target for touch */}
@@ -442,7 +487,16 @@ export function CompetitionQuadrantChart({
                     className={`pointer-events-none ${
                       isActive ? "fill-[var(--text)]" : "fill-[var(--text-secondary)]"
                     }`}
-                    style={{ fontSize: 11, fontWeight: 500 }}
+                    // Stroke-behind-fill halo keeps names legible where they cross
+                    // a grid line or another dot.
+                    style={{
+                      fontSize: 11,
+                      fontWeight: isActive ? 600 : 500,
+                      paintOrder: "stroke",
+                      stroke: "var(--card)",
+                      strokeWidth: 3.5,
+                      strokeLinejoin: "round",
+                    }}
                   >
                     {p.brandName}
                   </text>
@@ -452,10 +506,18 @@ export function CompetitionQuadrantChart({
           })}
         </svg>
 
-        {/* Selected point: brand + key metrics. Works on touch (tap) and pointer (hover). */}
-        <div className="mt-2 flex min-h-[1.5rem] flex-wrap items-center gap-x-2 gap-y-1 px-2 text-xs">
+        {/* Selected point: brand + key metrics. Works on touch (tap) and pointer
+            (hover). The empty state states the interaction instead of leaving a
+            reserved blank strip. */}
+        <div className="mt-2 flex min-h-[2rem] items-center px-2 text-xs">
           {active ? (
-            <>
+            <span
+              className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border px-3 py-1.5"
+              style={{
+                borderColor: QUADRANT_COLOR[active.quadrant],
+                background: "var(--bg-elevated)",
+              }}
+            >
               <span
                 aria-hidden
                 className="h-2 w-2 shrink-0 rounded-full"
@@ -463,31 +525,33 @@ export function CompetitionQuadrantChart({
               />
               <Link
                 href={brandHref(active.brandSlug)}
-                className="font-medium text-[var(--text)] underline decoration-[var(--border)] underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)]"
+                className="font-semibold text-[var(--text)] underline decoration-transparent underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)]"
               >
                 {active.brandName}
               </Link>
               <span className="font-medium" style={{ color: QUADRANT_COLOR[active.quadrant] }}>
                 {quadrantName[active.quadrant]}
               </span>
-              <span className="font-mono text-[var(--text-muted)]">
+              <span className="num font-mono text-[var(--text-muted)]">
                 {m.category.quadrantPointMetrics(
                   `${(active.appearanceRate * 100).toFixed(0)}%`,
                   active.avgRank.toFixed(1)
                 )}
               </span>
-            </>
-          ) : null}
+            </span>
+          ) : (
+            <span className="text-[var(--text-muted)]">{m.category.quadrantPointHint}</span>
+          )}
         </div>
 
         {movementOn && (
-          <p className="mt-1 px-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+          <p className="mt-1 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
             {m.category.quadrantMovementHint}
           </p>
         )}
 
         {/* Legend explains what each colour means without reading the axes. */}
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-[var(--border)] px-2 pt-3 text-[11px]">
+        <div className="mt-3 grid gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 text-[11px] sm:grid-cols-2">
           {(
             [
               "high_freq_high_pos",
@@ -499,10 +563,10 @@ export function CompetitionQuadrantChart({
             <span key={qid} className="inline-flex items-baseline gap-1.5">
               <span
                 aria-hidden
-                className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full"
+                className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full"
                 style={{ background: QUADRANT_COLOR[qid] }}
               />
-              <span className="font-medium text-[var(--text-secondary)]">
+              <span className="font-semibold" style={{ color: QUADRANT_COLOR[qid] }}>
                 {quadrantName[qid]}
               </span>
               <span className="text-[var(--text-muted)]">{quadrantMeaning[qid]}</span>
