@@ -1,12 +1,12 @@
 # GEO Radar：第五阶段 PRD
 
-> v1.5。基线 [phase-4](../phase-4/PRD-phase-4.md)。实现见 [technical.md](./technical.md)。未排期 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
+> v1.5 · **已发布**。基线 [phase-4](../phase-4/PRD-phase-4.md)。实现见 [technical.md](./technical.md)。未排期 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
 
 | 字段 | 内容 |
 |------|------|
 | 产品 | GEO Radar |
 | 阶段 | Phase 5 · v1.4 → v1.5 |
-| 状态 | 开发中 |
+| 状态 | 已发布 |
 | 文档 | 中文 · 网站英文 |
 
 ## 顺序
@@ -464,7 +464,7 @@ P6  实体质量 / 榜单可信度（全品类）
 
 ## P6 · 实体质量 / 榜单可信度（全品类）
 
-> 2026-08-17 审计：AI Image / Video 已做实体归并 + 6 周期 force 重算（Leonardo.ai ≠ SAP Leonardo、DALL·E 不再灌 ChatGPT、版本串归母品牌）。**其他品类同类污染仍在**；已禁用实体若未 rescore，旧 Top20 snapshot 仍会展示（如 HR Software #3 仍为 SAP Leonardo）。
+> 2026-08-17～18 已落地：全品类 SKU / 斜杠串归并、consolidate 不再用 BrandAlias 合并 Brand 行、115 个 category×week force rescore、Overall 入榜门槛（`SCORING_VERSION=3`）。代表验收：HR Software 无 SAP Leonardo；AI Image Leonardo.ai ≠ SAP Leonardo、DALL·E 独立；单响应幽灵行不再占 Top20 中段。
 
 ### 背景（现象）
 
