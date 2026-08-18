@@ -31,6 +31,7 @@ const en = {
     coverage: "Coverage",
     delta: "Change",
     noData: "No data",
+    listSeparator: ", ",
     top20: "Top 20",
     new: "NEW",
     out: "OUT",
@@ -293,7 +294,8 @@ const en = {
   rankings: {
     h1Line1: "Pick a category.",
     h1Line2: "See who AI picks.",
-    lead: "Top 20 boards across leading AI engines — refreshed on each category's collection period.",
+    lead: "Top 20 boards across leading AI engines.",
+    leadDetail: "Refreshed on each category's collection period.",
     filterPlaceholder: "Search category or brand…",
     filterEmpty: "No categories match that name.",
     filterClear: "Clear search",
@@ -323,13 +325,17 @@ const en = {
     sortBy: (label: string) => `Sort by ${label}`,
     sortedDesc: "highest first",
     sortedAsc: "lowest first",
-    tipScore: "Composite AI visibility score for this period. Higher is better.",
+    sortToggle: "click again to reverse",
+    sortReset: "Default order",
+    sortResetHint: "Sort rows by Overall rank again.",
+    tipScore:
+      "Composite AI visibility score for this period. Higher is better. Overall Top 20 also requires appearance ≥ 10% or mentions from ≥ 2 scoring engines.",
     tipAppearance:
       "Share of this period's prompts where the product was mentioned at all. Higher is better.",
     tipAvgRank:
       "Average position within the answers that mention it — 1.0 means it is usually named first. Lower is better.",
     tipCoverage:
-      "Share of scoring AI engines that ranked the product this period. Overall board only. Higher is better.",
+      "Share of scoring AI engines that ranked the product this period. Overall board only. Higher is better. Overall Top 20 also accepts brands with ≥ 2 scoring engines even if appearance is below 10%.",
     tipDelta: "Rank change vs the prior published period.",
     historicalUnavailable: "Historical period unavailable",
     historicalNone: (week: string) => `No published rankings are available for ${week}.`,
@@ -360,6 +366,7 @@ const en = {
     quadrantLaggards: "Laggards",
     quadrantPointMetrics: (appearance: string, avgRank: string) =>
       `${appearance} mention rate · avg #${avgRank}`,
+    quadrantSizeLegend: "Dot size = score",
     compareSelect: (name: string) => `Select ${name} to compare`,
     compareLead: "Compare products",
     compareSelected: (count: number, max: number) => `${count} of ${max} selected`,
@@ -371,13 +378,21 @@ const en = {
     compareSubtitle: (board: string, periodStart: string) =>
       `${board} · period ${periodStart}`,
     compareBest: "Best",
+    compareTie: "Tie",
+    compareHigherBetter: "higher is better",
+    compareLowerBetter: "lower is better",
+    compareScaleNote: "Bars use each metric's own scale, not the gap between these products.",
     quadrantMovementToggle: "Show movement",
     quadrantMovementHint:
       "Faded dot = prior published period, arrow points to this period. Median lines use this period.",
-    aboutMore: "About this ranking",
-    aboutLess: "Hide details",
     boardTitle: "Top 20 this period",
     quadrantPointHint: "Hover or tap a dot for its metrics.",
+    quadrantMedian: "median",
+    posHeader: "Pos",
+    posHeaderTip:
+      "Row position in the current sort. The badge by each name is its Overall rank, which never changes.",
+    overallRankBadge: (rank: number) => `Overall #${rank}`,
+    boardRankBadge: (rank: number) => `This board #${rank}`,
   },
   brand: {
     lastUpdated: (week: string) => `Last updated · ${week}`,
@@ -400,27 +415,21 @@ const en = {
       ` Engine differences in ${category}: ${descs}.`,
     engineRanks: (engine: string, rank: number) => `${engine} ranks it #${rank}`,
     basedOn: (week: string) => `Based on ${week}`,
-    whySummary: (args: {
-      rank: number;
-      category: string;
-      score: string;
-      mention: string;
-    }) =>
-      `#${args.rank} in ${args.category} · score ${args.score} · mention ${args.mention}%`,
+    companyLabel: (company: string) => `Company: ${company}`,
+    whyMetricRank: "Rank",
+    whyMetricMention: "Mention",
+    whyMetricEngines: "Engines ranking it",
+    rankBestEngineNote: "Not on overall board · showing best engine rank",
     whyStrengths: "Strengths",
     whyWeaknesses: "Weaknesses",
+    whyConsistencyTitle: "Engine consensus",
     whyTrendTitle: "Trend",
     whyEnginesClose: "Engine ranks are close across collected engines.",
-    whyStrengthBest: (engine: string, rank: number) =>
-      `${engine} ranks it #${rank} — among its best engine placements.`,
-    whyStrengthBeatsOverall: (engine: string, rank: number, overall: number) =>
-      `${engine} ranks it #${rank}, clearly ahead of overall #${overall}.`,
-    whyWeakAbsent: (engine: string) =>
-      `${engine} barely mentions it — collected but not in that engine's Top 20.`,
-    whyWeakRank: (engine: string, rank: number) =>
-      `${engine} is weaker at #${rank}.`,
-    whyTrendCard: (label: string, category: string) =>
-      `${label} in ${category}.`,
+    whyReasonBest: "Best engine placement",
+    whyReasonAheadOverall: (overall: number) => `Ahead of overall #${overall}`,
+    whyReasonWeak: "Weakest engine placement",
+    whyReasonAbsent: "Not in this engine's Top 20",
+    whyTrendHint: (category: string) => `Rank direction in ${category} over recent periods`,
     evidenceTitle: "Original recommendations",
     evidenceLead: "Unedited excerpts from AI answers in this period. English original only.",
     evidenceEngine: (engine: string) => engine,
@@ -428,11 +437,13 @@ const en = {
     evidenceCount: (n: number) => (n === 1 ? "1 engine" : `${n} engines`),
     evidenceExpandAll: "Expand all",
     evidenceCollapseAll: "Collapse all",
+    evidenceMoreHint: "Click to see other engines",
     rankingsByCategory: "Rankings by Category",
     rankingsEmpty: "This brand is not ranked in any category for this period.",
     rankingsEmptyLink: "Browse all rankings",
     mentionFrequency: "Mention Frequency",
     perEngine: "Per Engine",
+    engineUnranked: "Not in Top 20",
     rankHistory: "Rank History",
     scoreHistory: "Score History",
     historyWeeks: (n: number) => (n === 1 ? "1 period" : `${n} periods`),
@@ -499,19 +510,25 @@ const en = {
   company: {
     lastUpdated: (week: string) => `Last updated · ${week}`,
     productsTitle: "Products",
-    emptyProducts: "No ranked products for this company in the latest period.",
+    emptyProducts: "No products from this company are on an overall board this period.",
+    emptyProductsHint:
+      "Overall boards list a category's Top 20 only. A product can still be ranked on individual engine boards without appearing here.",
     emptyProductsCta: "Browse all rankings",
-    mentionFrequency: "Mention Frequency",
-    viewBrand: "Brand page",
+    lastSeenTitle: (week: string) => `Last on a board · ${week}`,
+    lastSeenHint: "These ranks are from that period, not the current one.",
+    mention: "Mention",
     category: "Category",
     note: "Company pages aggregate products by ownership. There is no company-level score or rank.",
-    summaryTitle: "This period",
-    productCount: (n: number) => (n === 1 ? "1 product" : `${n} products`),
+    /** Suffixes: the product name is rendered as a link before them. */
+    summaryLeadSuffix: (rank: number, category: string) =>
+      ` is this company's best-ranked product — #${rank} in ${category}.`,
+    summaryRiserSuffix: (spots: number, category: string) =>
+      ` climbed ${spots} ${spots === 1 ? "spot" : "spots"} in ${category}.`,
+    summaryCounts: (products: number, categories: number) =>
+      `${products} ${products === 1 ? "product" : "products"} · ${categories} ${
+        categories === 1 ? "category" : "categories"
+      }`,
     categoryCount: (n: number) => (n === 1 ? "1 category" : `${n} categories`),
-    bestProduct: (name: string, rank: number, category: string) =>
-      `Best rank · ${name} #${rank} in ${category}`,
-    biggestRiser: (name: string, spots: number, category: string) =>
-      `Biggest rise · ${name} ↑${spots} in ${category}`,
     sortBy: "Sort by",
     sortRank: "Rank",
     sortScore: "Score",
@@ -548,12 +565,18 @@ const en = {
           },
           {
             label: "Avg Rank Score",
-            text: " — exponential decay based on average position: 100 × e−0.15 × (avgRank − 1)",
+            text: " — exponential decay on average position: 100 × e^(−0.15 × (avgRank − 1))",
           },
           {
             label: "Model Coverage",
-            text: " — fraction of that category's scoring engines that week that mention the brand. Historical weeks keep the denominator they were published with.",
+            text: " — fraction of that category's scoring engines in the period that mention the brand. Historical periods keep the denominator they were published with.",
           },
+        ],
+      },
+      {
+        title: "Overall Top 20 eligibility",
+        paragraphs: [
+          "Overall boards only include brands that clear a minimum evidence gate: appearance rate ≥ 10%, or mentions from at least 2 scoring engines in the period. Single-response #1 ghosts stay out of Top 20 and can still appear under Also mentioned.",
         ],
       },
       {
@@ -562,6 +585,15 @@ const en = {
           "Individual engine rankings use a simplified formula without model coverage:",
         ],
         formula: "Engine Score = 0.55 × Appearance Rate + 0.45 × Avg Rank Score",
+      },
+      {
+        title: "How We Show Change",
+        paragraphs: [
+          "Period-over-period rank change (Δ) uses four labels: up, down, new, and flat. If there is no prior published period, the change cell shows —.",
+          "Also mentioned lists brands that appear in AI answers for the period but do not make that board's Top 20.",
+          "On category pages, the competition chart plots Top 20 brands by appearance rate (X) and average rank (Y, #1 at the top), split into Leaders, Challengers, Niche, and Laggards at the period medians.",
+          "Company pages aggregate products by ownership. There is no company-level score or company-level rank; product metrics match Brand and Category Overall boards.",
+        ],
       },
       {
         title: "Dynamic Ranking",
@@ -576,9 +608,9 @@ const en = {
         ],
       },
       {
-        title: "Historical Estimates",
+        title: "Historical Backfill",
         paragraphs: [
-          'Some early historical periods may be labelled Backfilled estimate. These rankings are generated retrospectively using the current collection and scoring method; they are not observations collected during the labelled period. Regular collection is labelled Observed.',
+          "Some earlier periods may be filled in later using the same prompts, engines, and scoring method as live collection. The front end treats them as ordinary historical periods for trends and Δ; it does not separately label which periods were backfilled.",
         ],
       },
     ],
@@ -614,6 +646,7 @@ const zh = {
     coverage: "覆盖率",
     delta: "变动",
     noData: "暂无数据",
+    listSeparator: "、",
     top20: "Top 20",
     new: "NEW",
     out: "OUT",
@@ -867,7 +900,8 @@ const zh = {
   rankings: {
     h1Line1: "选一个品类。",
     h1Line2: "看 AI 选谁。",
-    lead: "覆盖主流 AI 引擎的 Top 20 榜单——按各品类采集周期刷新。",
+    lead: "覆盖主流 AI 引擎的 Top 20 榜单。",
+    leadDetail: "按各品类采集周期刷新。",
     filterPlaceholder: "搜索品类或品牌…",
     filterEmpty: "没有匹配的品类。",
     filterClear: "清除搜索",
@@ -897,11 +931,16 @@ const zh = {
     sortBy: (label: string) => `按${label}排序`,
     sortedDesc: "从高到低",
     sortedAsc: "从低到高",
-    tipScore: "本周期的 AI 可见度综合得分，越高越好。",
-    tipAppearance: "本周期有多少比例的 Prompt 提到了该产品，越高越好。",
+    sortToggle: "再次点击可反转顺序",
+    sortReset: "默认排序",
+    sortResetHint: "重新按综合名次排序。",
+    tipScore:
+      "本周期的 AI 可见度综合得分，越高越好。综合榜 Top 20 另需出现率 ≥ 10%，或至少被 2 个计分引擎提及。",
+    tipAppearance: "本周期 prompts 中提及该产品的占比，越高越好。",
     tipAvgRank:
-      "在提到它的回答里的平均出场位次——1.0 表示通常被第一个点名。越小越好。",
-    tipCoverage: "本周期有多少比例的计分引擎给它排了名，仅综合榜有此列。越高越好。",
+      "在提及它的回答中的平均位次——1.0 表示通常被第一个点名。越小越好。",
+    tipCoverage:
+      "本周期计分引擎中将该产品纳入推荐的占比，仅综合榜。越高越好。出现率不足 10% 时，若仍被 ≥ 2 个计分引擎提及也可进综合 Top 20。",
     tipDelta: "相对上一已发布周期的名次变化。",
     historicalUnavailable: "历史周期不可用",
     historicalNone: (week: string) => `${week} 暂无已发布榜单。`,
@@ -931,6 +970,7 @@ const zh = {
     quadrantLaggards: "落后",
     quadrantPointMetrics: (appearance: string, avgRank: string) =>
       `提及率 ${appearance} · 平均第 ${avgRank} 名`,
+    quadrantSizeLegend: "圆点大小 = 得分",
     compareSelect: (name: string) => `勾选 ${name} 加入对比`,
     compareLead: "产品对比",
     compareSelected: (count: number, max: number) => `已选 ${count}/${max}`,
@@ -942,13 +982,20 @@ const zh = {
     compareSubtitle: (board: string, periodStart: string) =>
       `${board} · 周期 ${periodStart}`,
     compareBest: "最优",
+    compareTie: "持平",
+    compareHigherBetter: "越高越好",
+    compareLowerBetter: "越低越好",
+    compareScaleNote: "长条按各指标自身的量程绘制，不代表两者之间的差距。",
     quadrantMovementToggle: "显示位移",
     quadrantMovementHint:
       "淡点 = 上一已发布周期，箭头指向本周期。中位线按本周期计算。",
-    aboutMore: "关于这个榜单",
-    aboutLess: "收起说明",
     boardTitle: "本周期 Top 20",
     quadrantPointHint: "悬停或点击圆点查看指标。",
+    quadrantMedian: "中位",
+    posHeader: "位次",
+    posHeaderTip: "当前排序下的行位置。每个名称旁的徽章是综合名次，始终不变。",
+    overallRankBadge: (rank: number) => `综合第 ${rank}`,
+    boardRankBadge: (rank: number) => `本榜第 ${rank}`,
   },
   brand: {
     lastUpdated: (week: string) => `最近更新 · ${week}`,
@@ -971,27 +1018,21 @@ const zh = {
       ` ${category} 的引擎差异：${descs}。`,
     engineRanks: (engine: string, rank: number) => `${engine} 将其排在第 ${rank}`,
     basedOn: (week: string) => `基于 ${week}`,
-    whySummary: (args: {
-      rank: number;
-      category: string;
-      score: string;
-      mention: string;
-    }) =>
-      `${args.category} 第 ${args.rank} 名 · 得分 ${args.score} · 提及 ${args.mention}%`,
+    companyLabel: (company: string) => `公司：${company}`,
+    whyMetricRank: "名次",
+    whyMetricMention: "提及",
+    whyMetricEngines: "引擎在榜",
+    rankBestEngineNote: "未进综合榜 · 取最佳引擎名次",
     whyStrengths: "优势",
     whyWeaknesses: "弱点",
+    whyConsistencyTitle: "引擎一致性",
     whyTrendTitle: "趋势",
     whyEnginesClose: "各引擎接近。",
-    whyStrengthBest: (engine: string, rank: number) =>
-      `${engine} 排到第 ${rank} 名——为其最佳引擎名次之一。`,
-    whyStrengthBeatsOverall: (engine: string, rank: number, overall: number) =>
-      `${engine} 第 ${rank} 名，明显好于综合第 ${overall} 名。`,
-    whyWeakAbsent: (engine: string) =>
-      `${engine} 几乎不提——已采集但未进该引擎 Top 20。`,
-    whyWeakRank: (engine: string, rank: number) =>
-      `${engine} 较弱，第 ${rank} 名。`,
-    whyTrendCard: (label: string, category: string) =>
-      `${category}：${label}。`,
+    whyReasonBest: "最佳引擎名次",
+    whyReasonAheadOverall: (overall: number) => `优于综合第 ${overall} 名`,
+    whyReasonWeak: "最弱引擎名次",
+    whyReasonAbsent: "未进该引擎 Top 20",
+    whyTrendHint: (category: string) => `${category} 近几个周期的名次走向`,
     evidenceTitle: "推荐原文",
     evidenceLead: "本周期 AI 回答原文摘录，未改写；仅展示英文原文。",
     evidenceEngine: (engine: string) => engine,
@@ -999,11 +1040,13 @@ const zh = {
     evidenceCount: (n: number) => `${n} 个引擎`,
     evidenceExpandAll: "全部展开",
     evidenceCollapseAll: "全部收起",
+    evidenceMoreHint: "点击查看其他引擎",
     rankingsByCategory: "按品类排名",
     rankingsEmpty: "本周期该品牌未进入任何品类榜单。",
     rankingsEmptyLink: "查看全部排行榜",
     mentionFrequency: "提及频率",
     perEngine: "分引擎",
+    engineUnranked: "未进 Top 20",
     rankHistory: "排名历史",
     scoreHistory: "得分历史",
     historyWeeks: (n: number) => `${n} 个周期`,
@@ -1067,19 +1110,23 @@ const zh = {
   company: {
     lastUpdated: (week: string) => `最近更新 · ${week}`,
     productsTitle: "产品",
-    emptyProducts: "该公司在最新周期暂无上榜产品。",
+    emptyProducts: "该公司本周期没有产品进入综合榜。",
+    emptyProductsHint:
+      "综合榜只收录各品类前 20 名。产品可能仍在单个引擎榜上有名次，但不会出现在这里。",
     emptyProductsCta: "查看全部排行榜",
-    mentionFrequency: "提及频率",
-    viewBrand: "品牌页",
+    lastSeenTitle: (week: string) => `上次上榜 · ${week}`,
+    lastSeenHint: "以下名次属于该周期，非当前周期。",
+    mention: "提及",
     category: "品类",
     note: "公司页按归属聚合产品，不设公司总分或公司排名。",
-    summaryTitle: "本周期表现",
-    productCount: (n: number) => `${n} 个产品`,
+    /** 后缀：产品名在前面单独渲染为链接。 */
+    summaryLeadSuffix: (rank: number, category: string) =>
+      ` 是本公司名次最好的产品——${category} 第 ${rank} 名。`,
+    summaryRiserSuffix: (spots: number, category: string) =>
+      ` 在 ${category} 上升 ${spots} 名。`,
+    summaryCounts: (products: number, categories: number) =>
+      `${products} 个产品 · ${categories} 个品类`,
     categoryCount: (n: number) => `${n} 个品类`,
-    bestProduct: (name: string, rank: number, category: string) =>
-      `最佳名次 · ${name} #${rank}（${category}）`,
-    biggestRiser: (name: string, spots: number, category: string) =>
-      `最大上升 · ${name} ↑${spots}（${category}）`,
     sortBy: "排序",
     sortRank: "名次",
     sortScore: "得分",
@@ -1116,12 +1163,18 @@ const zh = {
           },
           {
             label: "Avg Rank Score（平均名次分）",
-            text: " — 基于平均位次的指数衰减：100 × e−0.15 × (avgRank − 1)",
+            text: " — 基于平均位次的指数衰减：100 × e^(−0.15 × (avgRank − 1))",
           },
           {
             label: "Model Coverage（模型覆盖）",
-            text: " — 当周该品类计分引擎中提及该品牌的比例。历史周保留发布时的分母。",
+            text: " — 该周期该品类计分引擎中提及该品牌的比例。历史周期保留发布时的分母。",
           },
+        ],
+      },
+      {
+        title: "综合榜 Top 20 入榜门槛",
+        paragraphs: [
+          "综合榜只收录通过证据门槛的品牌：出现率 ≥ 10%，或当周期至少被 2 个计分引擎提及。仅单条回答拿第 1 的“幽灵行”不进 Top 20，仍可出现在 Also mentioned。",
         ],
       },
       {
@@ -1130,6 +1183,15 @@ const zh = {
           "单个引擎榜单使用不含模型覆盖的简化公式：",
         ],
         formula: "Engine Score = 0.55 × Appearance Rate + 0.45 × Avg Rank Score",
+      },
+      {
+        title: "我们如何展示变化",
+        paragraphs: [
+          "相对上一周期的名次变化（Δ）统一为：升 / 降 / 新进 / 持平；无上一已发布周期则显示 —。",
+          "Also mentioned 列出本周期 AI 回答中有提及、但未进入该榜 Top 20 的品牌。",
+          "品类页竞争象限以 Top 20 的出现率为 X、平均名次为 Y（#1 在上），按本周期中位数划分为领导者 / 挑战者 / 利基 / 落后。",
+          "公司页按归属聚合产品，不设公司总分或公司排名；产品数字与 Brand、Category 综合榜一致。",
+        ],
       },
       {
         title: "动态发现排名",
@@ -1144,9 +1206,9 @@ const zh = {
         ],
       },
       {
-        title: "历史估算",
+        title: "历史回填",
         paragraphs: [
-          "部分早期历史周期可能标注为「回填估算」。这些排名用当前采集与计分方法回溯生成，并非标注周期当时的观测。常规采集标注为「观测」。",
+          "部分更早的周期可能后续用与线上一致的 prompt、引擎与计分方法补齐。前台把它们当作普通历史周期用于趋势与 Δ，不单独标注哪些周期是回填。",
         ],
       },
     ],

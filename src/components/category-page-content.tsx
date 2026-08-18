@@ -40,7 +40,7 @@ export function CategoryPageShell({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 font-mono text-[11px] text-[var(--text-secondary)]">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--brand)]" />
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--yellow)]" />
               {m.category.periodUpdated(formatWeekLabel(m, week))}
             </span>
             <h1 className="mt-2.5 text-2xl font-semibold leading-tight tracking-[-0.02em] text-balance sm:text-[2rem]">
@@ -57,38 +57,10 @@ export function CategoryPageShell({
           </div>
         </div>
         {cat && (
-          <>
-            <p className="mt-4 max-w-3xl text-[15px] leading-7 text-[var(--text-secondary)]">
-              {cat.lead}
-            </p>
-            {/* P2-6: the long body copy is kept verbatim, just folded away so the
-                board is above the fold on a laptop. */}
-            <details className="group mt-3">
-              <summary className="inline-flex list-none items-center gap-1.5 text-xs font-semibold text-[var(--brand)] transition-opacity hover:opacity-80 [&::-webkit-details-marker]:hidden">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                  aria-hidden
-                  className="transition-transform group-open:rotate-90"
-                >
-                  <path
-                    d="M4.5 2.5 8 6l-3.5 3.5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="group-open:hidden">{m.category.aboutMore}</span>
-                <span className="hidden group-open:inline">{m.category.aboutLess}</span>
-              </summary>
-              <p className="mt-2.5 max-w-3xl border-l-2 border-[var(--border)] pl-3.5 text-sm leading-7 text-[var(--text-muted)]">
-                {cat.body}
-              </p>
-            </details>
-          </>
+          <p className="mt-4 max-w-[68ch] text-[15px] leading-7 text-[var(--text-secondary)]">
+            {cat.lead}{" "}
+            <span className="text-[var(--text-muted)]">{cat.body}</span>
+          </p>
         )}
       </header>
 

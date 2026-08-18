@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { toBrandSlug } from "@/lib/brand-slug";
-import { engineLabel, formatEngineList } from "@/lib/constants";
+import { engineLabel } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n/use-i18n";
 import { getCategoryMessages } from "@/lib/i18n/messages";
 import { inferCollectedEngines, type CategoryBoardsData } from "@/lib/leaderboard-data";
@@ -13,6 +13,7 @@ import {
   COMPARE_MAX,
   DEFAULT_SORT_KEY,
   isAscendingSort,
+  isDefaultSort,
   nextSortState,
   resolveSortKey,
   sortLeaderboardRows,
@@ -60,19 +61,76 @@ const HEAD_CELL =
   "px-4 py-3 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]";
 
 /**
- * Top 3 get an accent tint plus a left rail — one hue, not gold/silver/bronze,
- * which fought the accent colour everywhere else on the page. Tailwind classes
- * (not inline styles) so `hover:` still wins over the tint.
+ * Top 3 are marked by a left rail and a boxed rank only. Tinted row backgrounds
+ * read as a block of colour across a 9-column table and fought the up/down
+ * green in the Change column.
  */
 function podiumRail(rank: number): string {
-  if (rank === 1) return "shadow-[inset_3px_0_0_var(--brand)]";
-  if (rank <= 3) return "shadow-[inset_3px_0_0_var(--brand-line)]";
+  if (rank === 1) return "shadow-[inset_3px_0_0_var(--yellow)]";
+  if (rank <= 3) return "shadow-[inset_3px_0_0_var(--yellow-soft)]";
   return "";
 }
 
 /**
- * One button per metric column doing both jobs: click sorts, hover/focus/tap
- * explains. Five separate `?` circles in a row was the noisiest thing on screen.
+ * Standalone `?` with a hover/tap tooltip, for header cells that explain but
+ * don't sort (the position column).
+ */
+function PlainTip({ tip }: { tip: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const tipId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label={tip}
+        aria-describedby={open ? tipId : undefined}
+        onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold leading-none transition-colors ${
+          open
+            ? "border-[var(--text-muted)] text-[var(--text)]"
+            : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
+        }`}
+      >
+        ?
+      </button>
+      {open && (
+        <span
+          id={tipId}
+          role="tooltip"
+          className="absolute left-0 top-full z-20 mt-1.5 w-56 whitespace-normal rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-left text-[11px] font-normal normal-case leading-relaxed tracking-normal text-[var(--text-secondary)] shadow-lg"
+        >
+          {tip}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Tip lives on a small `?` to the left of the label so hovering the sort
+ * control doesn't pop the explanation. Sort and explain are separate targets.
  */
 function MetricHeader({
   label,
@@ -113,10 +171,12 @@ function MetricHeader({
   }, [open]);
 
   const sortLabel = sortKey
-    ? `${m.category.sortBy(label)} · ${
-        active ? (ascending ? m.category.sortedAsc : m.category.sortedDesc) : ""
-      } · ${tip}`
-    : tip;
+    ? active
+      ? `${m.category.sortBy(label)} · ${
+          ascending ? m.category.sortedAsc : m.category.sortedDesc
+        } · ${m.category.sortToggle}`
+      : m.category.sortBy(label)
+    : undefined;
 
   return (
     <th
@@ -133,44 +193,60 @@ function MetricHeader({
       }
       className={`relative text-right ${HEAD_CELL}`}
     >
-      <button
-        type="button"
-        data-tip
-        aria-label={sortLabel}
-        aria-describedby={open ? tipId : undefined}
-        onClick={() => {
-          if (sortKey) onSort(sortKey);
-          setOpen(true);
-        }}
-        // Mouse (not pointer) events: touch fires pointerleave right after the
-        // tap, which would close the tooltip before it is ever seen.
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        className={`group inline-flex items-baseline gap-1.5 uppercase transition-colors ${
-          active ? "text-[var(--text)]" : "hover:text-[var(--text-secondary)]"
-        }`}
-      >
-        {/* The dotted rule only shows on hover: at rest it is invisible against
-            the elevated header, so it was pure noise. */}
-        <span className="underline decoration-transparent decoration-dotted underline-offset-[5px] transition-colors group-hover:decoration-[var(--text-muted)]">
-          {label}
-        </span>
-        {sortKey && (
-          <span
-            aria-hidden
-            className={`font-mono text-[10px] leading-none transition-opacity ${
-              active ? "opacity-100" : "opacity-0 group-hover:opacity-70"
+      <span className="inline-flex items-center justify-end gap-1.5">
+        <button
+          type="button"
+          data-tip
+          aria-label={tip}
+          aria-describedby={open ? tipId : undefined}
+          onClick={() => setOpen((v) => !v)}
+          // Mouse (not pointer) events: touch fires pointerleave right after the
+          // tap, which would close the tooltip before it is ever seen.
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[9px] font-semibold leading-none transition-colors ${
+            open
+              ? "border-[var(--text-muted)] text-[var(--text)]"
+              : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
+          }`}
+        >
+          ?
+        </button>
+        {sortKey ? (
+          <button
+            type="button"
+            aria-label={sortLabel}
+            onClick={() => onSort(sortKey)}
+            className={`group -mx-1 inline-flex items-baseline gap-1 rounded px-1 uppercase transition-colors hover:bg-[var(--card-hover)] ${
+              active ? "text-[var(--text)]" : "hover:text-[var(--text-secondary)]"
             }`}
           >
-            {active && ascending ? "↑" : "↓"}
-          </span>
+            <span>{label}</span>
+            {/* Always visible: an arrow that only appears on hover gives a mouse
+                user no reason to try clicking, and none at all on touch. The
+                double arrow says "sortable", a single one says "sorted, and this
+                is the direction". */}
+            <span
+              aria-hidden
+              className={`font-mono text-[10px] leading-none transition-opacity ${
+                active
+                  ? "font-semibold opacity-100"
+                  : "opacity-40 group-hover:opacity-90"
+              }`}
+            >
+              {active ? (ascending ? "↑" : "↓") : "↕"}
+            </span>
+          </button>
+        ) : (
+          <span>{label}</span>
         )}
-      </button>
+      </span>
       {active && (
         <span
           aria-hidden
-          className="absolute inset-x-0 -bottom-px h-[2px] bg-[var(--brand)]"
+          className="absolute inset-x-0 -bottom-px h-[2px] bg-[var(--text)]"
         />
       )}
       {/* whitespace-normal / normal-case: the header cell is uppercase + nowrap
@@ -245,7 +321,7 @@ function PeriodHighlightLine({
     <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
       <span
         aria-hidden
-        className="mr-2 inline-block h-1.5 w-1.5 -translate-y-[2px] rounded-full bg-[var(--brand)]"
+        className="mr-2 inline-block h-1.5 w-1.5 -translate-y-[2px] rounded-full bg-[var(--yellow)]"
       />
       {brand}
       {suffix}
@@ -307,6 +383,11 @@ export function CategoryBoard({
     setSortKey(next.sortKey);
     setFlipped(next.flipped);
   }
+  function resetSort() {
+    setSortKey(DEFAULT_SORT_KEY);
+    setFlipped(new Set());
+  }
+  const sortedByDefault = isDefaultSort({ sortKey: activeSortKey, flipped });
   const hasAnyBoardData = Object.values(data.boards).some((board) => board.snapshots.length > 0);
   const periodHighlight = data.periodHighlight;
 
@@ -330,7 +411,7 @@ export function CategoryBoard({
   return (
     <div>
       {periodHighlight && (
-        <div className="mb-4 rounded-xl border border-[var(--brand-line)] bg-[var(--brand-soft)] px-4 py-3">
+        <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3">
           <PeriodHighlightLine
             highlight={periodHighlight}
             categoryName={categoryName}
@@ -343,11 +424,7 @@ export function CategoryBoard({
         </div>
       )}
 
-      <div
-        className={`surface flex flex-wrap gap-1 p-1.5 ${
-          data.coverageExpansion && data.coverageExpansion.length > 0 ? "mb-2" : "mb-4"
-        }`}
-      >
+      <div className="surface mb-4 flex flex-wrap gap-1 p-1.5">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -355,7 +432,7 @@ export function CategoryBoard({
             onClick={() => selectTab(tabItem.key)}
             className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               tab === tabItem.key
-                ? "bg-[var(--brand)] text-[var(--brand-contrast)]"
+                ? "bg-[var(--cta-bg)] text-[var(--cta-text)]"
                 : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text)]"
             }`}
           >
@@ -363,12 +440,6 @@ export function CategoryBoard({
           </button>
         ))}
       </div>
-
-      {data.coverageExpansion && data.coverageExpansion.length > 0 && (
-        <p className="mb-4 text-xs leading-relaxed text-[var(--text-muted)]">
-          {m.category.coverageExpansion(formatEngineList(data.coverageExpansion))}
-        </p>
-      )}
 
       {view.snapshots.length === 0 ? (
         <div className="surface py-24 text-center">
@@ -387,16 +458,45 @@ export function CategoryBoard({
               the entry point is stated before any row is ticked. It shares the
               panel header with the board title instead of looking bolted on. */}
           <div className="surface-head flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-            <h2 className="panel-title text-sm font-semibold text-[var(--text)]">
-              {m.category.boardTitle}
-            </h2>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="panel-title text-sm font-semibold text-[var(--text)]">
+                {m.category.boardTitle}
+              </h2>
+              {/* Once another column drives the order, the # column stops matching
+                  row order — say so, and offer the way back. */}
+              {!sortedByDefault && (
+                <button
+                  type="button"
+                  onClick={resetSort}
+                  title={m.category.sortResetHint}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--text)]"
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <path
+                      d="M2.5 6a3.5 3.5 0 1 1 1.03 2.47"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M2.5 3.2v2.9h2.9"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {m.category.sortReset}
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 font-medium text-[var(--text-secondary)]">
                 <CheckboxGlyph />
                 {m.category.compareLead}
               </span>
               {selectedIds.length > 0 ? (
-                <span className="num rounded-full border border-[var(--brand-line)] bg-[var(--brand-soft)] px-2 py-0.5 font-mono font-medium text-[var(--text)]">
+                <span className="num rounded-full border border-[var(--border-hover)] bg-[var(--card)] px-2 py-0.5 font-mono font-medium text-[var(--text)]">
                   {m.category.compareSelected(selectedIds.length, COMPARE_MAX)}
                 </span>
               ) : (
@@ -414,7 +514,10 @@ export function CategoryBoard({
                     <span className="sr-only">{m.category.compareOpen}</span>
                   </th>
                   <th scope="col" className={`text-left ${HEAD_CELL}`}>
-                    #
+                    <span className="inline-flex items-center gap-1.5">
+                      <PlainTip tip={m.category.posHeaderTip} />
+                      {m.category.posHeader}
+                    </span>
                   </th>
                   <th scope="col" className={`text-left ${HEAD_CELL}`}>
                     {m.common.product}
@@ -466,18 +569,14 @@ export function CategoryBoard({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((s) => {
+                {rows.map((s, i) => {
                   const selected = selectedIds.includes(s.brandId);
-                  const podium = s.rank <= 3;
+                  const position = i + 1;
                   return (
                     <tr
                       key={s.brandId || s.id}
                       className={`group border-b border-[var(--border)] transition-colors last:border-b-0 hover:bg-[var(--card-hover)] ${
-                        selected
-                          ? "bg-[var(--card-hover)]"
-                          : podium
-                            ? "bg-[var(--brand-soft)]"
-                            : "bg-[var(--card)]"
+                        selected ? "bg-[var(--card-hover)]" : "bg-[var(--card)]"
                       } ${podiumRail(s.rank)}`}
                     >
                       <td className="w-9 py-0 pl-4 pr-0">
@@ -489,35 +588,52 @@ export function CategoryBoard({
                             onChange={() => toggleSelected(s.brandId)}
                             disabled={!selected && selectedIds.length >= COMPARE_MAX}
                             aria-label={m.category.compareSelect(s.brandName)}
-                            className="h-4 w-4 cursor-pointer accent-[var(--brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="h-4 w-4 cursor-pointer accent-[var(--cta-bg)] disabled:cursor-not-allowed disabled:opacity-40"
                           />
                         </label>
                       </td>
                       <td className="py-4 pl-4 pr-2">
-                        {s.rank <= 3 ? (
-                          <span className="num inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--card)] font-mono text-sm font-semibold text-[var(--text)]">
-                            {s.rank}
+                        {position <= 3 ? (
+                          <span className="num inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] font-mono text-sm font-semibold text-[var(--text)]">
+                            {position}
                           </span>
                         ) : (
                           <span className="num inline-flex h-7 w-7 items-center justify-center font-mono text-sm text-[var(--text-muted)]">
-                            {s.rank}
+                            {position}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <Link
-                          prefetch={false}
-                          href={`/brand/${s.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
-                          className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text)] underline decoration-transparent decoration-2 underline-offset-[4px] transition-colors hover:decoration-[var(--brand)] group-hover:decoration-[var(--brand-line)]"
-                        >
-                          {s.brandName}
-                        </Link>
+                        <span className="flex items-center gap-2">
+                          <Link
+                            prefetch={false}
+                            href={`/brand/${s.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
+                            className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text)] underline decoration-transparent decoration-2 underline-offset-[4px] transition-colors hover:decoration-[var(--text-muted)] group-hover:decoration-[var(--border-hover)]"
+                          >
+                            {s.brandName}
+                          </Link>
+                          {/* Overall rank is the row's stable identity. Shown only
+                              when the sort reorders rows, so the default view
+                              (position == rank) isn't cluttered with #7 next to 7. */}
+                          {!sortedByDefault && (
+                            <span
+                              className="num shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--text-muted)]"
+                              title={
+                                isOverall
+                                  ? m.category.overallRankBadge(s.rank)
+                                  : m.category.boardRankBadge(s.rank)
+                              }
+                            >
+                              #{s.rank}
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-4 py-4">
                         {s.parentCompanyName ? (
                           <Link
                             prefetch={false}
-                            href={`/company/${toBrandSlug(s.parentCompanyName)}`}
+                            href={`/company/${toBrandSlug(s.parentCompanyName)}?from=${encodeURIComponent(sourcePath)}`}
                             className="text-[13px] text-[var(--text-muted)] underline decoration-transparent underline-offset-[3px] transition-colors hover:text-[var(--text)] hover:decoration-[var(--text-muted)]"
                           >
                             {s.parentCompanyName}
@@ -538,7 +654,7 @@ export function CategoryBoard({
                             className="hidden h-[3px] w-14 overflow-hidden rounded-full bg-[var(--border)] sm:block"
                           >
                             <span
-                              className="block h-full rounded-full bg-[var(--brand-line)] transition-colors group-hover:bg-[var(--brand)]"
+                              className="block h-full rounded-full bg-[var(--yellow-soft)] transition-colors group-hover:bg-[var(--yellow)]"
                               style={{
                                 width: `${Math.min(100, Math.max(3, s.appearanceRate * 100))}%`,
                               }}
@@ -600,7 +716,7 @@ export function CategoryBoard({
               type="button"
               onClick={() => setCompareOpen(true)}
               disabled={!canCompare}
-              className="rounded-full bg-[var(--brand)] px-3.5 py-1.5 text-xs font-semibold text-[var(--brand-contrast)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-[var(--cta-bg)] px-3.5 py-1.5 text-xs font-semibold text-[var(--cta-text)] transition-colors hover:bg-[var(--cta-hover)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {m.category.compareOpen}
             </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { BrandHistoryPoint } from "@/lib/brand-history-data";
 import { filterHistoryByRange } from "@/lib/brand-why";
 import { formatShortUtcDate, formatWeekLabel } from "@/lib/i18n/messages";
@@ -50,6 +50,8 @@ function TrendLineChart({
   domainFloor?: number;
   domainCeil?: number;
 }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+
   if (points.length < 2) return null;
 
   const width = 320;
@@ -90,6 +92,24 @@ function TrendLineChart({
   const showAllLabels = points.length <= 6;
   const showPointValues = points.length <= 8;
 
+  /**
+   * The pointer rarely lands on a 3px dot, so the whole plot is the hit area and
+   * the nearest point wins. viewBox units differ from CSS pixels, and the default
+   * preserveAspectRatio centers the drawing, so undo both before snapping.
+   */
+  function nearestIndex(event: ReactPointerEvent<SVGSVGElement>): number {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const scale = Math.min(rect.width / width, rect.height / height);
+    const drawnX = (event.clientX - rect.left - (rect.width - width * scale) / 2) / scale;
+    const ratio = (drawnX - padX) / (width - padX * 2);
+    return Math.min(points.length - 1, Math.max(0, Math.round(ratio * (points.length - 1))));
+  }
+
+  const active = hovered === null ? null : points[hovered];
+  const activeX = hovered === null ? 0 : toX(hovered);
+  const activeDelta = hovered !== null && hovered > 0 ? active!.value - points[hovered - 1]!.value : 0;
+  const activeImproved = invertY ? activeDelta < 0 : activeDelta > 0;
+
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
@@ -105,11 +125,25 @@ function TrendLineChart({
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full"
+        className="w-full touch-pan-y"
         style={{ height: 96 }}
         role="img"
         aria-label={`${title}: ${weekCountLabel}, ${points[0]!.label} to ${latest.label}`}
+        onPointerMove={(event) => setHovered(nearestIndex(event))}
+        onPointerDown={(event) => setHovered(nearestIndex(event))}
+        onPointerLeave={() => setHovered(null)}
       >
+        {active && (
+          <line
+            x1={activeX.toFixed(1)}
+            x2={activeX.toFixed(1)}
+            y1={padTop - 4}
+            y2={height - padBottom}
+            stroke="var(--border)"
+            strokeWidth="1"
+            strokeDasharray="2 3"
+          />
+        )}
         <path
           d={pathD}
           fill="none"
@@ -123,19 +157,21 @@ function TrendLineChart({
           const y = toY(p.value);
           const labelAbove = y > padTop + 14;
           const valueText = formatValue(p.value);
+          const isActive = hovered === i;
           return (
             <g key={`${p.label}-${i}`}>
               <circle
                 cx={x.toFixed(1)}
                 cy={y.toFixed(1)}
-                r={i === points.length - 1 ? 4 : 3.25}
-                fill="var(--card)"
-                stroke={lineColor}
+                r={isActive ? 5.5 : i === points.length - 1 ? 4 : 3.25}
+                fill={isActive ? lineColor : "var(--card)"}
+                stroke={isActive ? "var(--card)" : lineColor}
                 strokeWidth="1.75"
+                style={{ transition: "r 120ms ease" }}
               >
                 <title>{`${p.label}: ${valueText}`}</title>
               </circle>
-              {showPointValues && (
+              {showPointValues && !isActive && (
                 <text
                   x={x.toFixed(1)}
                   y={(labelAbove ? y - 8 : y + 14).toFixed(1)}
@@ -150,6 +186,26 @@ function TrendLineChart({
             </g>
           );
         })}
+        {active && (
+          <text
+            x={(activeX < 72 ? padX : activeX > width - 72 ? width - padX : activeX).toFixed(1)}
+            y="9"
+            textAnchor={activeX < 72 ? "start" : activeX > width - 72 ? "end" : "middle"}
+            fontSize="10"
+            fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+            fill="var(--text-secondary)"
+          >
+            {`${active.label} · `}
+            <tspan fill="var(--text)" fontWeight="600">
+              {formatValue(active.value)}
+            </tspan>
+            {activeDelta !== 0 && (
+              <tspan dx="5" fill={activeImproved ? "var(--green)" : "var(--red)"}>
+                {`${activeImproved ? "↑" : "↓"}${Math.abs(activeDelta).toFixed(invertY ? 0 : 1)}`}
+              </tspan>
+            )}
+          </text>
+        )}
       </svg>
       <div
         className={`mt-1 grid font-mono text-[10px] text-[var(--text-muted)] ${

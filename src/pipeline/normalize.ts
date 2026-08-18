@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
 import { classifyEntity } from "@/lib/brand-entities";
-
+import {
+  PREFERRED_CANONICAL,
+  preferredCanonicalName,
+} from "@/lib/brand-canonical";
 import { normalizeBrandKey, preprocessBrand } from "@/lib/brand-keys";
 
 export { preprocessBrand } from "@/lib/brand-keys";
@@ -45,7 +48,10 @@ export async function normalizeWeek(week: string) {
     const key = `${mention.response.id}\u0000${mention.rawBrand}`;
     if (resolvedKeys.has(key)) continue;
 
-    const processed = preprocessBrand(mention.rawBrand);
+    const preprocessed = preprocessBrand(mention.rawBrand);
+    const preferredKey = normalizeBrandKey(preprocessed);
+    const forcedPreferred = Boolean(PREFERRED_CANONICAL[preferredKey]);
+    const processed = preferredCanonicalName(preprocessed);
     const lower = normalizeBrandKey(processed);
     if (
       ignoredSet.has(lower) ||
@@ -54,12 +60,23 @@ export async function normalizeWeek(week: string) {
       continue;
     }
 
-    let brandId = canonicalMap.get(lower) ?? aliasMap.get(lower);
-    let matchType = brandId
-      ? canonicalMap.has(lower)
-        ? "canonical"
-        : "alias"
+    // Curated preferred names beat stale review_queue aliases
+    // (e.g. "Leonardo" → SAP Leonardo).
+    let brandId = canonicalMap.get(lower) ?? null;
+    let matchType: string | null = brandId
+      ? forcedPreferred
+        ? "preferred"
+        : "canonical"
       : null;
+
+    if (!brandId && !forcedPreferred) {
+      brandId =
+        aliasMap.get(lower) ??
+        aliasMap.get(preferredKey) ??
+        aliasMap.get(normalizeBrandKey(mention.rawBrand)) ??
+        null;
+      if (brandId) matchType = "alias";
+    }
 
     if (!brandId) {
       // Avoid hard-failing on brand canonicalName uniqueness.

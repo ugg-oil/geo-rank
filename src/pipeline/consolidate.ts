@@ -26,17 +26,9 @@ export async function consolidateBrands() {
     brandIdToTarget.set(brand.id, targetId);
   }
 
-  const aliases = await prisma.brandAlias.findMany();
-  for (const alias of aliases) {
-    const targetId = brandIdToTarget.get(alias.brandId);
-    if (!targetId) continue;
-    const aliasBrand = brands.find(
-      (b) => normalizeBrandKey(b.canonicalName) === normalizeBrandKey(alias.alias)
-    );
-    if (aliasBrand) {
-      brandIdToTarget.set(aliasBrand.id, targetId);
-    }
-  }
+  // Aliases resolve raw mention strings at normalize time. Do NOT use them to
+  // merge Brand rows — review_queue aliases like "Leonardo"→SAP Leonardo or
+  // "DALL·E"→OpenAI DALL·E otherwise collapse unrelated products.
 
   for (const [variant] of Object.entries(PREFERRED_CANONICAL)) {
     const preferred = PREFERRED_CANONICAL[variant];

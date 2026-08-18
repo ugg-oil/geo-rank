@@ -4,6 +4,7 @@ import {
   isExcludedFromCategory,
 } from "@/lib/entity-audit";
 import { classifyEntity } from "@/lib/brand-entities";
+import { preferredCanonicalName } from "@/lib/brand-canonical";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Entity audit assertion failed: ${message}`);
@@ -89,6 +90,46 @@ assert(
 assert(
   !classifyEntity("Black Forest Labs").rankingEnabled,
   "Black Forest Labs classified as a non-ranked company"
+);
+assert(
+  preferredCanonicalName("Leonardo.ai") === "Leonardo.ai",
+  "Leonardo.ai stays Leonardo.ai"
+);
+assert(
+  preferredCanonicalName("Leonardo") === "Leonardo.ai",
+  "bare Leonardo maps to Leonardo.ai"
+);
+assert(
+  preferredCanonicalName("Midjourney v6") === "Midjourney",
+  "Midjourney v6 merges into Midjourney"
+);
+assert(
+  preferredCanonicalName("ChatGPT / GPT Image 2") === "DALL·E",
+  "GPT Image wording merges into DALL·E"
+);
+assert(
+  preferredCanonicalName("OpenAI DALL·E") === "DALL·E",
+  "OpenAI DALL·E merges into DALL·E"
+);
+assert(
+  !classifyEntity("Midjourney v6").rankingEnabled,
+  "Midjourney v6 is not independently rankable"
+);
+assert(
+  !classifyEntity("SAP Leonardo").rankingEnabled,
+  "SAP Leonardo is not rankable"
+);
+assert(
+  approvedCanonicalName("Otter.ai Pro Max") === "Otter",
+  "Otter SKU merges into Otter"
+);
+assert(
+  approvedCanonicalName("Shopify/Shopify Plus") === "Shopify",
+  "Shopify Plus compound merges into Shopify"
+);
+assert(
+  preferredCanonicalName("CrowdStrike Falcon / Charlotte AI") === "CrowdStrike Falcon",
+  "CrowdStrike compound maps to Falcon"
 );
 
 const readyForMigration = ENTITY_AUDIT.filter(

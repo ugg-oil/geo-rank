@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import {
   COLLECTION_ENGINES,
+  OVERALL_MIN_APPEARANCE_RATE,
+  OVERALL_MIN_SCORING_ENGINES,
   SCORE_WEIGHTS,
   TOP_N,
 } from "@/lib/constants";
@@ -8,6 +10,7 @@ import { isExcludedFromCategory } from "@/lib/entity-audit";
 import {
   canPublishOverall,
   isEngineValid,
+  meetsOverallBoardGate,
   modelCoverageScore,
   selectScoringEngines,
 } from "@/lib/engine-scoring";
@@ -177,16 +180,32 @@ export async function scoreCategory(
       w.appearance * appearanceRate * 100 +
       w.avgRank * avgRankScore +
       w.modelCoverage * modelCoverage * 100;
-    return { brandId: s.brandId, score, appearanceRate, avgRank, modelCoverage };
+    return {
+      brandId: s.brandId,
+      score,
+      appearanceRate,
+      avgRank,
+      modelCoverage,
+      scoringEngineMentions: s.engines.size,
+    };
   });
 
-  scored.sort((a, b) => {
+  const eligible = scored.filter((row) =>
+    meetsOverallBoardGate({
+      appearanceRate: row.appearanceRate,
+      scoringEngineMentions: row.scoringEngineMentions,
+      minAppearanceRate: OVERALL_MIN_APPEARANCE_RATE,
+      minScoringEngines: OVERALL_MIN_SCORING_ENGINES,
+    })
+  );
+
+  eligible.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.appearanceRate !== a.appearanceRate) return b.appearanceRate - a.appearanceRate;
     return a.avgRank - b.avgRank;
   });
 
-  const top = scored.slice(0, TOP_N);
+  const top = eligible.slice(0, TOP_N);
   for (let i = 0; i < top.length; i++) {
     await prisma.snapshot.create({
       data: {

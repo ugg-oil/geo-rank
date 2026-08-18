@@ -34,6 +34,8 @@
     "backfill": "npx tsx src/scripts/backfill-history.ts",
     "backfill:categories": "npx tsx src/scripts/backfill-category-history.ts",
     "pipeline:launch-gate": "npx tsx src/scripts/check-category-launch-gate.ts",
+    "pipeline:overall-gate": "npx tsx src/scripts/verify-overall-gate.ts",
+    "repair:p6": "npx tsx src/scripts/repair-p6-entities.ts",
     "retry-category": "npx tsx src/scripts/retry-category.ts",
     "collect-engine": "npx tsx src/scripts/collect-engine.ts",
     "publish": "npx tsx src/scripts/publish-leaderboards.ts"
