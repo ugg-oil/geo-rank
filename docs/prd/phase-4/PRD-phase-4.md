@@ -1,6 +1,6 @@
 # GEO Radar：第四阶段 PRD
 
-> v1.4 · **已发布**。v1.5 已发布见 [PRD-phase-5.md](../phase-5/PRD-phase-5.md)；未排期见 [PRD-phase-next.md](../PRD-phase-next.md)。品类 / 周期 / Prompt / exclude 见 [category-selection.md](../category-selection.md)。
+> v1.4 · **已发布**。v1.5 已发布见 [PRD-phase-5.md](../phase-5/PRD-phase-5.md)；v1.6 草案见 [PRD-phase-6.md](../phase-6/PRD-phase-6.md)；未排期见 [PRD-phase-next.md](../PRD-phase-next.md)。品类 / 周期 / Prompt / exclude 见 [category-selection.md](../category-selection.md)。
 
 | 字段 | 内容 |
 |------|------|

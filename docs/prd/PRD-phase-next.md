@@ -1,8 +1,10 @@
 # GEO Radar：后续规划
 
-> **未排期**（后续开发池）。已发布见 [phase-1](./PRD-phase-1.md)、[phase-2](./PRD-phase-2.md)、[phase-3](./phase-3/PRD-phase-3.md)、[phase-4](./phase-4/PRD-phase-4.md)（v1.4）、[phase-5](./phase-5/PRD-phase-5.md)（v1.5）。
+> **未排期**（后续开发池）。已发布见 [phase-1](./PRD-phase-1.md)、[phase-2](./PRD-phase-2.md)、[phase-3](./phase-3/PRD-phase-3.md)、[phase-4](./phase-4/PRD-phase-4.md)（v1.4）、[phase-5](./phase-5/PRD-phase-5.md)（v1.5）。草案：[phase-6](./phase-6/PRD-phase-6.md)（v1.6 · 周更 SLA + Watch）。
 >
 > 品类清单 / 周期 / Prompt 维护见 [category-selection.md](./category-selection.md)。
+>
+> **2026-08-18**：N1 Watch 最小闭环已抽进 [phase-6 P4](./phase-6/PRD-phase-6.md)。本文件保留完整入口设计与 N2–N11；phase-6 做完 Watch 之前不要在这里再开平行实现。
 >
 > **2026-08-17**：补充产品入口需求——「邮件监控」「新品类请求」「GEO Audit（后期独立入口）」；先定需求，不落地实现。现有 Brand / Category 页 Lead CTA（`track_brand` / `geo_audit` 混入口）待本批产品化后替换或收敛。
 
