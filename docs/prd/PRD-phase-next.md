@@ -4,7 +4,7 @@
 >
 > 品类清单 / 周期 / Prompt 维护见 [category-selection.md](./category-selection.md)。
 >
-> **2026-08-18**：N1 Watch 最小闭环已抽进 [phase-6 P4](./phase-6/PRD-phase-6.md)。本文件保留完整入口设计与 N2–N11；phase-6 做完 Watch 之前不要在这里再开平行实现。
+> **2026-08-18**：Phase 6 改成业务主线：[P1 Watch](./phase-6/PRD-phase-6.md)、周期页、对比 URL、CTA 分流。本文件保留 N1 全文与 N2–N11；不要平行再做一套入口。
 >
 > **2026-08-17**：补充产品入口需求——「邮件监控」「新品类请求」「GEO Audit（后期独立入口）」；先定需求，不落地实现。现有 Brand / Category 页 Lead CTA（`track_brand` / `geo_audit` 混入口）待本批产品化后替换或收敛。
 

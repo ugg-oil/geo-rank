@@ -1,6 +1,6 @@
 # GEO Radar：第六阶段 PRD
 
-> v1.6 · **草案**。基线 [phase-5](../phase-5/PRD-phase-5.md)（v1.5 已发布）。事故事实：[weekly-pipeline-incidents.md](../../incidents/weekly-pipeline-incidents.md)。未进本阶段的想法仍放 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
+> v1.6 · **草案**。基线 [phase-5](../phase-5/PRD-phase-5.md)（v1.5 已发布）。事故：[weekly-pipeline-incidents.md](../../incidents/weekly-pipeline-incidents.md)。未进本阶段：[phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
 
 | 字段 | 内容 |
 |------|------|
@@ -8,123 +8,170 @@
 | 阶段 | Phase 6 · v1.5 → v1.6 |
 | 状态 | 草案 · 未开始 |
 | 文档 | 中文 · 网站英文 |
-| 起草 | 2026-08-18（Week of 2026-08-17 人工救火收工当天） |
+| 起草 | 2026-08-18 |
 
-## 为什么现在做这个阶段
+## 业务现状（实际，不是愿景）
 
-v1.5 把 24 品类、页面和实体门槛做出来了，但 **连续三个周一的周更都没按计划自己跑完**：
+v1.5 交出的东西：24 品类 × 6 引擎的 **「AI 推荐了谁」周榜**、Brand / Company 页、Movers、Period Insights、品类页 2–3 产品对比。这是相对 [MyGeoRadar](../../research/competitive-analysis-mygeoradar.md) 的差异——他们卖一次 URL 扫描（Schema / NAP / llms.txt），我们有他们没有的 **周期排名数据**。
 
-| 周次 | 卡点 | 人做了什么 |
-|------|------|------------|
-| 08-03 | collecting 无超时；normalize 超时；Blob `latest` 不覆盖 | 重试 + 发布补丁 |
-| 08-10 | 步进 tick 停在 collecting | 人工补采 5 核心品类 |
-| 08-17 | DeepSeek 挡 extract；之后 classifying / publishing 空转 | 门槛跳过 DeepSeek；人工 catchup；部署后处理连跑 |
+但这套数据现在几乎不变现、也不形成回头：
 
-08-17 收工状态：`pipeline_runs` `success`、643 snapshots、前台已是本周；Blob 镜像仍 skip。前台能看榜 ≠ 管道可信。本阶段先把「周一不用人盯」做实，再加一个真正能兑现的产品入口（Watch）。
+| 现象 | 业务后果 |
+|------|----------|
+| 连续三周周一不能自己发榜 | 对品牌说「每周更新」是假承诺；Watch / 传播都建在空头上 |
+| Brand CTA 文案像监控，表单是 `track_brand` / `geo_audit` 线索（还收 Website / Message） | 想盯排名的人填销售表；想买诊断的人和想订阅的人混在一张表里，两种意向都验不成 |
+| Period Insights / Movers 只活在首页 | 每周期已经有「谁升了 7 名」这种可转发事实，没有出口，等于白算 |
+| 品类对比勾选后出弹层，**没有 URL** | 不能丢进 Slack / 推特 / 销售邮件；B2B 榜单靠截图和链接传，现在传不出去 |
+| 访客看完 ChatGPT #1 就走 | 没有「下周期告诉我变了没」；零邮件名单，零留存，付费无从谈起 |
+| 首页「Period start · 08-17」像全站更新 | 实际只有 5 个 7 天品类 due；品牌方会对着 14 天品类觉得数据没动、产品骗人 |
+| 引擎 Tab 可能是没采完，不是零提及 | 对外「DeepSeek 不推荐你们」会变成错误指控 |
+
+本阶段商业假设（可证伪）：**品牌方愿意用邮箱换「下周期我的名次变了没」**。证不出来，就不要做付费 Audit、不要做账号、不要扩品类。
+
+本阶段 **不** 假设：有人现在愿意为 GEO Audit 付钱。线索表存在几个月了，没有产品化漏斗，不算验证过的需求。
 
 ## 顺序
 
+业务主线在前。P0 仍是第一块，因为它是所有对外承诺的前提，不是「技术自嗨」。
+
 ```text
-P0  周更 SLA / 管道收口     周一 due 品类必须自动发布；禁止 snapshots 齐了还挂 running
-P1  卡住要能看见、要告警    别再靠聊天里贴 CRON_SECRET 去 curl
-P2  采集尾巴与引擎分榜      DeepSeek 长尾；分榜空态不能装成「没人提」
-P3  7 天 / 14 天周期话术    首页像全站更新，实际只有 5 个 7 天品类 due
-P4  Watch 邮件监控          现有 CTA 像监控，实际是销售线索表
-P5  实体质量周流程          不能再靠一次性全库 rescore
+P0  周一必须自己发榜        商业前提：周更是产品，不是后台任务
+P1  Watch 邮件              唯一留存入口；验证「有人要盯排名」
+P2  周期内容可传播          已有 Movers / Insights，做成可转发的一页
+P3  对比可分享              品类页已能比 2–3，缺链接
+P4  CTA 分流                监控 / 线索 / Audit 三个承诺拆开
+P5  对外数据诚实            7/14 天周期、引擎未采完，不能装成事实
+P6  管道收口 / 告警         支撑 P0；给人看的状态，不是产品功能
+P7  实体周扫                脏 Top20 会毁 Watch 邮件的可信度
 ```
 
-## 全站约束（本阶段）
+## 全站约束
 
-- 对外仍 **period / 采集周期**，日期 `YYYY-MM-DD`；禁止 week / Weekly。
-- 前台 SoT 仍是 DB `snapshots`；不把 Blob 镜像做成发布硬条件。
-- 不新开引擎（Copilot / Kimi）、不新开品类。6 个引擎都跑不稳，先别加第 7 个。
-- 不把 GEO Audit 混进 Watch CTA（N3 仍在 phase-next）。
-- Hobby 上 `after()` 仍不可靠；自链只是加速，**小时 catchup 才是续跑保证**。
+- 对外 **period / 采集周期**，日期 `YYYY-MM-DD`；禁止 week / Weekly。
+- 前台 SoT = DB `snapshots`。
+- 不新开引擎、不新开品类、不做付费墙、不做账号、GEO Audit 不进主 CTA。
+- Watch 成功标准是 **验证过的邮箱 + 至少一封周期信 + 可退订**，不是「表单提交数」。
 
-## 已落地（本阶段基线，不当作新需求）
+## 已落地基线（不当新需求）
 
-08-18 已上线，验收见事故文档：
+08-18：采集门槛跳过 DeepSeek 尾巴、catchup 便宜闸门、后处理同 tick 连跑、extract/score 心跳。08-17 已 `success`、643 snapshots、前台本周可读。
 
-- 采集门槛：每 due 品类 ≥3 完整引擎即可进 extract，不等 DeepSeek。
-- catchup 入口只读 `pipeline_runs`；`getPipelineHealth` 在 tick `done` 之后。
-- 后处理同一 tick 连跑；extract/score 中途心跳。
-- `collectOne` 失败重试上限；新 run 从第一个未完成引擎起。
-
-本阶段补的是：**这些修完之后仍然发生的洞**（publishing 挂着、health 与前台不一致、无告警、DeepSeek 分榜空洞、周期话术、假监控 CTA）。
+仍缺：publishing 曾空转 80+ 分钟、health 与前台脱节、无卡住告警、假监控 CTA、内容无出口。
 
 ---
 
-## P0 · 周更 SLA / 管道收口
+## P0 · 周一必须自己发榜（商业前提）
 
-**事实：** 08-18 12:59 UTC 前，run `cmsy053qd000004jxcysqwp2p` 已有 **643 snapshots**，前台 Category 页 `week` 已是 `Week of 2026-08-17`，但 `pipeline_runs.status=running`、`currentStep=publishing`、心跳停在 11:35 UTC。health 503。人工 catchup **2.2s** 把 publishing（Blob skip）收成 `success`。
+没有这一条，P1–P4 全是空头支票。
 
-### 目标
+**事实：** 08-03 / 08-10 / 08-17 三个周一都靠人救。08-18 前台已是本周，run 仍 `publishing`，health 503。
 
-due 品类的 Overall Top20 在周一窗口内自动可读；snapshots 已齐时 run 必须在当次 tick 收成，禁止再靠人 poke。
+- [ ] P0-1：**SLA** due 品类（7 天每周；14 天仅对齐周）在周一 UTC 06:00 前 Overall Top20 可读；未齐发告警。
+- [ ] P0-2：**修复** snapshots 已齐且前台可读时，health 不得因 `running`+`publishing` 报红。
+- [ ] P0-3：**修复** `snapshotCount > 0` 且 Blob skip/failed_mirror → 当 tick 写 `success`。禁止再空转 publishing。
+- [ ] P0-4：**验收** 下一个 due 周一不靠人工 poke，due 品类前台切新周期。
 
-- [ ] P0-1：**新增** 发布 SLA：每个自然周，**本周 due 品类**（`shouldCollectCategoryInPeriod`）在周一 UTC 06:00（日级 catchup）前须有 Overall Top20；未齐发告警。7 天品类每周 due；14 天品类只在对齐周考核。
-- [ ] P0-2：**修复** health 与前台对齐：若本周 due 品类 snapshots 已齐且前台可读，`getPipelineHealth` 不得因 `status=running` + `currentStep=publishing` 判失败。建议：snapshots 门槛满足 → `ok` 或 `ok`+warning `run_not_finalized`；`running` 只在 **还没有可读榜** 时打红。
-- [ ] P0-3：**修复** `publishing` 收口：`snapshotCount > 0` 且镜像 skip/failed_mirror 时，本 tick **必须** 写 `status=success` + `finishedAt`。禁止 snapshots 已齐还把 run 留在 `publishing` 空转（08-18 实测 80+ 分钟）。
-- [ ] P0-4：**新增** extract 软截止：对齐 collect。`PIPELINE_TICK_BUDGET_MS` 用尽停在 `extracting`，已写入的 mentions 保留，下 tick 续；禁止 20 分钟硬超时把整 run 标 failed。
-- [ ] P0-5：**修复** score 半截品类：`scoreCategory` 中途被平台掐死时，不得留下「已有 snapshot 行 → 下 tick 整类 skip」的半成品。按品类事务或完成后才可见。
-- [ ] P0-6：**验收** 下一个 due 周一：不人工 curl catchup，前台 due 品类切到新周期；`pipeline_runs` 最终 `success`。失败则本条不勾。
+extract 软截止、score 半截品类 → 归 P6，不挡 P0 过线。
 
-## P1 · 卡住要能看见、要告警
+---
 
-**事实：** classifying 空转 40 分钟、publishing 空转 ~80 分钟，Resend 告警没把人叫起来。排障方式是聊天贴 `CRON_SECRET` 打 health。
+## P1 · Watch 邮件（留存）
 
-- [ ] P1-1：**新增** 鉴权只读状态页（或扩 `/api/pipeline-health`）：week、run id、`currentStep`、心跳年龄、collected / extracted / snapshots、due 品类覆盖。给自己看，不给访客。
-- [ ] P1-2：**新增** 卡住告警：`running` 且心跳 ≥ 15 分钟，且当前步不是「采集软预算内的 collecting」→ 邮件。classifying / publishing 这种秒级步超时必须告。已有 `PIPELINE_ALERT_EMAIL_*`，这次没用上。
-- [ ] P1-3：**新增** catchup 跳过原因进告警/状态：`already_running` 时带心跳年龄和 step，避免「看起来在跑其实死了」。
-- [ ] P1-4：**约束** 密钥只放 Vercel / GitHub Actions；文档禁止把 secret 写进聊天或仓库。轮换 08-18 已暴露的 `CRON_SECRET`（Vercel + GHA 同步）。
+**用户：** 品牌 / 市场 / GEO 的人，已经在 Brand 或 Category 页上看到自己或竞品。
 
-## P2 · 采集尾巴与引擎分榜
+**现在发生的事：** 点 CTA → 填邮箱 + 品牌名 + 网站 + 留言 + 勾选「监控 / 诊断」。提交进 `leads`。之后什么都没有。没有验证邮件，没有下周期通知，和「Monitor visibility」文案不符。
 
-**事实：** 08-17 因 DeepSeek 卡住。门槛跳过后 Overall 能发，但 DeepSeek 在 Meeting / Cyber **0/8**，Marketing **2/8**。引擎 Tab 会像「这周期没人提」，其实是没采完。
+**改成：** 当前页对象只读（ChatGPT / AI Tools），只要邮箱，验证后生效，每周期最多一封：名次、是否跌出 Top20、显著 Δ。退订在邮件里。需求骨架 [phase-next N1](../PRD-phase-next.md)。
 
-- [ ] P2-1：**变更** DeepSeek 为 best-effort：不挡 Overall（已是）；超时/失败在 run 摘要里记 `engineIncomplete`，不靠「看起来像空榜」。
-- [ ] P2-2：**新增** 引擎分榜空态：该引擎本周期 ok responses < 品类 active prompts → 文案「本周期该引擎采集未完成」，禁止用空 Top20 冒充零提及。
-- [ ] P2-3：**新增** 采集覆盖摘要（可只在状态页）：品类 × 引擎 `ok / expected`。08-17 若当时有这张表，不用翻 DB。
-- [ ] P2-4：**不做** 本阶段接入 Copilot / Kimi。
+- [ ] P1-1：**新增** 订阅对象来自当前页，邮箱 + 验证；未验证不发信。
+- [ ] P1-2：**新增** 周期信：该对象在锚定品类的 rank / Δ / OUT；无变化可跳过或一句话「持平」（默认跳过，降噪音）。
+- [ ] P1-3：**变更** Brand / Category 主 CTA → Watch。不收 Website / Message。
+- [ ] P1-4：**约束** 不做账号、不做「我的监控列表」、不在 Watch 表单里塞 Audit。
+- [ ] P1-5：**验收** 真邮箱：验证 → 下一 due 周期收到或正确跳过 → 退订失效。
+- [ ] P1-6：**业务验收** 连续两个 due 周期后，能回答：验证订阅数、打开/退订（有就记；没有 ESP 就先记发送成功数）。**证伪：** 两个周期验证订阅 < 10 且不是投递故障 → Watch 文案/入口重做，不顺势做付费。
 
-## P3 · 7 天 / 14 天周期话术
+---
 
-**事实：** 08-17 只有 5 个 7 天品类 due（AI Tools / Image / Marketing / Meeting / Cyber）。14 天品类仍停在 08-10。首页 Hero「Period start · 2026-08-17」+ Movers 会让人以为 24 个品类都更新了。
+## P2 · 周期内容可传播
 
-- [ ] P3-1：**变更** 首页标明范围：本周期更新的是哪些品类（或「N 个品类本周期已更新」），14 天品类显示其真实周期起始日，不跟 7 天品类混成一个「全站最新」。
-- [ ] P3-2：**变更** `/rankings` 品类卡带「最近更新 YYYY-MM-DD」；过期未 due 不显示成 NEW。
-- [ ] P3-3：**文档** operations：周一 checklist 写清 due 集合怎么算；14 天品类对齐周才考核 P0-1。
+**事实：** 首页已经用规则模板算出「Amplitude 营销工具 #15→#8」「Grok 升 7」。这些句子只给到过首页的人看。竞品靠指南页获客；我们最该传的是 **每周期排名变化**，现在没有 permalink。
 
-## P4 · Watch 邮件监控
+- [ ] P2-1：**新增** `/period/{YYYY-MM-DD}`（或等价）一页：该起始日 due 品类的 Top movers / NEW / OUT，规则生成，无 LLM。首页 Insights 链过来。可索引。
+- [ ] P2-2：**新增** 同页 OG：标题带日期和 1 个最大位移，便于贴 X / LinkedIn。
+- [ ] P2-3：**新增** 人工发布清单（ops，不是自动发社交）：每周期 3–5 条现成句子 + 链接。自动发社交仍放 phase-next。
+- [ ] P2-4：**验收** 08-17 这类周期能稳定打开该页；未 due 的 14 天品类不假装更新。
 
-**事实：** Brand / Category 上的 CTA 语义是监控可见度，表单却是 `track_brand` / `geo_audit` 线索。周更现在能发榜了，这个入口再不兑现就是假的。需求骨架已在 [phase-next N1](../PRD-phase-next.md)；本阶段只做最小 Watch。
+---
 
-- [ ] P4-1：**新增** 订阅对象来自当前页（品牌或品类），邮箱 + 验证邮件；确认后生效。
-- [ ] P4-2：**新增** 每周期最多一封：排名 / 是否跌出 Top20 / 可选显著 Δ；邮件内退订。
-- [ ] P4-3：**变更** Brand 主 CTA 从线索表换成 Watch；GEO Audit 不得当主按钮（N3 仍后期）。
-- [ ] P4-4：**约束** 不做账号体系、不做站内「我的监控列表」、不收集 Website / 销售意向。
-- [ ] P4-5：**验收** 用真实邮箱走通：验证 → 下一 due 周期收到一封 → 退订失效。
+## P3 · 对比可分享
 
-## P5 · 实体质量周流程
+**事实：** 品类页能勾 2–3 个产品出指标弹层。一关就没了。B2B 决策链靠「把这个链接丢给老板」。
 
-**事实：** phase-5 P6 一次性 merge + 115 次 force rescore 把当时的 SKU / 幽灵行清了。每周 `auto_new` 仍会进榜；Review Queue 没有「发布后必扫」节奏，问题会再堆到要全库重打分。
+- [ ] P3-1：**新增** URL 状态：`/category/{slug}?compare=a,b,c`（slug 稳定、≤3）。打开即对比。
+- [ ] P3-2：**新增** 「复制对比链接」；OG 可用「A vs B vs C · 品类 · 周期日」。
+- [ ] P3-3：**约束** 不做保存竞品组、不做登录、不比跨品类。
+- [ ] P3-4：**验收** 无会话打开对比 URL，指标与勾选一致。
 
-- [ ] P5-1：**新增** 每周发布后扫描：新进 Overall Top20 / Also mentioned 且 `entityTypeSource=rule` 的品牌列表（run 级日志或状态页）。
-- [ ] P5-2：**变更** 命中 SKU / 斜杠 / 版本规则的新 brand 默认 `rankingEnabled=false`，进 Queue，不进下一周期 Overall（规则表已有，缺的是默认路径）。
-- [ ] P5-3：**约束** 不把「再跑一次全品类 force rescore」当常规操作；只允许规则变更后的定向重打。
+---
+
+## P4 · CTA 分流
+
+**事实：** 一个 Lead 表两个 intent，主按钮还叫监控。Watch 上线后如果还留这张表当主路径，P1 会被冲掉。
+
+- [ ] P4-1：**变更** 主路径 = Watch（P1）。`leads` 表单从 Brand 主 CTA 拿掉。
+- [ ] P4-2：**变更** 诊断意向降为 Watch 成功态下的次级一行：「需要人工看一遍？留下联系方式」→ 仍写 `geo_audit`，不得并列主按钮。无 Watch 成功态不展示。
+- [ ] P4-3：**新增** `/rankings` 轻量「建议新品类」（[N2](../PRD-phase-next.md)）：品类名 + 可选邮箱。文案写清不保证上线。用来收集下一步扩品类信号，不自动建品类。
+- [ ] P4-4：**不做** 独立 GEO Audit 页、定价、支付。
+
+---
+
+## P5 · 对外数据诚实（信任）
+
+信任问题，不是文案美化。错误周期和空引擎榜会让 Watch 邮件变成指控。
+
+- [ ] P5-1：**变更** 首页写清本周期 **更新了哪些品类**；14 天品类用自己的起始日，不跟 7 天混成「全站最新」。
+- [ ] P5-2：**变更** `/rankings` 卡带「最近更新 YYYY-MM-DD」。
+- [ ] P5-3：**新增** 引擎分榜：ok responses < active prompts → 「本周期该引擎采集未完成」，禁止空 Top20 冒充零提及。（08-17 Meeting/Cyber DeepSeek 0/8）
+- [ ] P5-4：**文档** 周一 due 集合怎么算（ops）。
+
+---
+
+## P6 · 管道收口 / 告警（支撑 P0）
+
+给人看的产品不依赖这些，周一发榜依赖这些。
+
+- [ ] P6-1：**新增** extract 软截止（对齐 collect）。
+- [ ] P6-2：**修复** score 按品类完整提交，禁止半截 snapshot 导致下 tick skip。
+- [ ] P6-3：**新增** 鉴权状态页：step、心跳年龄、due 覆盖、品类×引擎 ok/expected。
+- [ ] P6-4：**新增** 告警：非采集长尾的 `running` 心跳 ≥ 15 分钟 → 邮件。classifying / publishing 必须告。
+- [ ] P6-5：**约束** 轮换 08-18 已暴露的 `CRON_SECRET`；密钥不进聊天。
+
+---
+
+## P7 · 实体周扫（Watch 可信度）
+
+脏实体进 Top20，周期信会把「Otter.ai Pro Max #12」发给用户。phase-5 P6 是一次性清洗。
+
+- [ ] P7-1：**新增** 发布后扫描新进 Top20 / Also mentioned 的 rule 实体。
+- [ ] P7-2：**变更** SKU / 斜杠 / 版本规则命中 → 默认 `rankingEnabled=false`，进 Queue。
+- [ ] P7-3：**约束** 全库 force rescore 不是常规动作。
 
 ---
 
 ## 不做（本阶段）
 
-- 新品类、新引擎、Blob 强制镜像、R2。
-- GEO Audit 独立入口（N3）、账号、付费墙、CSV/PDF 导出。
-- 对比页大改（品类页 2–3 产品对比已有）；可分享 URL 对比放到 phase-next。
-- 重采 08-17 DeepSeek 空洞（除非 P2 做完且成本可接受）。
+- 新品类（先看 P4-3 请求）、新引擎、Blob 强制镜像。
+- GEO Audit 产品化、支付、账号、CSV/PDF、webhook。
+- 自动发 X / LinkedIn（P2 只给人工素材 + permalink）。
+- 重采 08-17 DeepSeek 空洞。
+- 抄竞品做 URL 扫描。那是另一门生意；我们的资产是排名时间序列。
 
 ## 过线标准
 
-1. 下一个 due 周一不靠人工 poke，due 品类前台切新周期（P0-6）。
-2. snapshots 已齐时 health 不再因 publishing 空转报红（P0-2 / P0-3）。
-3. 引擎未采完有明确空态，不以空榜冒充零提及（P2-2）。
-4. Watch 最小闭环可退订（P4-5）。
+1. 下一个 due 周一不靠人 poke，due 品类切新周期（P0-4）。
+2. Watch：真邮箱走通验证 / 一封信 / 退订（P1-5）。
+3. 有一条可转发的周期页 URL（P2-1）和一条可转发的对比 URL（P3-1）。
+4. Brand 主 CTA 不再是线索表（P4-1）。
+5. 引擎未采完不装零提及（P5-3）。
+
+商业是否成立看 P1-6，不看本阶段是否「做完功能」。
