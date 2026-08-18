@@ -43,6 +43,6 @@ AI 回答
 - [Review Queue](../ops/review-queue.md)：品牌审核操作
 - [Phase 1 PRD](../prd/PRD-phase-1.md)：已实现范围
 - [Phase 2 PRD](../prd/PRD-phase-2.md)：已实现范围
-- [Phase 5 PRD](../prd/phase-5/PRD-phase-5.md) · [技术文档](../prd/phase-5/technical.md)：当前阶段
+- [Phase 5 PRD](../prd/phase-5/PRD-phase-5.md) · [技术文档](../prd/phase-5/technical.md)：v1.5 已发布
 - [Phase 4 PRD](../prd/phase-4/PRD-phase-4.md)：v1.4 已发布
 - [Phase 3 PRD](../prd/phase-3/PRD-phase-3.md) · [技术文档](../prd/phase-3/technical.md)

@@ -2,7 +2,7 @@
 
 > 入选标准、全量清单、周期、exclude。Prompt 正文见 [`src/scripts/seed-prompts.ts`](../../src/scripts/seed-prompts.ts)（每品类 ×8）；回填时追加 ` as of {periodStartDate}`，不改 seed。
 >
-> 当前阶段：[PRD-phase-5](./phase-5/PRD-phase-5.md) · [technical §8](./phase-5/technical.md)；已发布阶段：[phase-4](./phase-4/PRD-phase-4.md)；未排期：[PRD-phase-next](./PRD-phase-next.md)。
+> 已发布阶段：[phase-4](./phase-4/PRD-phase-4.md)（v1.4）、[phase-5](./phase-5/PRD-phase-5.md)（v1.5 · [technical §8–9](./phase-5/technical.md)）；未排期：[PRD-phase-next](./PRD-phase-next.md)。
 >
 > **合计 24 品类 · 全部已发布。** 采集按天/周期（默认 7 或 14）；标签用起始日 `YYYY-MM-DD`。exclude = `entity-audit` 的 `excludedCategories`（仅列出品类）；同品牌可多榜。Company 列见 `parent-company.ts`。
 >

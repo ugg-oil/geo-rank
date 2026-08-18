@@ -2,7 +2,7 @@
 
 | 目录 | 内容 |
 |------|------|
-| [prd/](./prd/) | 产品需求：phase-1～4 已发布，[phase-5](./prd/phase-5/PRD-phase-5.md) 当前开发，[phase-next](./prd/PRD-phase-next.md) 未排期 |
+| [prd/](./prd/) | 产品需求：phase-1～5 已发布，[phase-next](./prd/PRD-phase-next.md) 未排期 |
 | [engineering/](./engineering/) | 架构、数据管道、SEO |
 | [ops/](./ops/) | 环境配置、周更运维、Review Queue |
 | [research/](./research/) | 竞品与调研 |

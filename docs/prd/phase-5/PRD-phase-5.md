@@ -1,12 +1,12 @@
 # GEO Radar：第五阶段 PRD
 
-> v1.5。基线 [phase-4](../phase-4/PRD-phase-4.md)。实现见 [technical.md](./technical.md)。未排期 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
+> v1.5 · **已发布**。基线 [phase-4](../phase-4/PRD-phase-4.md)。实现见 [technical.md](./technical.md)。未排期 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
 
 | 字段 | 内容 |
 |------|------|
 | 产品 | GEO Radar |
 | 阶段 | Phase 5 · v1.4 → v1.5 |
-| 状态 | 开发中 |
+| 状态 | 已发布 |
 | 文档 | 中文 · 网站英文 |
 
 ## 顺序
@@ -460,3 +460,43 @@ P5  品类扩展（11 个）  category-selection
 #### 全局约束
 
 - [x] P5-12：**约束** Top 20 须有 Brand Page；exclude 只限本品类；首页/榜单品类列表同源；临近 4 档齐后发布（launch-gate 2026-08-16 四档全绿；HR ATS exclude 已落）
+
+## P6 · 实体质量 / 榜单可信度（全品类）
+
+> 2026-08-17～18 已落地：全品类 SKU / 斜杠串归并、consolidate 不再用 BrandAlias 合并 Brand 行、115 个 category×week force rescore、Overall 入榜门槛（`SCORING_VERSION=3`）。代表验收：HR Software 无 SAP Leonardo；AI Image Leonardo.ai ≠ SAP Leonardo、DALL·E 独立；单响应幽灵行不再占 Top20 中段。
+
+### 背景（现象）
+
+1. **单次第 1 刷分**：`appearance ≈ 2%` + `avgRank = 1` → Overall ≈ 42.7，挤进 Top20。最新 Overall 约 150+ 条 appearance < 8% 的行；Cyber / Meeting / CRM / AI Tools / Accounting / Design 等重灾。
+2. **版本 / SKU / 斜杠拼盘未归母品牌**：如 `Otter.ai Pro Max`、`Fireflies.ai 3.0`、`Shopify/Shopify Plus`、`CrowdStrike Falcon / Charlotte AI`、`Fin AI 3.0`。库内 `rankingEnabled` 且名字像版本/拼盘的 brand 数百条。
+3. **错误 alias / consolidate**：历史 review_queue alias 把无关产品并到错误 Brand；`preprocessBrand` 剥 `.ai` 加剧碰撞（Leonardo 样例）。
+
+### 优先级
+
+#### P6-0 · 全品类 force rescore（先做）
+
+- [x] P6-0：**修复** 对所有已发布品类 × 已有周期 `scoreCategory(..., { force: true })`（或等价全量 reprocess），使 `rankingEnabled=false` / 已 merge 的实体立刻从 Top20 消失。（2026-08-17：115 个 category×week 已 force 重算）
+- [x] P6-0-1：**验收** HR Software 最新档不再出现 SAP Leonardo；Recruiting / SaaS 历史档同类残留消失。
+- [x] P6-0-2：**验收** AI Image 修后 Top20 形态在 rescore 后仍保持（回归抽查）。
+
+#### P6-1 · 批量实体归并（SKU / 斜杠串 → 母产品）
+
+- [x] P6-1：**新增** `brand-canonical` / `entity-audit` 高频 merge 规则（按品类扫 Top20 + Also mentioned）。
+- [x] P6-1-1：**合并** Meeting：`Otter.ai Pro Max` → Otter；`Fireflies.ai 3.0` → Fireflies；同类 SKU。
+- [x] P6-1-2：**合并** E-commerce：`Shopify/Shopify Plus`、`Shopify V2` → Shopify。
+- [x] P6-1-3：**合并** Cyber：CrowdStrike / Charlotte / Falcon 拼盘 → 主产品线；Defender 拼盘 → Microsoft Defender（或约定口径）。
+- [x] P6-1-4：**合并** Helpdesk / CRM / Design / Dev / PM：斜杠双产品、Fin AI 3.0、Adobe XD/CC 拼盘等按母产品归并。
+- [x] P6-1-5：**修复** consolidate **禁止**用 BrandAlias 合并 Brand 行（仅 normalize 解析 raw）；preferredCanonical 优先于脏 alias（AI Image 已落地，全链路确认）。
+- [x] P6-1-6：**约束** 版本 / model SKU：`rankingEnabled=false`，parent → 母产品；新 `auto_new` 命中规则表时不得单独上榜。
+- [x] P6-1-7：**执行** merge 后再次全品类 force rescore + 抽查各 family 代表品类 Top20。
+
+#### P6-2 · Overall 入榜门槛（评分 / 发布规则）
+
+- [x] P6-2：**新增** Overall Top N 最低门槛：appearance ≥ 10%，**或** 当周期 ≥ 2 个计分引擎提及（`OVERALL_MIN_APPEARANCE_RATE` / `OVERALL_MIN_SCORING_ENGINES`，`SCORING_VERSION=3`）。
+- [x] P6-2-1：**文档** methodology / Tooltip 同步门槛说明（中英）。
+- [x] P6-2-2：**验收** 单次第 1 幽灵行不再占据 Top20 中段；Also mentioned 可承接未达门槛实体。
+
+### 不做（本块范围外）
+
+- 不重采引擎原始 response（只修解析 / 归并 / 计分 / 门槛）。
+- 不把 GEO Audit / 邮件监控混进本块（见 [PRD-phase-next](../PRD-phase-next.md) N1–N3）。
