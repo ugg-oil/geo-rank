@@ -1,6 +1,6 @@
 # Phase 5 技术文档
 
-> 对应需求：[PRD-phase-5.md](./PRD-phase-5.md)。本文只写实现、数据源、组件与验收细节。
+> 对应需求：[PRD-phase-5.md](./PRD-phase-5.md)（v1.5 · 已发布）。本文只写实现、数据源、组件与验收细节。
 
 ## 1. 范围与文件
 
@@ -127,11 +127,11 @@ Modal 并排表
 
 ## 6. 验收清单（工程）
 
-- [ ] 无 week 话术回归；品类列表只改一处
-- [ ] Top 5 / Top 3 / movers / insights / 空态降级不报错
-- [ ] 表排序不破坏 Δ；coverage 仅 Overall；对比 2–3 限制
-- [ ] Also mentioned / Why 日期与页头周期一致
-- [ ] 象限位移跟页头周期；无上期隐藏
+- [x] 无 week 话术回归；品类列表只改一处
+- [x] Top 5 / Top 3 / movers / insights / 空态降级不报错
+- [x] 表排序不破坏 Δ；coverage 仅 Overall；对比 2–3 限制
+- [x] Also mentioned / Why 日期与页头周期一致
+- [x] 象限位移跟页头周期；无上期隐藏
 - [x] Brand：Why/原文默认展开；三卡；from 置顶；Δ；引擎链；空态；历史起止
 - [x] Company：摘要；排序+from 置顶；品类行 Δ；空态
 - [x] P5：`P5-n` / `P5-n-1` + 临近 4 档×6 引擎已齐（含 DeepSeek `*-6`）；P5-12 launch-gate 四档全绿（2026-08-16）；边界见 §8.5
