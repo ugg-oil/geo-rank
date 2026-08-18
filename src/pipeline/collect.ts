@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/db";
 import { getOpenRouter } from "@/lib/openrouter";
-import { COLLECTION_ENGINES, ENGINE_MODEL_SLUGS, type Engine } from "@/lib/constants";
+import {
+  COLLECTION_ENGINES,
+  ENGINE_MODEL_SLUGS,
+  MAX_CATEGORY_ENGINE_RETRIES,
+  type Engine,
+} from "@/lib/constants";
 import { getCurrentWeek } from "@/lib/week";
 import {
   assertBeforeDeadline,
@@ -8,9 +13,12 @@ import {
   PIPELINE_COLLECTION_TIMEOUT_MS,
 } from "@/lib/pipeline-timeouts";
 
+// Fix 3: default concurrency raised from 1 to 2 so slow engines (DeepSeek)
+// run two prompts at once per tick, doubling throughput within a category.
+// Override with PIPELINE_COLLECTION_CONCURRENCY env var if needed.
 const COLLECTION_CONCURRENCY = Math.max(
   1,
-  Math.floor(Number(process.env.PIPELINE_COLLECTION_CONCURRENCY) || 1)
+  Math.floor(Number(process.env.PIPELINE_COLLECTION_CONCURRENCY) || 2)
 );
 
 function completionText(message: { content?: unknown } | undefined) {
@@ -37,13 +45,28 @@ type CollectionJob = {
   promptText: string;
 };
 
-async function collectOne(job: CollectionJob, week: string) {
+async function collectOne(
+  job: CollectionJob,
+  week: string,
+  onPromptComplete?: () => Promise<void> | void
+) {
   const existing = await prisma.response.findFirst({
     where: { week, engine: job.engine, promptId: job.promptId },
     orderBy: { createdAt: "desc" },
   });
 
   if (existing?.status === "ok") return `skip ${job.engine} / ${job.promptId}`;
+
+  // Fix 4: cap retries on structurally-failing prompts (e.g. content policy
+  // refusals) so they don't block engineComplete indefinitely.
+  if (existing?.status === "failed") {
+    const failCount = await prisma.response.count({
+      where: { week, engine: job.engine, promptId: job.promptId, status: "failed" },
+    });
+    if (failCount >= MAX_CATEGORY_ENGINE_RETRIES) {
+      return `skip-maxretry ${job.engine} / ${job.promptId}`;
+    }
+  }
 
   try {
     const completion = await getOpenRouter().chat.completions.create({
@@ -73,6 +96,8 @@ async function collectOne(job: CollectionJob, week: string) {
     } else {
       await prisma.response.create({ data });
     }
+
+    await onPromptComplete?.();
     return `${rawText.trim() ? "✓" : "✗"} ${job.engine} / ${job.promptId}`;
   } catch (error) {
     const data = {
@@ -92,6 +117,8 @@ async function collectOne(job: CollectionJob, week: string) {
       await prisma.response.create({ data });
     }
     console.error(`Collection failed for ${job.engine} / ${job.promptId}:`, error);
+
+    await onPromptComplete?.();
     return `✗ ${job.engine} / ${job.promptId}`;
   }
 }
@@ -110,6 +137,8 @@ export type CollectOptions = {
   softDeadline?: boolean;
   /** Heartbeat after each category (serverless stale detection). */
   onCategoryComplete?: (category: string) => Promise<void> | void;
+  /** Heartbeat after each prompt (serverless stale detection). */
+  onPromptComplete?: () => Promise<void> | void;
 };
 
 export type CollectEngineResult = {
@@ -150,7 +179,7 @@ export async function collectCategory(
       if (deadline) {
         assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
       }
-      results[index] = await collectOne(jobs[index], w);
+      results[index] = await collectOne(jobs[index], w, options.onPromptComplete);
     }
   }
 
