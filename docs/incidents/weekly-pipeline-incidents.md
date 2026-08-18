@@ -44,7 +44,7 @@
 
 规范化会对大量 mention 逐条查询并写入数据库。本周有 2,465 条提及，逐条读写使该阶段在 20 分钟 watchdog 内无法完成。这个超时是保护机制正确生效，而不是数据本身异常。
 
-### 3. 发布缺少“提交点”语义（主因）
+### 3. 发布缺少"提交点"语义（主因）
 
 发布本周文件成功并不等于站点已经切换。本周文件写入后：
 
@@ -91,12 +91,74 @@
 ### 后续迭代
 
 1. 为数据库连接中断记录连接/请求上下文，并评估 Prisma/数据库连接池配置。
-2. 将发布状态持久化为可查询的“周文件完成 + latest 已切换”两阶段状态，避免只看 Pipeline `success` 判断站点已更新。
+2. 将发布状态持久化为可查询的"周文件完成 + latest 已切换"两阶段状态，避免只看 Pipeline `success` 判断站点已更新。
 3. 已实现发布后前台冒烟检查，确认 AI Tools 品类页读取的周次正确；首页检查可在首页展示周次后复用同一机制。
 
 ## 经验与边界
 
-- “计算完成”与“站点已发布”是两个独立结果，必须分别验收。
+- "计算完成"与"站点已发布"是两个独立结果，必须分别验收。
 - 对外部 API、数据库批处理和 Blob 发布都需要超时、幂等与可观测性；只靠人工观察运行状态不足以保证周更。
 - 重发已验证快照属于发布恢复，不应重新执行采集；它不产生新的 OpenRouter 请求费用。
 - 本次无法从现有日志精确拆分每次失败重试所产生的 OpenRouter 用量。未来应在每次运行中记录请求数、重试数和 provider request ID，才能做费用级别的归因。
+
+---
+
+# 2026-08-10 周更卡住（collecting）
+
+**状态：** 本周核心 5 品类已人工续跑恢复；结构性防再发见下方。  
+**影响周次：** `Week of 2026-08-10`  
+**现象：** Cron 启动后 `pipeline_runs` 长期 `running` / `collecting`（约 26h+），本周 snapshots=0；前台当前周空榜。
+
+## 根因（与 2026-08-03 同类）
+
+1. **`/api/cron` 一次跑完全部 pipeline**，超过 Vercel serverless 执行上限时进程被杀死，**来不及把 run 标成 `failed`**。  
+2. 陈旧判定原先看 `started_at`、默认 **30 小时**，卡住期间无法重入。  
+3. Blob store blocked 是并行问题；空榜主因是本周未完成计分（DB-first 部署后仍需有 snapshots）。
+
+## 恢复（已做）
+
+- 人工标记卡住 run 失败。  
+- 仅核心 5 品类补采（跳过已 ok 的 chatgpt/gemini），再 extract → score；`publish` 默认不写 Blob。  
+- 生产 `/category/ai-tools` 恢复显示 `Week of 2026-08-10`。
+
+## 防再发（代码）
+
+- `runPipelineTick`：每次 Cron 只推进一个引擎或一个后处理阶段。  
+- Cron `after()` 自链 + `vercel.json` 周一错峰多次触发。  
+- `pipeline_runs.updated_at` 心跳；无心跳默认 **90 分钟** 标 stale。  
+- `maxDuration = 300`。  
+- 本地 `npm run pipeline` 仍为一键全量。
+
+详见 [operations.md](../ops/operations.md)。
+
+---
+
+# 2026-08-18 Pipeline 采集稳定性修复
+
+**状态：** 已实施  
+**影响周次：** `Week of 2026-08-17`（deepseek 卡在 collecting，pipeline 无法推进至 extract/score/publish）  
+**现象：** run 长期停在 `collecting:deepseek`，其余 5 个引擎早已完成，前台无法发布本周榜单。
+
+![Pipeline 采集稳定性修复当前问题全景](./pipeline-current-problem-flow-2026-08-18.png)
+
+## 根因（与前两次同类，但更深层）
+
+1. **引擎串行 + 必须全部完成才推进**：6 个引擎严格串行，最后一个引擎（deepseek）必须 `engineComplete=true` 才能进入 `extracting`。deepseek 长尾慢时，整条 pipeline 死等。
+2. **心跳只在 category 级别更新**：deepseek 卡在某个 category 中间时，`pipeline_runs.updated_at` 不动 → 90 分钟无心跳 → stale 判定 → run 被标 failed → 新 run 从头重建，浪费大量 tick。
+3. **采集并发默认 1**：每次只打一个 OpenRouter 请求，deepseek 某 prompt 卡 60 秒就能吃掉整段 240s tick 预算。
+4. **failed prompt 无重试上限**：结构性失败的 prompt 每次 tick 都重试，永远不会 ok，永远阻止 `engineComplete=true`。
+5. **stale 重启从第一个引擎重头来**：即使 chatgpt/gemini/grok 等已全部完成，新 run 仍从 `collecting:chatgpt` 开始空转多个 tick 才能到达 deepseek。
+
+## 修复（已实施）
+
+- **Fix 1（根因）**：tick 进入 collecting 分支时，**先**调 `hasSufficientCollectedForScoring()`；若每个 due category 已有 ≥ 3 个完整引擎，立即跳到 `extracting`，不再等 deepseek。
+- **Fix 2**：prompt 完成（成功或失败）后触发 heartbeat 回调（10s 节流），防止卡在 category 中间时被误判 stale。
+- **Fix 3**：采集并发默认值 `1 → 2`，单 tick deepseek 吞吐量翻倍。
+- **Fix 4**：`collectOne()` 加入重试计数，达到 `MAX_CATEGORY_ENGINE_RETRIES`（=2）次 failed 后 skip，不再烧 API。
+- **Fix 5**：新 run 创建时调 `findFirstIncompleteEngine()`，从真正未完成的引擎开始，跳过已完成引擎的空转 tick。
+- **Fix 6**：`runFullPipeline()`（本地 `npm run pipeline`）同步应用门槛推进逻辑，不再死等 deepseek。
+
+## 改动文件
+
+- `src/pipeline/collect.ts`：Fix 2（prompt heartbeat 回调）、Fix 3（并发 1→2）、Fix 4（重试上限）
+- `src/pipeline/run.ts`：Fix 1（tick 开头提前推进）、Fix 5（smart restart）、Fix 6（runFullPipeline）

@@ -1,4 +1,11 @@
-import { COLLECTION_ENGINES, type Engine, isEngine } from "@/lib/constants";
+import {
+  CATEGORIES,
+  COLLECTION_ENGINES,
+  MAX_CATEGORY_ENGINE_RETRIES,
+  MIN_SCORING_ENGINES_FOR_OVERALL,
+  PROMPTS_PER_CATEGORY,
+  type Engine,
+} from "@/lib/constants";
 import { collectEngine } from "./collect";
 import { extractWeek } from "./extract";
 import { normalizeWeek } from "./normalize";
@@ -8,6 +15,8 @@ import { scoreAll } from "./score";
 import { publishLeaderboards } from "./publish";
 import { getCurrentWeek } from "@/lib/week";
 import { prisma } from "@/lib/db";
+import { getCategoryPeriodDays } from "@/lib/category-period";
+import { shouldCollectCategoryInPeriod } from "@/lib/period";
 import {
   PipelineTimeoutError,
   PIPELINE_COLLECTION_TIMEOUT_MS,
@@ -25,7 +34,7 @@ function collectStepFor(engine: Engine) {
 function parseCollectEngine(step: string | null | undefined): Engine | null {
   if (!step?.startsWith("collecting:")) return null;
   const engine = step.slice("collecting:".length);
-  return isEngine(engine) ? engine : null;
+  return COLLECTION_ENGINES.includes(engine as Engine) ? (engine as Engine) : null;
 }
 
 function nextStepAfterCollect(engine: Engine): string {
@@ -55,6 +64,111 @@ async function touchRun(runId: string, data: Record<string, unknown> = {}) {
     where: { id: runId },
     data,
   });
+}
+
+/**
+ * Returns true when every due category already has >= MIN_SCORING_ENGINES_FOR_OVERALL
+ * engines whose OK response count covers all active prompts for that category.
+ * Used to skip slow trailing engines (e.g. DeepSeek) and advance to extract/score.
+ */
+async function hasSufficientCollectedForScoring(week: string) {
+  const expectedCategories = CATEGORIES.filter((category) =>
+    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+  );
+  if (expectedCategories.length === 0) return false;
+
+  const [activePrompts, okResponses] = await Promise.all([
+    prisma.prompt.findMany({
+      where: { category: { in: expectedCategories }, active: true },
+      select: { id: true, category: true },
+    }),
+    prisma.response.findMany({
+      where: {
+        week,
+        category: { in: expectedCategories },
+        engine: { in: [...COLLECTION_ENGINES] },
+        status: "ok",
+      },
+      select: { category: true, engine: true, promptId: true },
+    }),
+  ]);
+
+  const promptCounts = new Map<string, number>();
+  for (const p of activePrompts) {
+    promptCounts.set(p.category, (promptCounts.get(p.category) ?? 0) + 1);
+  }
+
+  const promptIdsByCategoryEngine = new Map<string, Set<string>>();
+  for (const r of okResponses) {
+    const key = `${r.category}\0${r.engine}`;
+    const set = promptIdsByCategoryEngine.get(key) ?? new Set<string>();
+    set.add(r.promptId);
+    promptIdsByCategoryEngine.set(key, set);
+  }
+
+  for (const category of expectedCategories) {
+    const expectedPrompts = promptCounts.get(category) ?? PROMPTS_PER_CATEGORY;
+    const completeEngines = COLLECTION_ENGINES.filter((engine) => {
+      const key = `${category}\0${engine}`;
+      return (promptIdsByCategoryEngine.get(key)?.size ?? 0) >= expectedPrompts;
+    });
+    if (completeEngines.length < MIN_SCORING_ENGINES_FOR_OVERALL) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Fix 5: when a stale run is killed and a new one created, start from the
+ * first engine that hasn't yet collected all prompts for every due category,
+ * rather than always restarting from the first engine.
+ * Falls back to the first engine when everything is already complete
+ * (shouldn't happen in practice, but safe).
+ */
+async function findFirstIncompleteEngine(week: string): Promise<Engine> {
+  const expectedCategories = CATEGORIES.filter((category) =>
+    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+  );
+
+  const [activePrompts, okResponses] = await Promise.all([
+    prisma.prompt.findMany({
+      where: { category: { in: expectedCategories }, active: true },
+      select: { id: true, category: true },
+    }),
+    prisma.response.findMany({
+      where: {
+        week,
+        category: { in: expectedCategories },
+        engine: { in: [...COLLECTION_ENGINES] },
+        status: "ok",
+      },
+      select: { category: true, engine: true, promptId: true },
+    }),
+  ]);
+
+  const promptCounts = new Map<string, number>();
+  for (const p of activePrompts) {
+    promptCounts.set(p.category, (promptCounts.get(p.category) ?? 0) + 1);
+  }
+
+  const promptIdsByCategoryEngine = new Map<string, Set<string>>();
+  for (const r of okResponses) {
+    const key = `${r.category}\0${r.engine}`;
+    const set = promptIdsByCategoryEngine.get(key) ?? new Set<string>();
+    set.add(r.promptId);
+    promptIdsByCategoryEngine.set(key, set);
+  }
+
+  for (const engine of COLLECTION_ENGINES) {
+    const engineComplete = expectedCategories.every((category) => {
+      const expectedPrompts = promptCounts.get(category) ?? PROMPTS_PER_CATEGORY;
+      const key = `${category}\0${engine}`;
+      return (promptIdsByCategoryEngine.get(key)?.size ?? 0) >= expectedPrompts;
+    });
+    if (!engineComplete) return engine;
+  }
+
+  return COLLECTION_ENGINES[0]!;
 }
 
 async function failStaleRunning(week: string) {
@@ -96,11 +210,15 @@ export async function runPipelineTick(
   if (run && run.status === "running") {
     // continue existing
   } else {
+    // Fix 5: start from the first engine that still has incomplete prompts,
+    // not always chatgpt. This avoids burning tick budget on empty scans when
+    // the first N engines already have all OK responses.
+    const firstEngine = await findFirstIncompleteEngine(w);
     run = await prisma.pipelineRun.create({
       data: {
         week: w,
         status: "running",
-        currentStep: collectStepFor(COLLECTION_ENGINES[0]!),
+        currentStep: collectStepFor(firstEngine),
       },
     });
     logPipelineEvent({ event: "run_started", week: w, runId: run.id, mode: "tick" });
@@ -119,20 +237,60 @@ export async function runPipelineTick(
 
     const collectEngineName = parseCollectEngine(step);
     if (collectEngineName) {
+      // Fix 1: check the scoring threshold BEFORE doing any collection work.
+      // If we already have enough complete engines for every due category,
+      // skip the rest of collection and advance to extracting immediately.
+      // This prevents slow trailing engines (DeepSeek) from blocking the
+      // entire pipeline when the threshold is already satisfied.
+      const alreadySufficient = await hasSufficientCollectedForScoring(w);
+      if (alreadySufficient) {
+        const collectedCount = await prisma.response.count({ where: { week: w, status: "ok" } });
+        await touchRun(run.id, { collectedCount, currentStep: "extracting" });
+        logPipelineEvent({
+          event: "tick_completed",
+          week: w,
+          runId: run.id,
+          stage: step,
+          nextStep: "extracting",
+          earlyAdvance: true,
+        });
+        return tickContinue(run.id, w, step, "extracting");
+      }
+
+      // When a specific prompt is slow (e.g. DeepSeek long-tail), we still want
+      // `pipeline_runs.updated_at` to keep moving so stale detection doesn't
+      // kill the whole run mid-category.
+      let lastHeartbeatMs = 0;
+      async function heartbeatThrottled() {
+        const now = Date.now();
+        if (now - lastHeartbeatMs < 10_000) return;
+        lastHeartbeatMs = now;
+        await touchRun(run!.id, {});
+      }
+
       // Soft budget under serverless maxDuration; unfinished engines stay on this step.
       const deadline = Date.now() + PIPELINE_TICK_BUDGET_MS;
       const batch = await collectEngine(w, collectEngineName, deadline, {
         softDeadline: true,
         onCategoryComplete: async () => {
-          await touchRun(run.id, {});
+          await heartbeatThrottled();
+        },
+        onPromptComplete: async () => {
+          await heartbeatThrottled();
         },
       });
       const collectedCount = await prisma.response.count({
         where: { week: w, status: "ok" },
       });
-      const next = batch.engineComplete
-        ? nextStepAfterCollect(collectEngineName)
-        : collectStepFor(collectEngineName);
+
+      // Re-check after this engine's tick: maybe it pushed us over the threshold.
+      const shouldAdvance = await hasSufficientCollectedForScoring(w);
+      const next = shouldAdvance
+        ? "extracting"
+        : batch.engineComplete
+          ? nextStepAfterCollect(collectEngineName)
+          : collectStepFor(collectEngineName);
+
       await touchRun(run.id, { collectedCount, currentStep: next });
       logPipelineEvent({
         event: "tick_completed",
@@ -286,6 +444,14 @@ export async function runFullPipeline(
   try {
     const collectResults: string[] = [];
     for (const engine of COLLECTION_ENGINES) {
+      // Fix 6: same early-advance logic as tick mode — skip slow trailing
+      // engines once scoring threshold is already met.
+      const sufficient = await hasSufficientCollectedForScoring(w);
+      if (sufficient) {
+        logPipelineEvent({ event: "stage_skipped", week: w, runId: run.id, stage: `collecting:${engine}`, reason: "threshold_met" });
+        break;
+      }
+
       const batch = await timedStage(`collecting:${engine}`, () => {
         const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
         return collectEngine(w, engine, deadline).then((r) => r.results);
