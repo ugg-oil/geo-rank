@@ -86,7 +86,10 @@ export async function extractResponse(responseId: string) {
   }
 }
 
-export async function extractWeek(week: string) {
+export async function extractWeek(
+  week: string,
+  options?: { onProgress?: () => Promise<void> | void }
+) {
   const responses = await prisma.response.findMany({
     where: { week, status: "ok" },
     select: { id: true },
@@ -102,6 +105,7 @@ export async function extractWeek(week: string) {
       assertBeforeDeadline("extraction", deadline, PIPELINE_EXTRACTION_TIMEOUT_MS);
       const mentions = await extractResponse(responses[index].id);
       count += mentions.length;
+      await options?.onProgress?.();
     }
   }
   await Promise.all(

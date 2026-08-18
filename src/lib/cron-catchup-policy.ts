@@ -10,6 +10,8 @@ import { PIPELINE_RUN_STALE_TIMEOUT_MS } from "@/lib/pipeline-timeouts";
  * - Resume cold `running` rows instead of sitting until the 90m stale timeout.
  * - Cap remounts so structural gaps cannot burn API forever.
  * - Keep Monday `/api/cron` as the primary schedule (no circuit there).
+ * - Entry gate must be cheap: GHA pokes with `curl --max-time 25`. Full
+ *   `getPipelineHealth()` (prompts/responses/snapshots) stays after the tick.
  */
 
 /** Self-chain ceiling. 6 engines + ~6 post stages needs headroom when `after()` holds. */
@@ -28,16 +30,14 @@ export const CATCHUP_ACTIVE_LEASE_MS = 5 * 60_000;
  */
 export const CATCHUP_MAX_RUNS_PER_WEEK = 6;
 
-export type CatchupHealthLike = {
-  ok: boolean;
-  reason?: string;
-  run: {
-    id: string;
-    status: string;
-    currentStep: string | null;
-    updatedAt: Date;
-  } | null;
-};
+/** Latest `pipeline_runs` row only — no coverage scans. */
+export type CatchupRunSnapshot = {
+  id: string;
+  status: string;
+  currentStep: string | null;
+  updatedAt: Date;
+  snapshotCount: number | null;
+} | null;
 
 export type CatchupDecision =
   | {
@@ -60,19 +60,39 @@ function heartbeatAgeMs(run: { updatedAt: Date }) {
   return Date.now() - run.updatedAt.getTime();
 }
 
+export async function loadCatchupRunSnapshot(week: string): Promise<CatchupRunSnapshot> {
+  return prisma.pipelineRun.findFirst({
+    where: { week },
+    orderBy: { startedAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      currentStep: true,
+      updatedAt: true,
+      snapshotCount: true,
+    },
+  });
+}
+
+function entryReason(run: CatchupRunSnapshot): string {
+  if (!run) return "no pipeline run found";
+  if (run.status === "running") return "resume_cold_running";
+  if (run.status === "success") return "success_without_snapshots";
+  return `run status is ${run.status}`;
+}
+
 export async function decideCatchupEntry(
   week: string,
-  health: CatchupHealthLike
+  run: CatchupRunSnapshot
 ): Promise<CatchupDecision> {
-  if (health.ok && health.run) {
+  if (run?.status === "success" && (run.snapshotCount ?? 0) > 0) {
     return {
       action: "skip",
       reason: "already_published",
-      runId: health.run.id,
+      runId: run.id,
     };
   }
 
-  const run = health.run;
   if (run?.status === "running") {
     const age = heartbeatAgeMs(run);
     if (age < CATCHUP_ACTIVE_LEASE_MS) {
@@ -87,7 +107,7 @@ export async function decideCatchupEntry(
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
       return {
         action: "run",
-        reason: health.reason ?? "resume_cold_running",
+        reason: entryReason(run),
         mode: "continue",
         runId: run.id,
         runsThisWeek,
@@ -110,7 +130,7 @@ export async function decideCatchupEntry(
 
   return {
     action: "run",
-    reason: health.reason ?? "catchup_needed",
+    reason: entryReason(run),
     mode: "start",
     runId: run?.id,
     runsThisWeek,

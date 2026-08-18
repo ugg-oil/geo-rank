@@ -24,6 +24,16 @@ export const PIPELINE_TICK_BUDGET_MS = readPositiveInt(
   240_000
 );
 
+/**
+ * Minimum remaining tick budget before packing another post-stage
+ * (extract → … → publish) in the same invocation. Avoids starting scoring
+ * or publishing with a few seconds left and dying mid-write.
+ */
+export const PIPELINE_POST_STAGE_PACK_MIN_MS = readPositiveInt(
+  "PIPELINE_POST_STAGE_PACK_MIN_MS",
+  20_000
+);
+
 export const PIPELINE_EXTRACTION_TIMEOUT_MS = readPositiveInt(
   "PIPELINE_EXTRACTION_TIMEOUT_MS",
   20 * 60_000
