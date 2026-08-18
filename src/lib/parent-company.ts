@@ -14,6 +14,8 @@ const RAW_PARENT_COMPANIES: Record<string, string> = {
   "dall·e": "OpenAI",
   "stable diffusion": "Stability AI",
   "flux.1": "Black Forest Labs",
+  "leonardo.ai": "Leonardo.ai",
+  leonardo: "Leonardo.ai",
   "sap leonardo": "SAP",
   photoshop: "Adobe",
   ray2: "Luma AI",

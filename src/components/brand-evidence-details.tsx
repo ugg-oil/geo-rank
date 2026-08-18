@@ -40,10 +40,13 @@ export function BrandEvidenceDetails({
     return engines[0] ? new Set([engines[0]]) : new Set();
   });
 
+  const [showOthers, setShowOthers] = useState(false);
+
   if (groups.length === 0) return null;
 
   const weekLabel = formatWeekLabel(m, week);
   const engineCount = byEngine.length;
+  const [firstEngine, ...otherEngines] = byEngine;
 
   function toggleEngine(engine: string) {
     setOpenEngines((prev) => {
@@ -56,10 +59,64 @@ export function BrandEvidenceDetails({
 
   function expandAll() {
     setOpenEngines(new Set(byEngine.map((g) => g.engine)));
+    setShowOthers(true);
   }
 
   function collapseAll() {
     setOpenEngines(new Set());
+    setShowOthers(false);
+  }
+
+  function renderEngine(group: EngineGroup) {
+    const open = openEngines.has(group.engine);
+    return (
+      <div key={group.engine} className="rounded-lg border border-[var(--border)] bg-[var(--card)]">
+        <button
+          type="button"
+          onClick={() => toggleEngine(group.engine)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-[var(--text)]"
+          aria-expanded={open}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            aria-hidden
+            className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-90" : ""}`}
+          >
+            <path
+              d="M4.5 2.5L8 6l-3.5 3.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {engineLabel(group.engine)}
+          <span className="font-normal text-xs text-[var(--text-muted)]">
+            · {group.items.length}
+          </span>
+        </button>
+        {open && (
+          <div className="space-y-4 border-t border-[var(--border)] px-4 py-3">
+            {group.items.map((item) => (
+              <div key={`${item.categorySlug}-${item.engine}`}>
+                <p className="text-xs font-medium text-[var(--text-secondary)]">
+                  {getCategoryMessages(m, item.categorySlug)?.name ?? item.categorySlug}
+                </p>
+                <p
+                  className="mt-2 border-l-2 border-[var(--border)] pl-3 text-sm leading-6 text-[var(--text-secondary)]"
+                  lang="en"
+                >
+                  {item.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -111,62 +168,36 @@ export function BrandEvidenceDetails({
             </button>
           </div>
         </div>
-        <div className="space-y-3">
-          {byEngine.map((group) => {
-            const open = openEngines.has(group.engine);
-            return (
-              <div
-                key={group.engine}
-                className="rounded-lg border border-[var(--border)] bg-[var(--card)]"
+        {firstEngine && <div className="space-y-3">{renderEngine(firstEngine)}</div>}
+        {otherEngines.length > 0 && (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowOthers((prev) => !prev)}
+              aria-expanded={showOthers}
+              className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden
+                className={`shrink-0 transition-transform ${showOthers ? "rotate-90" : ""}`}
               >
-                <button
-                  type="button"
-                  onClick={() => toggleEngine(group.engine)}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-[var(--text)]"
-                  aria-expanded={open}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    aria-hidden
-                    className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-90" : ""}`}
-                  >
-                    <path
-                      d="M4.5 2.5L8 6l-3.5 3.5"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  {engineLabel(group.engine)}
-                  <span className="font-normal text-xs text-[var(--text-muted)]">
-                    · {group.items.length}
-                  </span>
-                </button>
-                {open && (
-                  <div className="space-y-4 border-t border-[var(--border)] px-4 py-3">
-                    {group.items.map((item) => (
-                      <div key={`${item.categorySlug}-${item.engine}`}>
-                        <p className="text-xs font-medium text-[var(--text-secondary)]">
-                          {getCategoryMessages(m, item.categorySlug)?.name ?? item.categorySlug}
-                        </p>
-                        <p
-                          className="mt-2 border-l-2 border-[var(--border)] pl-3 text-sm leading-6 text-[var(--text-secondary)]"
-                          lang="en"
-                        >
-                          {item.text}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                <path
+                  d="M4.5 2.5L8 6l-3.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {m.brand.evidenceMoreHint}
+            </button>
+            {showOthers && otherEngines.map((group) => renderEngine(group))}
+          </div>
+        )}
       </div>
     </details>
   );

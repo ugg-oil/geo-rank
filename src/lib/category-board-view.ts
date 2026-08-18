@@ -44,6 +44,18 @@ export function nextSortState(
 }
 
 /**
+ * True while the board is in published order. Drives the "default order" reset
+ * chip: once sorted by another metric the `#` column no longer matches row
+ * order, which reads as a bug unless there is a way back.
+ */
+export function isDefaultSort(state: {
+  sortKey: SortKey;
+  flipped: ReadonlySet<SortKey>;
+}): boolean {
+  return state.sortKey === DEFAULT_SORT_KEY && !state.flipped.has(DEFAULT_SORT_KEY);
+}
+
+/**
  * Sort a copy of the board. Rows missing the metric (coverage can be null)
  * sink to the bottom; ties fall back to the published rank.
  */

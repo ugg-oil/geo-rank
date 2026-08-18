@@ -18,6 +18,7 @@ P2  品类排行页        /category/[slug]
 P3  品牌详情页        /brand/[slug]
 P4  公司页            /company/[slug]
 P5  品类扩展（11 个）  category-selection
+P6  实体质量 / 榜单可信度（全品类）
 ```
 
 ## 全站约束（本阶段）
@@ -50,7 +51,7 @@ P5  品类扩展（11 个）  category-selection
 - [x] P2-3：**变更** Also mentioned 说明带周期日：ZH「截止本周期 {YYYY-MM-DD}…」；EN 等价。日期 = 当前页所选周期起始日。
 - [x] P2-4：**变更** 竞争象限（基座 phase-4）：X=出现率，Y=平均名次（`#1` 在上）；四象限颜色 + 对外名领导者/挑战者/利基/落后（中位划分不变）；悬停/点选显示品牌+关键指标并进 Brand（移动端不得只靠 hover）。
 - [x] P2-5：**新增** 本周期 vs 上周期位移：上期淡点 + 本期实点 + 同品牌连线/箭头；两期并集 scale；中位线用本周期；无上一已发布周期则不提供。仍只 Overall Top 20。
-- [ ] P2-6：**变更** 样式优化：Top 20 表、对比入口/弹层、竞争象限、Also mentioned 视觉层级与间距统一；桌面/移动可读；沿用现有 CSS token，不另开视觉体系；不改 P2-1～P2-5 的指标语义与交互契约。
+- [x] P2-6：**变更** 样式优化：Top 20 表、对比入口/弹层、竞争象限、Also mentioned 视觉层级与间距统一；桌面/移动可读；沿用现有 CSS token，不另开视觉体系；不改 P2-1～P2-5 的指标语义与交互契约。
 
 ## P3 · 品牌详情页 · `/brand/[slug]`
 
@@ -460,3 +461,43 @@ P5  品类扩展（11 个）  category-selection
 #### 全局约束
 
 - [x] P5-12：**约束** Top 20 须有 Brand Page；exclude 只限本品类；首页/榜单品类列表同源；临近 4 档齐后发布（launch-gate 2026-08-16 四档全绿；HR ATS exclude 已落）
+
+## P6 · 实体质量 / 榜单可信度（全品类）
+
+> 2026-08-17 审计：AI Image / Video 已做实体归并 + 6 周期 force 重算（Leonardo.ai ≠ SAP Leonardo、DALL·E 不再灌 ChatGPT、版本串归母品牌）。**其他品类同类污染仍在**；已禁用实体若未 rescore，旧 Top20 snapshot 仍会展示（如 HR Software #3 仍为 SAP Leonardo）。
+
+### 背景（现象）
+
+1. **单次第 1 刷分**：`appearance ≈ 2%` + `avgRank = 1` → Overall ≈ 42.7，挤进 Top20。最新 Overall 约 150+ 条 appearance < 8% 的行；Cyber / Meeting / CRM / AI Tools / Accounting / Design 等重灾。
+2. **版本 / SKU / 斜杠拼盘未归母品牌**：如 `Otter.ai Pro Max`、`Fireflies.ai 3.0`、`Shopify/Shopify Plus`、`CrowdStrike Falcon / Charlotte AI`、`Fin AI 3.0`。库内 `rankingEnabled` 且名字像版本/拼盘的 brand 数百条。
+3. **错误 alias / consolidate**：历史 review_queue alias 把无关产品并到错误 Brand；`preprocessBrand` 剥 `.ai` 加剧碰撞（Leonardo 样例）。
+
+### 优先级
+
+#### P6-0 · 全品类 force rescore（先做）
+
+- [x] P6-0：**修复** 对所有已发布品类 × 已有周期 `scoreCategory(..., { force: true })`（或等价全量 reprocess），使 `rankingEnabled=false` / 已 merge 的实体立刻从 Top20 消失。（2026-08-17：115 个 category×week 已 force 重算）
+- [x] P6-0-1：**验收** HR Software 最新档不再出现 SAP Leonardo；Recruiting / SaaS 历史档同类残留消失。
+- [x] P6-0-2：**验收** AI Image 修后 Top20 形态在 rescore 后仍保持（回归抽查）。
+
+#### P6-1 · 批量实体归并（SKU / 斜杠串 → 母产品）
+
+- [x] P6-1：**新增** `brand-canonical` / `entity-audit` 高频 merge 规则（按品类扫 Top20 + Also mentioned）。
+- [x] P6-1-1：**合并** Meeting：`Otter.ai Pro Max` → Otter；`Fireflies.ai 3.0` → Fireflies；同类 SKU。
+- [x] P6-1-2：**合并** E-commerce：`Shopify/Shopify Plus`、`Shopify V2` → Shopify。
+- [x] P6-1-3：**合并** Cyber：CrowdStrike / Charlotte / Falcon 拼盘 → 主产品线；Defender 拼盘 → Microsoft Defender（或约定口径）。
+- [x] P6-1-4：**合并** Helpdesk / CRM / Design / Dev / PM：斜杠双产品、Fin AI 3.0、Adobe XD/CC 拼盘等按母产品归并。
+- [x] P6-1-5：**修复** consolidate **禁止**用 BrandAlias 合并 Brand 行（仅 normalize 解析 raw）；preferredCanonical 优先于脏 alias（AI Image 已落地，全链路确认）。
+- [x] P6-1-6：**约束** 版本 / model SKU：`rankingEnabled=false`，parent → 母产品；新 `auto_new` 命中规则表时不得单独上榜。
+- [x] P6-1-7：**执行** merge 后再次全品类 force rescore + 抽查各 family 代表品类 Top20。
+
+#### P6-2 · Overall 入榜门槛（评分 / 发布规则）
+
+- [x] P6-2：**新增** Overall Top N 最低门槛：appearance ≥ 10%，**或** 当周期 ≥ 2 个计分引擎提及（`OVERALL_MIN_APPEARANCE_RATE` / `OVERALL_MIN_SCORING_ENGINES`，`SCORING_VERSION=3`）。
+- [x] P6-2-1：**文档** methodology / Tooltip 同步门槛说明（中英）。
+- [x] P6-2-2：**验收** 单次第 1 幽灵行不再占据 Top20 中段；Also mentioned 可承接未达门槛实体。
+
+### 不做（本块范围外）
+
+- 不重采引擎原始 response（只修解析 / 归并 / 计分 / 门槛）。
+- 不把 GEO Audit / 邮件监控混进本块（见 [PRD-phase-next](../PRD-phase-next.md) N1–N3）。

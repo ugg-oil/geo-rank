@@ -4,6 +4,7 @@ import { CompanyPageContent } from "@/components/company-page-content";
 import {
   emptyCompanyPageData,
   getCompanyIndex,
+  getCompanyLastSeen,
   getCompanyPage,
 } from "@/lib/company-page";
 import { getPublishedLeaderboardWeeks } from "@/lib/published-leaderboard";
@@ -23,6 +24,21 @@ function brandSlugFromFromParam(from?: string): string | null {
     if (parts.length !== 2 || parts[0] !== "brand") return null;
     const brandSlug = parts[1]!;
     return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(brandSlug) ? brandSlug : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Safe back targets: brand or category pages only (open-redirect guard). */
+function getValidCompanyBackTarget(from?: string): URL | null {
+  if (!from) return null;
+  try {
+    const target = new URL(from, "http://localhost");
+    const parts = target.pathname.split("/").filter(Boolean);
+    if (parts.length !== 2) return null;
+    if (parts[0] !== "brand" && parts[0] !== "category") return null;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[1]!)) return null;
+    return target;
   } catch {
     return null;
   }
@@ -63,15 +79,22 @@ export default async function CompanyPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { from } = await searchParams;
   const fromBrandSlug = brandSlugFromFromParam(from);
+  const backTarget = getValidCompanyBackTarget(from);
+  const backCategorySlug =
+    backTarget?.pathname.startsWith("/category/") ? (backTarget.pathname.split("/")[2] ?? null) : null;
+  const backHref = backTarget ? `${backTarget.pathname}${backTarget.search}` : "/rankings";
   const data = await getCompanyPage(slug);
   if (!data) {
     const [index, weeks] = await Promise.all([getCompanyIndex(), getPublishedLeaderboardWeeks()]);
     if (!index[slug]) notFound();
+    const lastSeen = await getCompanyLastSeen(slug);
     return (
       <main className="mx-auto max-w-6xl px-6 pt-4 pb-10 sm:pt-5 sm:pb-14">
         <CompanyPageContent
-          data={emptyCompanyPageData(slug, index[slug]!.name, weeks[0] ?? "")}
+          data={emptyCompanyPageData(slug, index[slug]!.name, weeks[0] ?? "", lastSeen)}
           fromBrandSlug={fromBrandSlug}
+          backHref={backHref}
+          backCategorySlug={backCategorySlug}
         />
       </main>
     );
@@ -97,7 +120,12 @@ export default async function CompanyPage({ params, searchParams }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(breadcrumbJsonLd) }}
       />
-      <CompanyPageContent data={data} fromBrandSlug={fromBrandSlug} />
+      <CompanyPageContent
+        data={data}
+        fromBrandSlug={fromBrandSlug}
+        backHref={backHref}
+        backCategorySlug={backCategorySlug}
+      />
     </main>
   );
 }

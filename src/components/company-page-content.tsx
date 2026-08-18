@@ -15,11 +15,80 @@ import { useI18n } from "@/lib/i18n/use-i18n";
 type Props = {
   data: CompanyPageData;
   fromBrandSlug?: string | null;
+  backHref?: string;
+  backCategorySlug?: string | null;
 };
 
-/** Shared across product cards so # / score / frequency columns line up. */
-const PRODUCT_METRICS_GRID =
-  "grid grid-cols-[minmax(0,1fr)_3.5rem_4rem_5.5rem_2.5rem] gap-x-2 px-3 sm:grid-cols-[minmax(0,1fr)_3.5rem_4.5rem_7rem_2.75rem]";
+/**
+ * One grid for header + all category rows so columns line up across products.
+ * At lg the name column is capped and the four metric columns split whatever is
+ * left evenly. The cap is a fixed length rather than fit-content because each
+ * row is its own grid container, so a content-sized track would resolve to a
+ * different width per row and the columns would stop lining up.
+ */
+const METRICS_GRID =
+  "grid grid-cols-[minmax(0,1fr)_2.75rem_3.25rem_3rem_2.5rem] items-center gap-x-3 px-4 sm:grid-cols-[minmax(0,1fr)_4.5rem_5.5rem_9rem_4.5rem] sm:gap-x-4 sm:px-5 lg:grid-cols-[26rem_1fr_1fr_1fr_1fr] lg:gap-x-5";
+
+/** Same podium language as the category board: a left rail, not a tinted row. */
+function podiumRail(rank: number): string {
+  if (rank === 1) return "shadow-[inset_3px_0_0_var(--yellow)]";
+  if (rank <= 3) return "shadow-[inset_3px_0_0_var(--yellow-soft)]";
+  return "";
+}
+
+function RankBadge({ rank }: { rank: number }) {
+  const podium = rank <= 3;
+  return (
+    <span
+      className={`num inline-flex h-7 min-w-[1.75rem] items-center justify-center px-1 font-mono text-sm ${
+        podium
+          ? "rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] font-semibold text-[var(--text)]"
+          : "text-[var(--text-muted)]"
+      }`}
+    >
+      #{rank}
+    </span>
+  );
+}
+
+/**
+ * Same shape as the category board's appearance column: a fixed-width bar sitting
+ * right next to its own number. A flex-1 bar that stretches the column instead
+ * floats far from the value and stops reading as that value's bar.
+ */
+function MentionRail({ rate }: { rate: number }) {
+  return (
+    <span className="inline-flex items-center justify-end gap-2.5">
+      <span
+        aria-hidden
+        className="hidden h-[3px] w-14 overflow-hidden rounded-full bg-[var(--border)] sm:block"
+      >
+        <span
+          className="block h-full rounded-full bg-[var(--yellow-soft)] transition-colors group-hover:bg-[var(--yellow)]"
+          style={{ width: `${Math.min(100, Math.max(3, rate * 100))}%` }}
+        />
+      </span>
+      <span className="num font-mono text-[var(--text-secondary)]">
+        {(rate * 100).toFixed(0)}%
+      </span>
+    </span>
+  );
+}
+
+function sortedCategories(
+  product: CompanyPageData["products"][number],
+  sortKey: CompanyProductSortKey,
+  categoryNameOf: (slug: string) => string
+) {
+  return [...product.categories].sort((a, b) => {
+    if (sortKey === "score") return b.score - a.score || a.slug.localeCompare(b.slug);
+    if (sortKey === "category") {
+      const nameDiff = categoryNameOf(a.slug).localeCompare(categoryNameOf(b.slug));
+      return nameDiff !== 0 ? nameDiff : a.slug.localeCompare(b.slug);
+    }
+    return a.rank - b.rank || a.slug.localeCompare(b.slug);
+  });
+}
 
 function DeltaBadge({ delta }: { delta: RankDelta }) {
   const { m } = useI18n();
@@ -36,7 +105,12 @@ function DeltaBadge({ delta }: { delta: RankDelta }) {
   return <span className="font-mono text-xs text-[var(--text-muted)]">—</span>;
 }
 
-export function CompanyPageContent({ data, fromBrandSlug }: Props) {
+export function CompanyPageContent({
+  data,
+  fromBrandSlug,
+  backHref = "/rankings",
+  backCategorySlug = null,
+}: Props) {
   const { m } = useI18n();
   const weekLabel = formatWeekLabel(m, data.week);
   const [sortKey, setSortKey] = useState<CompanyProductSortKey>("rank");
@@ -48,11 +122,19 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
     : [];
   const summary = data.summary;
 
+  const backLabel = fromBrandSlug
+    ? (data.products.find((p) => p.slug === fromBrandSlug)?.name ??
+      data.lastSeen?.products.find((p) => p.slug === fromBrandSlug)?.name ??
+      m.common.allRankings)
+    : backCategorySlug
+      ? (getCategoryMessages(m, backCategorySlug)?.name ?? m.common.categoryRankings)
+      : m.common.allRankings;
+
   return (
     <>
       <Link
-        href="/rankings"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+        href={backHref}
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
           <path
@@ -63,7 +145,7 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
             strokeLinejoin="round"
           />
         </svg>
-        {m.common.allRankings}
+        {backLabel}
       </Link>
 
       <div className="space-y-8">
@@ -79,8 +161,60 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
         </div>
 
         {!hasProducts ? (
-          <div className="space-y-3">
-            <p className="text-sm text-[var(--text-muted)]">{m.company.emptyProducts}</p>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <p className="text-sm text-[var(--text)]">{m.company.emptyProducts}</p>
+              <p className="max-w-2xl text-sm text-[var(--text-muted)]">
+                {m.company.emptyProductsHint}
+              </p>
+            </div>
+
+            {data.lastSeen && (
+              <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 sm:px-5">
+                  <h2 className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                    {m.company.lastSeenTitle(formatWeekLabel(m, data.lastSeen.week))}
+                  </h2>
+                  <p className="text-xs text-[var(--text-muted)]">{m.company.lastSeenHint}</p>
+                </div>
+                {data.lastSeen.products.map((product, index) => (
+                  <div
+                    key={product.slug}
+                    className={index > 0 ? "border-t border-[var(--border)]" : ""}
+                  >
+                    <Link
+                      prefetch={false}
+                      href={`/brand/${product.slug}`}
+                      className="flex items-baseline justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--card-hover)] sm:px-5"
+                    >
+                      <span className="min-w-0 truncate text-sm font-semibold text-[var(--text)]">
+                        {product.name}
+                      </span>
+                      <span className="inline-flex shrink-0 items-center rounded-md border border-[var(--border)] bg-[var(--card-hover)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+                        {m.common.out}
+                      </span>
+                    </Link>
+                    {sortedCategories(product, "rank", categoryNameOf).map((category) => (
+                      <div
+                        key={category.slug}
+                        className="flex items-baseline justify-between gap-3 border-t border-[var(--border)] px-4 py-2.5 text-sm sm:px-5"
+                      >
+                        <Link
+                          href={`/category/${category.slug}`}
+                          className="min-w-0 truncate pl-3 text-[var(--text-secondary)] transition-colors hover:text-[var(--text)]"
+                        >
+                          {categoryNameOf(category.slug)}
+                        </Link>
+                        <span className="shrink-0 font-mono tabular-nums text-[var(--text-muted)]">
+                          #{category.rank}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </section>
+            )}
+
             <Link
               href="/rankings"
               className="inline-flex text-sm font-medium text-[var(--text)] underline decoration-[var(--border)] underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)]"
@@ -90,46 +224,50 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
           </div>
         ) : (
           <>
+            {/* Three oversized cells for "2 / 3 / #1" read as empty boxes. The same
+                facts fit one highlight line, matching the category board's lead. */}
             {summary && (
-              <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 sm:p-6">
-                <h2 className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  {m.company.summaryTitle}
-                </h2>
-                <ul className="mt-3 space-y-2 text-sm text-[var(--text-secondary)]">
-                  <li>
-                    {m.company.productCount(summary.productCount)}
-                    {" · "}
-                    {m.company.categoryCount(summary.categoryCount)}
-                  </li>
-                  <li>
+              <section className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-5 py-3.5 sm:px-6">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                    <span
+                      aria-hidden
+                      className="mr-2 inline-block h-1.5 w-1.5 -translate-y-[2px] rounded-full bg-[var(--yellow)]"
+                    />
                     <Link
                       prefetch={false}
                       href={`/brand/${summary.bestProduct.slug}`}
-                      className="font-medium text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+                      className="font-medium text-[var(--text)] underline decoration-transparent underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)]"
                     >
-                      {m.company.bestProduct(
-                        summary.bestProduct.name,
-                        summary.bestProduct.rank,
-                        categoryNameOf(summary.bestProduct.categorySlug)
-                      )}
+                      {summary.bestProduct.name}
                     </Link>
-                  </li>
+                    {m.company.summaryLeadSuffix(
+                      summary.bestProduct.rank,
+                      categoryNameOf(summary.bestProduct.categorySlug)
+                    )}
+                  </p>
                   {summary.biggestRiser && (
-                    <li>
+                    <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                      <span className="mr-2 font-mono text-xs font-medium text-[var(--green)]">
+                        ↑{summary.biggestRiser.spots}
+                      </span>
                       <Link
                         prefetch={false}
                         href={`/brand/${summary.biggestRiser.slug}`}
-                        className="font-medium text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+                        className="font-medium text-[var(--text)] underline decoration-transparent underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)]"
                       >
-                        {m.company.biggestRiser(
-                          summary.biggestRiser.name,
-                          summary.biggestRiser.spots,
-                          categoryNameOf(summary.biggestRiser.categorySlug)
-                        )}
+                        {summary.biggestRiser.name}
                       </Link>
-                    </li>
+                      {m.company.summaryRiserSuffix(
+                        summary.biggestRiser.spots,
+                        categoryNameOf(summary.biggestRiser.categorySlug)
+                      )}
+                    </p>
                   )}
-                </ul>
+                </div>
+                <p className="shrink-0 font-mono text-xs tabular-nums text-[var(--text-muted)]">
+                  {m.company.summaryCounts(summary.productCount, summary.categoryCount)}
+                </p>
               </section>
             )}
 
@@ -156,36 +294,91 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
                 )}
               </div>
 
-              <div className="space-y-4">
-                {sorted.map((product) => (
-                  <section
-                    key={product.slug}
-                    className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-6"
-                  >
-                    <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
+                <div
+                  className={`${METRICS_GRID} border-b border-[var(--border)] bg-[var(--bg-elevated)] py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]`}
+                >
+                  <div>{m.company.category}</div>
+                  <div className="text-right">#</div>
+                  <div className="text-right">{m.common.score}</div>
+                  <div className="text-right">{m.company.mention}</div>
+                  <div className="text-right">{m.common.delta}</div>
+                </div>
+
+                {sorted.map((product, index) => {
+                  const pinned = product.slug === fromBrandSlug;
+                  const bestRank = Math.min(...product.categories.map((c) => c.rank));
+                  const categories = sortedCategories(product, sortKey, categoryNameOf);
+                  // A product in one category was two rows for a single data
+                  // point: an empty header band, then the values. Fold it flat.
+                  if (categories.length === 1) {
+                    const category = categories[0];
+                    const delta = categoryRankDelta(
+                      category,
+                      product.slug,
+                      data.hasPrevWeekData
+                    );
+                    return (
+                      <div
+                        key={product.slug}
+                        className={`${METRICS_GRID} group py-3 text-sm transition-colors hover:bg-[var(--card-hover)] ${
+                          index > 0 ? "border-t border-[var(--border)]" : ""
+                        } ${pinned ? "bg-[var(--bg-elevated)]" : ""} ${podiumRail(bestRank)}`}
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <RankBadge rank={bestRank} />
+                          <Link
+                            prefetch={false}
+                            href={`/brand/${product.slug}`}
+                            className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.01em] text-[var(--text)] underline decoration-transparent underline-offset-[3px] transition-colors hover:decoration-[var(--text-muted)]"
+                          >
+                            {product.name}
+                          </Link>
+                          <Link
+                            href={`/category/${category.slug}`}
+                            className="hidden min-w-0 truncate text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)] sm:block"
+                          >
+                            {categoryNameOf(category.slug)}
+                          </Link>
+                        </div>
+                        <div className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
+                          #{category.rank}
+                        </div>
+                        <div className="text-right font-mono font-semibold tabular-nums text-[var(--text)]">
+                          {category.score.toFixed(1)}
+                        </div>
+                        <div className="text-right">
+                          <MentionRail rate={category.mentionFrequency} />
+                        </div>
+                        <div className="flex justify-end">
+                          <DeltaBadge delta={delta} />
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={product.slug}
+                      className={index > 0 ? "border-t border-[var(--border)]" : ""}
+                    >
+                      {/* Group header for a multi-category product: tinted so an
+                          empty metrics area reads as a heading, not a blank row. */}
                       <Link
                         prefetch={false}
                         href={`/brand/${product.slug}`}
-                        className="text-base font-semibold text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+                        className={`flex items-center gap-2.5 bg-[var(--bg-elevated)] px-4 py-3 transition-colors hover:bg-[var(--card-hover)] sm:px-5 ${
+                          pinned ? "ring-1 ring-inset ring-[var(--border-hover)]" : ""
+                        } ${podiumRail(bestRank)}`}
                       >
-                        {product.name}
+                        <RankBadge rank={bestRank} />
+                        <span className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.01em] text-[var(--text)]">
+                          {product.name}
+                        </span>
+                        <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                          {m.company.categoryCount(product.categories.length)}
+                        </span>
                       </Link>
-                      <span className="text-xs text-[var(--text-muted)]">
-                        {m.company.viewBrand}
-                      </span>
-                    </div>
-                    <div className="overflow-hidden rounded-lg border border-[var(--border)]">
-                      <div
-                        className={`${PRODUCT_METRICS_GRID} border-b border-[var(--border)] bg-[var(--bg-elevated)] py-2 text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]`}
-                      >
-                        <div className="text-left">{m.company.category}</div>
-                        <div className="text-right">#</div>
-                        <div className="text-right">{m.common.score}</div>
-                        <div className="text-right">{m.company.mentionFrequency}</div>
-                        <div className="text-right">{m.common.delta}</div>
-                      </div>
-                      {product.categories.map((category) => {
-                        const categoryName = categoryNameOf(category.slug);
+                      {categories.map((category) => {
                         const delta = categoryRankDelta(
                           category,
                           product.slug,
@@ -194,24 +387,24 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
                         return (
                           <div
                             key={category.slug}
-                            className={`${PRODUCT_METRICS_GRID} border-b border-[var(--border)] py-2.5 text-sm last:border-b-0`}
+                            className={`${METRICS_GRID} group border-t border-[var(--border)] py-2.5 text-sm transition-colors hover:bg-[var(--card-hover)]`}
                           >
-                            <div className="min-w-0">
+                            <div className="min-w-0 pl-[2.375rem]">
                               <Link
                                 href={`/category/${category.slug}`}
-                                className="font-medium text-[var(--text)] hover:text-[var(--text-secondary)] transition-colors"
+                                className="block truncate text-[var(--text-secondary)] transition-colors hover:text-[var(--text)]"
                               >
-                                {categoryName}
+                                {categoryNameOf(category.slug)}
                               </Link>
                             </div>
-                            <div className="text-right font-mono tabular-nums text-[var(--text)]">
+                            <div className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
                               #{category.rank}
                             </div>
-                            <div className="text-right font-mono tabular-nums text-[var(--text)]">
+                            <div className="text-right font-mono font-semibold tabular-nums text-[var(--text)]">
                               {category.score.toFixed(1)}
                             </div>
-                            <div className="text-right font-mono tabular-nums text-[var(--text-secondary)]">
-                              {(category.mentionFrequency * 100).toFixed(0)}%
+                            <div className="text-right">
+                              <MentionRail rate={category.mentionFrequency} />
                             </div>
                             <div className="flex justify-end">
                               <DeltaBadge delta={delta} />
@@ -220,8 +413,8 @@ export function CompanyPageContent({ data, fromBrandSlug }: Props) {
                         );
                       })}
                     </div>
-                  </section>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>

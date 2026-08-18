@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import {
   buildCompetitionQuadrant,
@@ -22,9 +22,17 @@ type Props = {
 // surrounding UI copy.
 const VIEW_W = 960;
 const VIEW_H = 480;
-const PAD = { top: 44, right: 50, bottom: 80, left: 80 };
+const PAD = { top: 40, right: 34, bottom: 74, left: 62 };
 /** Baseline shared by the bottom corner labels and the x-axis title. */
-const FOOT_OFFSET = 50;
+const FOOT_OFFSET = 48;
+/** Landmark labels. 4 left 16 anonymous dots and the plot read as noise. */
+const LABEL_LIMIT = 9;
+/** Dot radius range; area-ish encoding of the composite score. */
+const R_MIN = 5;
+const R_MAX = 12;
+/** Keeps the largest dot clear of the frame. The rank domain clamps at #1, so
+    without this the top brands render half-on the top border. */
+const INSET = R_MAX + 4;
 
 function scaleLinear(
   value: number,
@@ -37,12 +45,24 @@ function scaleLinear(
   return r0 + ((value - d0) / (d1 - d0)) * (r1 - r0);
 }
 
-/** P2-4: outward-facing quadrant names + one colour per quadrant. */
+/**
+ * P2-4: outward-facing quadrant names, styled off both axes instead of four
+ * arbitrary hues. Colour tracks the position axis (amber = high) and fill tracks
+ * the frequency axis (solid = high), so Leaders is the only solid amber dot and
+ * Laggards the faintest hollow one — using only the palette the page already has.
+ */
 const QUADRANT_COLOR: Record<QuadrantPoint["quadrant"], string> = {
-  high_freq_high_pos: "var(--q-leaders)",
-  high_freq_lower_pos: "var(--q-challengers)",
-  lower_freq_high_pos: "var(--q-niche)",
-  lower_freq_lower_pos: "var(--q-laggards)",
+  high_freq_high_pos: "var(--q-high-pos)",
+  high_freq_lower_pos: "var(--q-lower-pos)",
+  lower_freq_high_pos: "var(--q-high-pos)",
+  lower_freq_lower_pos: "var(--q-lower-pos)",
+};
+
+const QUADRANT_SOLID: Record<QuadrantPoint["quadrant"], boolean> = {
+  high_freq_high_pos: true,
+  high_freq_lower_pos: true,
+  lower_freq_high_pos: false,
+  lower_freq_lower_pos: false,
 };
 
 /**
@@ -80,8 +100,20 @@ export function CompetitionQuadrantChart({
       brandSlug: s.brandSlug,
       appearanceRate: s.appearanceRate,
       avgRank: s.avgRank,
-    }))
+    })),
+    { labelLimit: LABEL_LIMIT }
   );
+  // Score isn't part of the quadrant model (it isn't plotted on either axis), so
+  // the radius scale reads it straight off the board rows.
+  const scoreById = new Map(snapshots.map((s) => [s.brandId, s.score]));
+  const scores = snapshots.map((s) => s.score);
+  const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+  const maxScore = scores.length > 0 ? Math.max(...scores) : 1;
+  function radiusOf(brandId: string): number {
+    const score = scoreById.get(brandId);
+    if (score === undefined || maxScore === minScore) return (R_MIN + R_MAX) / 2;
+    return scaleLinear(score, [minScore, maxScore], [R_MIN, R_MAX]);
+  }
 
   const [activeId, setActiveId] = useState<string | null>(null);
   // Which point the last touch tap landed on. Touch synthesises hover events, so
@@ -123,8 +155,8 @@ export function CompetitionQuadrantChart({
   const minR = Math.min(...ranks);
   const maxR = Math.max(...ranks);
   // Pad domain slightly so points aren't on the frame edge.
-  const fPad = (maxF - minF) * 0.08 || 0.05;
-  const rPad = (maxR - minR) * 0.08 || 0.5;
+  const fPad = (maxF - minF) * 0.04 || 0.05;
+  const rPad = (maxR - minR) * 0.04 || 0.5;
   const freqDomain: [number, number] = [
     Math.max(0, minF - fPad),
     Math.min(1, maxF + fPad),
@@ -137,9 +169,9 @@ export function CompetitionQuadrantChart({
   const plotTop = PAD.top;
   const plotBottom = VIEW_H - PAD.bottom;
 
-  const xOf = (f: number) => scaleLinear(f, freqDomain, [plotLeft, plotRight]);
+  const xOf = (f: number) => scaleLinear(f, freqDomain, [plotLeft + INSET, plotRight - INSET]);
   // Invert Y: #1 (low avgRank) at top
-  const yOf = (r: number) => scaleLinear(r, rankDomain, [plotTop, plotBottom]);
+  const yOf = (r: number) => scaleLinear(r, rankDomain, [plotTop + INSET, plotBottom - INSET]);
 
   const mx = xOf(model.medianFrequency);
   const my = yOf(model.medianAvgRank);
@@ -211,8 +243,8 @@ export function CompetitionQuadrantChart({
             aria-pressed={movementOn}
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               movementOn
-                ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--brand-contrast)]"
-                : "border-[var(--border)] bg-[var(--card)] text-[var(--text-secondary)] hover:border-[var(--brand-line)] hover:text-[var(--text)]"
+                ? "border-transparent bg-[var(--cta-bg)] text-[var(--cta-text)]"
+                : "border-[var(--border)] bg-[var(--card)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text)]"
             }`}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -229,16 +261,29 @@ export function CompetitionQuadrantChart({
         )}
       </div>
 
-      {/* Cap the width so a wide card doesn't scale the whole plot (and its
-          fonts) up — full-bleed 16:9 was taller than the fold on desktop. The
-          legend/metrics line share the frame so they stay aligned. */}
-      <div className="mx-auto max-w-4xl bg-[var(--card)] px-2 py-4 sm:px-4">
+      {/* Full card width: capping this at max-w-3xl shrank the plot to a third of
+          the panel and made 20 dots look scattered. The legend/metrics line
+          share the frame so they stay aligned. */}
+      <div className="bg-[var(--card)] px-3 py-4 sm:px-5">
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           className="block h-auto w-full"
           role="img"
           aria-label={m.category.quadrantTitle}
         >
+          {/* Clips the Leaders wash to the frame's rounded top-right corner. */}
+          <defs>
+            <clipPath id={`${titleId}-plot`}>
+              <rect
+                x={plotLeft}
+                y={plotTop}
+                width={plotRight - plotLeft}
+                height={plotBottom - plotTop}
+                rx={10}
+              />
+            </clipPath>
+          </defs>
+
           {/* One faint rule per tick plus a frame: without them the dots float in
               white space and nobody can read a value off the plot. */}
           <g aria-hidden>
@@ -276,8 +321,20 @@ export function CompetitionQuadrantChart({
             />
           </g>
 
-          {/* Median crosshairs. No quadrant fills: 20 dots over four tinted
-              blocks turns the card into a colour swatch. */}
+          {/* Leaders is the corner every brand wants; a faint wash makes the
+              target legible without tinting all four blocks. */}
+          <rect
+            x={mx}
+            y={plotTop}
+            width={Math.max(0, plotRight - mx)}
+            height={Math.max(0, my - plotTop)}
+            fill="var(--q-high-pos)"
+            opacity={0.05}
+            clipPath={`url(#${titleId}-plot)`}
+          />
+
+          {/* Median crosshairs. No quadrant fills beyond Leaders: 20 dots over
+              four tinted blocks turns the card into a colour swatch. */}
           <line
             x1={mx}
             y1={plotTop}
@@ -296,6 +353,25 @@ export function CompetitionQuadrantChart({
             strokeWidth={1.5}
             strokeDasharray="5 6"
           />
+          {/* Naming the dashed lines is what turns "two random lines" into
+              "this is the split". */}
+          <text
+            x={mx + 5}
+            y={plotBottom - 6}
+            className="fill-[var(--text-muted)]"
+            style={{ fontSize: 10.5, fontStyle: "italic" }}
+          >
+            {m.category.quadrantMedian}
+          </text>
+          <text
+            x={plotRight - 5}
+            y={my - 6}
+            textAnchor="end"
+            className="fill-[var(--text-muted)]"
+            style={{ fontSize: 10.5, fontStyle: "italic" }}
+          >
+            {m.category.quadrantMedian}
+          </text>
 
           {/* Quadrant corner names */}
           {(Object.keys(cornerPositions) as QuadrantPoint["quadrant"][]).map(
@@ -307,12 +383,12 @@ export function CompetitionQuadrantChart({
                   x={pos.x}
                   y={pos.y}
                   textAnchor={pos.anchor}
-                  fill={QUADRANT_COLOR[qid]}
+                  className="fill-[var(--text-muted)]"
                   style={{
-                    fontSize: 11,
+                    fontSize: 11.5,
                     fontWeight: 600,
                     letterSpacing: 0.3,
-                    opacity: 0.9,
+                    opacity: 0.95,
                   }}
                 >
                   {quadrantName[qid]}
@@ -346,11 +422,11 @@ export function CompetitionQuadrantChart({
           {rankTicks.map((r) => (
             <text
               key={`ry-${r}`}
-              x={plotLeft - 14}
+              x={plotLeft - 10}
               y={yOf(r) + 4}
               textAnchor="end"
               className="fill-[var(--text-muted)]"
-              style={{ fontSize: 10.5, fontFamily: "var(--font-mono)" }}
+              style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
             >
               #{r}
             </text>
@@ -359,10 +435,10 @@ export function CompetitionQuadrantChart({
             <text
               key={`tx-${f}`}
               x={xOf(f)}
-              y={plotBottom + 24}
+              y={plotBottom + 22}
               textAnchor="middle"
               className="fill-[var(--text-muted)]"
-              style={{ fontSize: 10.5, fontFamily: "var(--font-mono)" }}
+              style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}
             >
               {Math.round(f * 100)}%
             </text>
@@ -370,20 +446,7 @@ export function CompetitionQuadrantChart({
 
           {/* Movement vs prior published period (P2-5) */}
           {movementOn && (
-            <g>
-              <defs>
-                <marker
-                  id={`${titleId}-arrow`}
-                  viewBox="0 0 8 8"
-                  refX={6}
-                  refY={4}
-                  markerWidth={5}
-                  markerHeight={5}
-                  orient="auto-start-reverse"
-                >
-                  <path d="M0 1 L6 4 L0 7 z" fill="var(--text-muted)" />
-                </marker>
-              </defs>
+            <g className="quadrant-layer-in">
               {movements.map(({ point, prev }) => {
                 const x1 = xOf(prev.appearanceRate);
                 const y1 = yOf(prev.avgRank);
@@ -391,8 +454,11 @@ export function CompetitionQuadrantChart({
                 const y2 = yOf(point.avgRank);
                 const len = Math.hypot(x2 - x1, y2 - y1);
                 // Stop short of the current dot, otherwise it swallows the arrowhead.
-                const trim = Math.min(11, len / 2);
+                const trim = Math.min(radiusOf(point.brandId) + 4, len / 2);
                 const k = len > 0 ? (len - trim) / len : 0;
+                const tipX = x1 + (x2 - x1) * k;
+                const tipY = y1 + (y2 - y1) * k;
+                const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
                 return (
                   <g key={`move-${point.brandId}`}>
                     <circle
@@ -403,16 +469,32 @@ export function CompetitionQuadrantChart({
                       opacity={0.28}
                     />
                     {len > 6 && (
-                      <line
-                        x1={x1}
-                        y1={y1}
-                        x2={x1 + (x2 - x1) * k}
-                        y2={y1 + (y2 - y1) * k}
-                        stroke="var(--text-muted)"
-                        strokeWidth={1.5}
-                        opacity={0.55}
-                        markerEnd={`url(#${titleId}-arrow)`}
-                      />
+                      <>
+                        <line
+                          x1={x1}
+                          y1={y1}
+                          x2={tipX}
+                          y2={tipY}
+                          stroke="var(--text-muted)"
+                          strokeWidth={1.5}
+                          opacity={0.55}
+                        />
+                        {/* Placement lives on the wrapper: a CSS transform in the
+                            keyframe overrides a transform attribute on the same
+                            element, which would snap the arrowhead to the origin.
+                            Inside the rotation, -x is back along the trail. */}
+                        <g transform={`translate(${tipX} ${tipY}) rotate(${angle})`}>
+                          <path
+                            className="quadrant-glide"
+                            d="M-4 -3 L2 0 L-4 3 z"
+                            fill="var(--text-muted)"
+                            opacity={0.7}
+                            style={
+                              { "--glide": `${-(len - trim)}px` } as CSSProperties
+                            }
+                          />
+                        </g>
+                      </>
                     )}
                   </g>
                 );
@@ -426,11 +508,20 @@ export function CompetitionQuadrantChart({
             const cy = yOf(p.avgRank);
             const isActive = activeId === p.brandId;
             const showLabel = p.defaultLabel || isActive;
+            // Everything but the hovered dot recedes, so a 20-dot cloud reads as
+            // one selection instead of twenty competing marks.
+            const faded = activeId !== null && !isActive;
+            const r = radiusOf(p.brandId);
+            const solid = QUADRANT_SOLID[p.quadrant];
             // Flip the label inwards near the right edge so long names
             // ("ChatGPT") don't get clipped by the viewBox.
             const flipLabel = cx > plotRight - 105;
             return (
-              <g key={p.brandId}>
+              <g
+                key={p.brandId}
+                className="transition-opacity duration-150"
+                opacity={faded ? 0.3 : 1}
+              >
                 <a
                   href={brandHref(p.brandSlug)}
                   onClick={(e) => {
@@ -455,18 +546,23 @@ export function CompetitionQuadrantChart({
                     <circle
                       cx={cx}
                       cy={cy}
-                      r={18}
+                      r={r + 10}
                       fill={QUADRANT_COLOR[p.quadrant]}
                       opacity={0.18}
                     />
                   )}
+                  {/* Card-coloured base so hollow dots still occlude whatever
+                      grid line or trail passes behind them. */}
+                  {!solid && (
+                    <circle cx={cx} cy={cy} r={isActive ? r + 2 : r} fill="var(--card)" />
+                  )}
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={isActive ? 9.5 : 7}
-                    fill={QUADRANT_COLOR[p.quadrant]}
-                    stroke="var(--card)"
-                    strokeWidth={2.5}
+                    r={isActive ? r + 2 : r}
+                    fill={solid ? QUADRANT_COLOR[p.quadrant] : "none"}
+                    stroke={solid ? "var(--card)" : QUADRANT_COLOR[p.quadrant]}
+                    strokeWidth={solid ? 2.5 : 2}
                     opacity={isActive ? 1 : 0.92}
                     className="cursor-pointer transition-[r] duration-150"
                   />
@@ -474,15 +570,15 @@ export function CompetitionQuadrantChart({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={21}
+                    r={Math.max(21, r + 12)}
                     fill="transparent"
                     className="cursor-pointer"
                   />
                 </a>
                 {showLabel && (
                   <text
-                    x={flipLabel ? cx - 13 : cx + 13}
-                    y={Math.max(plotTop + 6, cy - 12)}
+                    x={flipLabel ? cx - (r + 6) : cx + r + 6}
+                    y={Math.max(plotTop + 6, cy - (r + 6))}
                     textAnchor={flipLabel ? "end" : "start"}
                     className={`pointer-events-none ${
                       isActive ? "fill-[var(--text)]" : "fill-[var(--text-secondary)]"
@@ -490,7 +586,7 @@ export function CompetitionQuadrantChart({
                     // Stroke-behind-fill halo keeps names legible where they cross
                     // a grid line or another dot.
                     style={{
-                      fontSize: 11,
+                      fontSize: 11.5,
                       fontWeight: isActive ? 600 : 500,
                       paintOrder: "stroke",
                       stroke: "var(--card)",
@@ -521,7 +617,13 @@ export function CompetitionQuadrantChart({
               <span
                 aria-hidden
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: QUADRANT_COLOR[active.quadrant] }}
+                style={
+                  QUADRANT_SOLID[active.quadrant]
+                    ? { background: QUADRANT_COLOR[active.quadrant] }
+                    : {
+                        boxShadow: `inset 0 0 0 1.5px ${QUADRANT_COLOR[active.quadrant]}`,
+                      }
+                }
               />
               <Link
                 href={brandHref(active.brandSlug)}
@@ -529,7 +631,7 @@ export function CompetitionQuadrantChart({
               >
                 {active.brandName}
               </Link>
-              <span className="font-medium" style={{ color: QUADRANT_COLOR[active.quadrant] }}>
+              <span className="font-medium text-[var(--text-secondary)]">
                 {quadrantName[active.quadrant]}
               </span>
               <span className="num font-mono text-[var(--text-muted)]">
@@ -561,17 +663,31 @@ export function CompetitionQuadrantChart({
             ] as QuadrantPoint["quadrant"][]
           ).map((qid) => (
             <span key={qid} className="inline-flex items-baseline gap-1.5">
+              {/* Swatch mirrors the plot exactly: filled or hollow, amber or ink. */}
               <span
                 aria-hidden
                 className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full"
-                style={{ background: QUADRANT_COLOR[qid] }}
+                style={
+                  QUADRANT_SOLID[qid]
+                    ? { background: QUADRANT_COLOR[qid] }
+                    : { boxShadow: `inset 0 0 0 1.5px ${QUADRANT_COLOR[qid]}` }
+                }
               />
-              <span className="font-semibold" style={{ color: QUADRANT_COLOR[qid] }}>
+              <span className="font-semibold text-[var(--text-secondary)]">
                 {quadrantName[qid]}
               </span>
               <span className="text-[var(--text-muted)]">{quadrantMeaning[qid]}</span>
             </span>
           ))}
+          {/* Radius is a real encoding now, so it needs a key like the colours. */}
+          <span className="inline-flex items-center gap-1.5 border-t border-[var(--border)] pt-1.5 text-[var(--text-muted)] sm:col-span-2">
+            <svg aria-hidden viewBox="0 0 34 12" className="h-3 w-[34px] shrink-0">
+              <circle cx="4" cy="6" r="2.5" fill="var(--text-muted)" opacity={0.6} />
+              <circle cx="14" cy="6" r="4" fill="var(--text-muted)" opacity={0.6} />
+              <circle cx="27" cy="6" r="5.5" fill="var(--text-muted)" opacity={0.6} />
+            </svg>
+            {m.category.quadrantSizeLegend}
+          </span>
         </div>
       </div>
     </div>

@@ -29,6 +29,38 @@ type BrandBuildInfo = {
   categories: { category: string; rank: number; score: number; appearanceRate: number }[];
 };
 
+type SnapshotRow = {
+  week: string;
+  category: string;
+  engine: string | null;
+  rank: number;
+  score: number;
+  appearanceRate: number;
+};
+
+/** Best engine rank per category — used when a brand has engine boards but no overall row. */
+function bestEngineRowByCategory(rows: SnapshotRow[]): {
+  category: string;
+  engine: string;
+  rank: number;
+  score: number;
+  appearanceRate: number;
+}[] {
+  const best = new Map<string, SnapshotRow>();
+  for (const row of rows) {
+    if (!row.engine) continue;
+    const prev = best.get(row.category);
+    if (!prev || row.rank < prev.rank) best.set(row.category, row);
+  }
+  return [...best.values()].map((row) => ({
+    category: row.category,
+    engine: row.engine!,
+    rank: row.rank,
+    score: row.score,
+    appearanceRate: row.appearanceRate,
+  }));
+}
+
 /**
  * Build brand page data for every brand that has snapshots in this week.
  * Shared by publish-brands (Blob mirror) and DB-first brand / company reads.
@@ -338,9 +370,11 @@ export async function loadBrandPageBundle(
   });
 
   const overallByWeek = snaps.filter((row) => row.engine == null);
+  const engineByWeek = snaps.filter((row) => row.engine != null);
   const snapWeeks = [
-    ...new Set(overallByWeek.map((row) => row.week)),
+    ...new Set([...overallByWeek, ...engineByWeek].map((row) => row.week)),
   ].sort((a, b) => b.localeCompare(a));
+  if (snapWeeks.length === 0) return null;
 
   const requested =
     requestedWeek && /^\d{4}-\d{2}-\d{2}$/.test(requestedWeek)
@@ -350,15 +384,35 @@ export async function loadBrandPageBundle(
         : snapWeeks[0]!;
 
   let selectedWeek = requested;
-  if (!overallByWeek.some((row) => row.week === selectedWeek) && !requestedWeek) {
+  if (!snapWeeks.includes(selectedWeek) && !requestedWeek) {
     selectedWeek = snapWeeks[0] ?? "";
   }
-  const overalls = overallByWeek.filter((row) => row.week === selectedWeek);
-  if (!selectedWeek || overalls.length === 0) return null;
 
   const engineSnapshots = snaps.filter(
     (row) => row.week === selectedWeek && row.engine != null
   );
+  const realOveralls = overallByWeek.filter((row) => row.week === selectedWeek);
+  const synthesized =
+    realOveralls.length === 0 && engineSnapshots.length > 0
+      ? bestEngineRowByCategory(engineSnapshots)
+      : [];
+  const overalls =
+    realOveralls.length > 0
+      ? realOveralls
+      : synthesized.map((row) => ({
+          week: selectedWeek,
+          category: row.category,
+          engine: null as string | null,
+          rank: row.rank,
+          score: row.score,
+          appearanceRate: row.appearanceRate,
+        }));
+  if (!selectedWeek || overalls.length === 0) return null;
+
+  const bestEngineByCategory = new Map(
+    synthesized.map((row) => [row.category, row.engine] as const)
+  );
+
   const info: BrandBuildInfo = {
     canonicalName: ref.canonicalName,
     parentCompany: getCompanyColumnName(ref.canonicalName, ref.parentCanonicalName),
@@ -378,6 +432,17 @@ export async function loadBrandPageBundle(
     catMap.get(row.category)![row.engine!] = { rank: row.rank, score: row.score };
   }
   const data = toBrandPage(selectedWeek, slug, info, engineMap, new Map(), ref.id);
+
+  for (const entry of data.categories) {
+    const categoryName = CATEGORY_SLUG_MAP[entry.slug];
+    const bestEngine = categoryName ? bestEngineByCategory.get(categoryName) : undefined;
+    if (bestEngine) {
+      entry.rankSource = "best_engine";
+      entry.bestEngine = bestEngine;
+    } else {
+      entry.rankSource = "overall";
+    }
+  }
 
   // P3-4: previous-period overall rank per category for Δ badges.
   await Promise.all(
@@ -420,6 +485,25 @@ export async function loadBrandPageBundle(
     layerBoards[row.week] ??= {};
     layerBoards[row.week][categorySlug] ??= [];
     layerBoards[row.week][categorySlug].push({ brandSlug: slug });
+  }
+  // Engine-only appearances (no overall row that week) still feed rank history.
+  for (const row of engineByWeek) {
+    const categorySlug = CATEGORY_TO_SLUG[row.category];
+    if (!categorySlug) continue;
+    const weekBoard = boardsByWeek[row.week]?.[categorySlug];
+    if (weekBoard?.some((entry) => entry.brandSlug === slug)) continue;
+    boardsByWeek[row.week] ??= {};
+    boardsByWeek[row.week][categorySlug] ??= [];
+    boardsByWeek[row.week][categorySlug].push({
+      brandSlug: slug,
+      rank: row.rank,
+      score: row.score,
+    });
+    layerBoards[row.week] ??= {};
+    layerBoards[row.week][categorySlug] ??= [];
+    if (!layerBoards[row.week][categorySlug]!.some((entry) => entry.brandSlug === slug)) {
+      layerBoards[row.week][categorySlug].push({ brandSlug: slug });
+    }
   }
 
   const wantedNames = data.categories

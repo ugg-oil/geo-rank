@@ -15,11 +15,11 @@ import { useI18n } from "@/lib/i18n/use-i18n";
 function ArrowIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 16 16"
       fill="none"
-      className="transition-transform group-hover:translate-x-0.5"
+      className="transition-transform duration-150 group-hover:translate-x-0.5"
       aria-hidden
     >
       <path
@@ -40,7 +40,7 @@ function SearchIcon() {
       height="14"
       viewBox="0 0 14 14"
       fill="none"
-      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]"
       aria-hidden
     >
       <circle cx="6" cy="6" r="4.25" stroke="currentColor" strokeWidth="1.5" />
@@ -68,16 +68,15 @@ function CategoryCard({ card }: { card: Card }) {
 
   const leaders = card.leaders ?? [];
   const published = leaders.length > 0;
-  const categoryHref = `/category/${card.slug}`;
 
   const inner = (
     <>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="truncate text-[15px] font-semibold tracking-tight text-[var(--text)]">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="truncate text-base font-semibold tracking-tight text-[var(--text)]">
           {cat.name}
         </h3>
         {published ? (
-          <span className="shrink-0 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="shrink-0 text-[var(--text-muted)] transition-colors duration-150 group-hover:text-[var(--text)]">
             <ArrowIcon />
           </span>
         ) : (
@@ -86,22 +85,16 @@ function CategoryCard({ card }: { card: Card }) {
           </span>
         )}
       </div>
+
       {published ? (
-        <ol className="mt-2.5 space-y-1">
+        <ol className="mt-3.5 space-y-2.5">
           {leaders.map((row) => (
-            <li
-              key={row.brandSlug}
-              className="flex items-baseline gap-2 font-mono text-[11px] tabular-nums"
-            >
-              <span
-                className={`w-3 shrink-0 ${
-                  row.rank === 1 ? "text-[var(--yellow)]" : "text-[var(--text-muted)]"
-                }`}
-              >
+            <li key={row.brandSlug} className="flex items-center gap-2.5">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--bg-elevated)] font-mono text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
                 {row.rank}
               </span>
               <span
-                className={`min-w-0 flex-1 truncate text-[13px] ${
+                className={`min-w-0 flex-1 truncate text-[13.5px] ${
                   row.rank === 1
                     ? "font-medium text-[var(--text)]"
                     : "text-[var(--text-secondary)]"
@@ -109,26 +102,34 @@ function CategoryCard({ card }: { card: Card }) {
               >
                 {row.brandName}
               </span>
-              <span className="shrink-0 text-[var(--text-muted)]">
+              <span
+                className={`shrink-0 font-mono text-[13px] tabular-nums ${
+                  row.rank === 1
+                    ? "font-semibold text-[var(--yellow)]"
+                    : "font-medium text-[var(--text)]"
+                }`}
+              >
                 {row.score.toFixed(1)}
               </span>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="mt-2 text-xs text-[var(--text-muted)]">{m.rankings.unpublishedHint}</p>
+        <p className="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">
+          {m.rankings.unpublishedHint}
+        </p>
       )}
     </>
   );
 
   const shell = published
-    ? "group block rounded-xl border border-transparent bg-[var(--card)]/60 px-4 py-3.5 transition-colors hover:border-[var(--border)] hover:bg-[var(--card)]"
-    : "block rounded-xl border border-dashed border-[var(--border)] px-4 py-3.5 opacity-60";
+    ? "group block rounded-xl border border-[var(--border)] bg-[var(--card)] px-5 py-4.5 transition-[border-color,background-color,box-shadow] duration-150 hover:border-[var(--border-hover)] hover:bg-[var(--card-hover)] hover:shadow-[var(--shadow-card)]"
+    : "block rounded-xl border border-dashed border-[var(--border)] px-5 py-4.5 opacity-60";
 
   if (!published) return <div className={shell}>{inner}</div>;
 
   return (
-    <Link href={categoryHref} className={shell}>
+    <Link href={`/category/${card.slug}`} className={shell} title={m.rankings.viewBoard}>
       {inner}
     </Link>
   );
@@ -136,7 +137,7 @@ function CategoryCard({ card }: { card: Card }) {
 
 function CardGrid({ cards }: { cards: Card[] }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-4 xl:grid-cols-3 xl:gap-x-8">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
       {cards.map((card) => (
         <CategoryCard key={card.slug} card={card} />
       ))}
@@ -158,9 +159,7 @@ export function RankingsContent({ publishedAt, week, cards }: Props) {
     if (cat.name.toLowerCase().includes(q) || cat.short.toLowerCase().includes(q)) {
       return true;
     }
-    return (card.leaders ?? []).some((row) =>
-      row.brandName.toLowerCase().includes(q)
-    );
+    return (card.leaders ?? []).some((row) => row.brandName.toLowerCase().includes(q));
   };
 
   const filtered = cards.filter(matches);
@@ -180,13 +179,16 @@ export function RankingsContent({ publishedAt, week, cards }: Props) {
           <br />
           {m.rankings.h1Line2}
         </h1>
-        <p className="mt-3.5 max-w-xl text-base leading-relaxed text-[var(--text-secondary)]">
+        <p className="mt-3.5 max-w-md text-base leading-snug text-[var(--text-secondary)]">
           {m.rankings.lead}
+        </p>
+        <p className="mt-1 max-w-md text-sm leading-snug text-[var(--text-muted)]">
+          {m.rankings.leadDetail}
         </p>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-20 sm:pb-28">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-[var(--border)] pt-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-3 border-t border-[var(--border)] pt-4">
           <div className="relative w-full sm:w-72">
             <SearchIcon />
             <input
@@ -196,7 +198,7 @@ export function RankingsContent({ publishedAt, week, cards }: Props) {
               onChange={(e) => setQuery(e.target.value)}
               placeholder={m.rankings.filterPlaceholder}
               aria-label={m.rankings.filterPlaceholder}
-              className="w-full appearance-none rounded-full border border-transparent bg-[var(--card)] py-2 pl-9 pr-9 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-muted)] hover:border-[var(--border)] focus:border-[var(--border-hover)]"
+              className="w-full appearance-none rounded-full border border-[var(--border)] bg-[var(--card)] py-2 pl-9 pr-9 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-secondary)] hover:border-[var(--border-hover)] focus:border-[var(--border-hover)]"
             />
             {query && (
               <button
@@ -217,21 +219,19 @@ export function RankingsContent({ publishedAt, week, cards }: Props) {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            <span>{m.rankings.resultCount(filtered.length, cards.length)}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-[var(--border)] px-2.5 py-1 font-mono text-[11px] tabular-nums text-[var(--text-secondary)]">
+              {m.rankings.resultCount(filtered.length, cards.length)}
+            </span>
             {weekLabel && (
-              <>
-                <span className="opacity-40">·</span>
-                <span className="tracking-normal normal-case">{weekLabel}</span>
-              </>
+              <span className="inline-flex items-center rounded-full border border-[var(--border)] px-2.5 py-1 font-mono text-[11px] tabular-nums text-[var(--text-secondary)]">
+                {weekLabel}
+              </span>
             )}
             {updatedAt && (
-              <>
-                <span className="opacity-40">·</span>
-                <span className="tracking-normal normal-case">
-                  {m.common.updated(updatedAt)}
-                </span>
-              </>
+              <span className="hidden items-center font-mono text-[11px] text-[var(--text-muted)] sm:inline-flex">
+                {m.common.updated(updatedAt)}
+              </span>
             )}
           </div>
         </div>
@@ -247,8 +247,8 @@ export function RankingsContent({ publishedAt, week, cards }: Props) {
         ) : (
           <>
             {groups.map((group) => (
-              <div key={group.family} className="mt-10 first:mt-7">
-                <div className="mb-3 flex items-baseline gap-2.5">
+              <div key={group.family} className="mt-10 first:mt-8">
+                <div className="mb-3.5 flex items-baseline gap-2.5">
                   <h2 className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                     {m.rankings.families[group.family]}
                   </h2>

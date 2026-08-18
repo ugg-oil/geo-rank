@@ -6,6 +6,7 @@ import {
   compareMetricKeys,
   DEFAULT_SORT_KEY,
   isAscendingSort,
+  isDefaultSort,
   nextSortState,
   resolveSortKey,
   sortLeaderboardRows,
@@ -67,6 +68,18 @@ assert.equal(isAscendingSort("modelCoverage", noFlip), false);
   const switched = nextSortState(flippedOnce, "score");
   assert.equal(switched.sortKey, "score");
   assert.equal(switched.flipped.size, 0, "switching columns clears flips");
+}
+
+// The reset chip shows for any state other than published order.
+{
+  const noFlips = new Set<SortKey>();
+  assert.equal(isDefaultSort({ sortKey: "score", flipped: noFlips }), true);
+  assert.equal(isDefaultSort({ sortKey: "avgRank", flipped: noFlips }), false);
+  assert.equal(
+    isDefaultSort({ sortKey: "score", flipped: new Set<SortKey>(["score"]) }),
+    false,
+    "score flipped to lowest-first is not the published order"
+  );
 }
 
 const board: LeaderboardRow[] = [
