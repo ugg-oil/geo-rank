@@ -37,6 +37,12 @@ export interface CompanyProductEntry {
   categories: CompanyProductCategoryEntry[];
 }
 
+/** Most recent published period where the company still had overall-board products. */
+export interface CompanyLastSeen {
+  week: string;
+  products: CompanyProductEntry[];
+}
+
 export interface CompanyPageData {
   schemaVersion: number;
   scoringVersion: number;
@@ -48,6 +54,8 @@ export interface CompanyPageData {
   hasPrevWeekData: boolean;
   /** null when products.length === 0 */
   summary: CompanySummary | null;
+  /** Only set for the empty state, so "no products" can say when that changed. */
+  lastSeen: CompanyLastSeen | null;
 }
 
 export interface CompanyIndexEntry {
@@ -126,7 +134,7 @@ async function loadOverallBrandPages(week: string): Promise<BrandPageData[]> {
   return [...bySlug.values()];
 }
 
-type RawCompanyPage = Omit<CompanyPageData, "hasPrevWeekData" | "summary">;
+type RawCompanyPage = Omit<CompanyPageData, "hasPrevWeekData" | "summary" | "lastSeen">;
 
 async function loadCompanyPagesBySlug(week: string): Promise<Map<string, RawCompanyPage>> {
   const brandPages = await loadOverallBrandPages(week);
@@ -149,6 +157,7 @@ function finalizeCompanyPage(
     products,
     hasPrevWeekData,
     summary: buildCompanySummary(products, hasPrevWeekData),
+    lastSeen: null,
   };
 }
 
@@ -226,11 +235,34 @@ export const getCompanyPage = cache(async (slug: string): Promise<CompanyPageDat
   return getPublishedCompanyPage(slug, latest, weeks[1] ?? null);
 });
 
+/**
+ * Latest published period before `week` that still had overall-board products
+ * for this company. Lookback is bounded because each period scans that period's
+ * overall snapshots (cached per period, shared across company slugs).
+ */
+export async function getCompanyLastSeen(
+  slug: string,
+  maxLookback = 4
+): Promise<CompanyLastSeen | null> {
+  const weeks = await getPublishedLeaderboardWeeks();
+  for (const week of weeks.slice(1, 1 + maxLookback)) {
+    const pages = await ttlCache(`company-pages:${week}`, 60_000, () =>
+      loadCompanyPagesBySlug(week)
+    );
+    const page = pages.get(slug);
+    if (page && page.products.length > 0) {
+      return { week, products: page.products };
+    }
+  }
+  return null;
+}
+
 /** Empty shell for indexed companies with no ranked products this period. */
 export function emptyCompanyPageData(
   slug: string,
   name: string,
-  week: string
+  week: string,
+  lastSeen: CompanyLastSeen | null = null
 ): CompanyPageData {
   return {
     schemaVersion: 1,
@@ -242,5 +274,6 @@ export function emptyCompanyPageData(
     products: [],
     hasPrevWeekData: false,
     summary: null,
+    lastSeen,
   };
 }

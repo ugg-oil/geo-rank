@@ -91,13 +91,19 @@ export const SCORE_WEIGHTS = {
   engine: { appearance: 0.55, avgRank: 0.45 },
 };
 
+/** Overall Top N gate (P6-2): kill single-response #1 ghosts. */
+export const OVERALL_MIN_APPEARANCE_RATE = 0.1;
+/** Alternative gate: mentioned by at least this many scoring engines. */
+export const OVERALL_MIN_SCORING_ENGINES = 2;
+
 export const VALID_RESPONSE_THRESHOLD = 0.8;
 export const TOP_N = 20;
 export const MAX_MENTIONS_PER_RESPONSE = 30;
 export const PROMPTS_PER_CATEGORY = 8;
 export const MIN_SCORING_ENGINES_FOR_OVERALL = 3;
 export const MAX_CATEGORY_ENGINE_RETRIES = 2;
-export const SCORING_VERSION = 2;
+/** Bumped for P6 overall eligibility gate. */
+export const SCORING_VERSION = 3;
 
 export function weeklyPromptCount(engineCount = COLLECTION_ENGINES.length) {
   return engineCount * CATEGORIES.length * PROMPTS_PER_CATEGORY;

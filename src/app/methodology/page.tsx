@@ -4,7 +4,7 @@ import { MethodologyContent } from "@/components/methodology-content";
 export const metadata: Metadata = {
   title: "AI Visibility Methodology",
   description:
-    "Helps brands see mention frequency and rank trends in leading AI recommendations — so they can improve GEO. How we collect, score, and publish weekly rankings.",
+    "Helps brands see mention frequency and rank trends in leading AI recommendations — so they can improve GEO. How we collect, score, and publish period rankings.",
   keywords: [
     "AI visibility methodology",
     "GEO methodology",

@@ -33,6 +33,24 @@ export function modelCoverageScore(mentionedScoringEngines: number, scoringEngin
   return mentionedScoringEngines / scoringEngineCount;
 }
 
+/**
+ * Overall Top N eligibility (P6-2).
+ * Pass if appearance ≥ 10% OR mentioned by ≥ 2 scoring engines.
+ */
+export function meetsOverallBoardGate(options: {
+  appearanceRate: number;
+  scoringEngineMentions: number;
+  minAppearanceRate?: number;
+  minScoringEngines?: number;
+}) {
+  const minAppearance = options.minAppearanceRate ?? 0.1;
+  const minEngines = options.minScoringEngines ?? 2;
+  return (
+    options.appearanceRate >= minAppearance ||
+    options.scoringEngineMentions >= minEngines
+  );
+}
+
 export function coverageExpansionEngines(
   currentScoring: readonly string[],
   previousScoring: readonly string[]

@@ -17,10 +17,6 @@ export function AlsoMentionedTable({
   const { m } = useI18n();
   if (rows.length === 0) return null;
 
-  // Widest rate in the tail sets the bar scale — these are all small numbers, so
-  // scaling to 100% would render 20 identical stubs.
-  const maxRate = Math.max(...rows.map((row) => row.mentionRate), 0.01);
-
   return (
     <div className="surface mt-6 overflow-hidden">
       <div className="surface-head flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
@@ -59,7 +55,7 @@ export function AlsoMentionedTable({
                     <Link
                       prefetch={false}
                       href={`/brand/${row.brandSlug}?from=${encodeURIComponent(sourcePath)}`}
-                      className="font-medium text-[var(--text)] underline decoration-transparent decoration-2 underline-offset-[4px] transition-colors hover:decoration-[var(--brand)] group-hover:decoration-[var(--brand-line)]"
+                      className="font-medium text-[var(--text)] underline decoration-transparent decoration-2 underline-offset-[4px] transition-colors hover:decoration-[var(--text-muted)] group-hover:decoration-[var(--border-hover)]"
                     >
                       {row.brandName}
                     </Link>
@@ -69,14 +65,18 @@ export function AlsoMentionedTable({
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   <span className="inline-flex items-center justify-end gap-2.5">
+                    {/* Absolute 0–100% scale, so the track itself is the
+                        reference: these are all tail brands and the stubby bars
+                        say so. Scaling to the widest row in this table instead
+                        rendered a 21% rate as a full bar. */}
                     <span
                       aria-hidden
-                      className="hidden h-[3px] w-20 overflow-hidden rounded-full bg-[var(--border)] sm:block"
+                      className="hidden h-[3px] w-24 overflow-hidden rounded-full bg-[var(--border)] sm:block"
                     >
                       <span
-                        className="block h-full rounded-full bg-[var(--brand-line)] transition-colors group-hover:bg-[var(--brand)]"
+                        className="block h-full rounded-full bg-[var(--yellow-soft)] transition-colors group-hover:bg-[var(--yellow)]"
                         style={{
-                          width: `${Math.min(100, Math.max(4, (row.mentionRate / maxRate) * 100))}%`,
+                          width: `${Math.min(100, Math.max(2, row.mentionRate * 100))}%`,
                         }}
                       />
                     </span>

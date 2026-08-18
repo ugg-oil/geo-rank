@@ -20,22 +20,21 @@
   --red: #f87171;
   --yellow: #fbbf24;
   --blue: #60a5fa;
-  /* Competition quadrant: muted so 20 dots never look like a pie chart. */
-  --q-leaders: #34d399;
-  --q-challengers: #60a5fa;
-  --q-niche: #fbbf24;
-  --q-laggards: #8a8a8e;
+  /* Competition quadrant. The rest of the page is ink + a single amber accent,
+     so four hues can never sit right here. Instead the dots encode both axes
+     with the page's own two colours: amber = high position, ink = lower
+     position, and filled vs hollow (see QUADRANT_STYLE) = frequency. */
+  --q-high-pos: var(--yellow);
+  --q-lower-pos: #8e8e96;
   --podium-1: rgba(251, 191, 36, 0.16);
   --podium-2: rgba(180, 190, 210, 0.18);
   --podium-3: rgba(205, 127, 50, 0.16);
   --selection: rgba(255, 255, 255, 0.15);
   --shine: rgba(255, 255, 255, 0.03);
-  /* One accent for data emphasis across board, quadrant and charts. Matches
-     --q-leaders so the table and the quadrant read as the same system. */
-  --brand: #34d399;
-  --brand-soft: rgba(52, 211, 153, 0.12);
-  --brand-line: rgba(52, 211, 153, 0.4);
-  --brand-contrast: #062018;
+  /* Data accent only — rank rails and rate bars. Yellow to match the home page,
+     which already uses --yellow for #1 highlights and mini-bars. Chrome (tabs,
+     CTAs, sort indicators) stays ink; green/red stay reserved for up/down. */
+  --yellow-soft: rgba(251, 191, 36, 0.4);
   --grid: rgba(255, 255, 255, 0.08);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
   --shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.55), 0 20px 48px -24px rgba(0, 0, 0, 0.9);
@@ -60,19 +59,14 @@
   --red: #b91c1c;
   --yellow: #b45309;
   --blue: #1d4ed8;
-  --q-leaders: #059669;
-  --q-challengers: #2563eb;
-  --q-niche: #b45309;
-  --q-laggards: #8a8a8e;
+  --q-high-pos: var(--yellow);
+  --q-lower-pos: #6f6f77;
   --podium-1: rgba(180, 83, 9, 0.14);
   --podium-2: rgba(71, 85, 105, 0.14);
   --podium-3: rgba(146, 64, 14, 0.14);
   --selection: rgba(20, 20, 20, 0.12);
   --shine: rgba(20, 20, 20, 0.02);
-  --brand: #059669;
-  --brand-soft: rgba(5, 150, 105, 0.1);
-  --brand-line: rgba(5, 150, 105, 0.35);
-  --brand-contrast: #ffffff;
+  --yellow-soft: rgba(180, 83, 9, 0.32);
   --grid: rgba(20, 20, 20, 0.075);
   --shadow-card: 0 1px 2px rgba(28, 25, 18, 0.06), 0 10px 28px -16px rgba(28, 25, 18, 0.18);
   --shadow-raised: 0 2px 6px rgba(28, 25, 18, 0.08), 0 22px 48px -22px rgba(28, 25, 18, 0.26);
@@ -136,7 +130,8 @@ select {
   background: var(--bg-elevated);
 }
 
-/* Section eyebrow: a short accent rule left of a panel title. */
+/* Section eyebrow: a short neutral rule left of a panel title. Kept colourless
+   so the accent stays reserved for data (rails, rate bars). */
 .panel-title {
   position: relative;
   padding-left: 0.625rem;
@@ -150,7 +145,7 @@ select {
   bottom: 0.15em;
   width: 3px;
   border-radius: 9999px;
-  background: var(--brand);
+  background: var(--text-muted);
 }
 
 /* Metric columns only line up while digits share an advance width. */
@@ -201,4 +196,41 @@ select {
 
 .animate-fade-up-delay-3 {
   animation: fade-up 0.6s ease-out 0.3s both;
+}
+
+/* Quadrant movement. The trails and ghost dots are static — animating 15 of
+   them staggered read as a slideshow transition. Only the arrowheads move, once,
+   gliding the length of their own trail so the eye picks up direction of travel.
+   --glide is the negative trail length in local (pre-rotation) coordinates. */
+@keyframes quadrant-layer-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes quadrant-glide {
+  from {
+    transform: translateX(var(--glide));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.quadrant-layer-in {
+  animation: quadrant-layer-in 220ms ease-out both;
+}
+
+.quadrant-glide {
+  animation: quadrant-glide 760ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quadrant-layer-in,
+  .quadrant-glide {
+    animation: none;
+  }
 }

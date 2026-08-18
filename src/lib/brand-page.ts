@@ -22,6 +22,13 @@ export interface BrandPageCategoryEntry {
   score: number;
   mentionFrequency: number;
   engines: Record<string, BrandPageEngineEntry>;
+  /**
+   * Where `rank` came from. `best_engine` = no overall snapshot this period;
+   * rank/score are the best engine-board row (see `bestEngine`).
+   */
+  rankSource?: "overall" | "best_engine";
+  /** Engine key when rankSource is best_engine. */
+  bestEngine?: string;
   /** Previous published overall rank in this category; null if absent last period. */
   prevRank?: number | null;
   /** Whether a previous published period exists for this category. */
@@ -128,7 +135,7 @@ export async function getBrandIndex(week?: string): Promise<BrandIndex> {
 
 export const getBrandPageBundle = cache(
   async (slug: string, requestedWeek?: string): Promise<BrandPageBundle | null> => {
-    return ttlCache(`brand-bundle:${slug}:${requestedWeek ?? "latest"}`, 60_000, () =>
+    return ttlCache(`brand-bundle:v2:${slug}:${requestedWeek ?? "latest"}`, 60_000, () =>
       loadBrandPageBundle(slug, requestedWeek)
     );
   }

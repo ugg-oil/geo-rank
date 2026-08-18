@@ -210,3 +210,17 @@ P5-12         全局约束：Brand Page / exclude 本品类 / 列表同源 / lau
 ### 8.6 launch-gate（P5-12）
 
 > **2026-08-16**：`yarn pipeline:launch-gate -- --all-new` 对 `08-10` · `07-27` · `07-13` · `06-29` 均为 `allOk: true`（≥30 候选、≥3 引擎、Top20 无越界）。列表同源：`CATEGORIES.length === CATEGORY_CARDS.length`（24）。Brand Page：overall snapshot → `getBrandPageBundle` 可读。
+
+## 9. P6 · 实体质量 / 榜单门槛
+
+> 需求见 [PRD-phase-5.md](./PRD-phase-5.md) P6。2026-08-17 已落地。
+
+| 项 | 触点 |
+|----|------|
+| 归并规则 | `brand-canonical.ts` `PREFERRED_CANONICAL`；`entity-audit.ts` merge；SKU `rankingEnabled: false` in `brand-entities.ts` |
+| normalize | preferredCanonical 优先于 BrandAlias；consolidate **不用** alias 合并 Brand 行 |
+| Overall 门槛 | `meetsOverallBoardGate`：appearance ≥ 10% **或** ≥ 2 scoring engines；`SCORING_VERSION = 3` |
+| 文案 | methodology + category Tooltip（中英） |
+| 修复脚本 | `npm run repair:p6` / `src/scripts/repair-p6-rescore.ts`；门禁单测 `npm run pipeline:overall-gate` |
+
+2026-08-17 已对 115 个 category×week Overall 做 force rescore。Also mentioned 仍收录未进 Top20 的提及。
