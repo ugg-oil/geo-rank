@@ -223,9 +223,13 @@ export async function scoreCategory(
   }
 }
 
-export async function scoreAll(week: string, options?: { force?: boolean }) {
+export async function scoreAll(
+  week: string,
+  options?: { force?: boolean; onProgress?: (category: string) => Promise<void> | void }
+) {
   const { CATEGORIES } = await import("@/lib/constants");
   for (const cat of CATEGORIES) {
     await scoreCategory(week, cat, options);
+    await options?.onProgress?.(cat);
   }
 }
