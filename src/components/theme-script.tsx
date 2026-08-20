@@ -1,6 +1,5 @@
-import Script from "next/script";
-
-const THEME_BOOTSTRAP = `
+/** Runs synchronously in <head> before paint to avoid dark→light flash. */
+export const THEME_BOOTSTRAP = `
 (() => {
   try {
     const key = "geo-radar-theme";
@@ -13,15 +12,10 @@ const THEME_BOOTSTRAP = `
           : "dark";
     document.documentElement.setAttribute("data-theme", theme);
   } catch (_) {
-    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.setAttribute("data-theme", "light");
   }
+  requestAnimationFrame(() => {
+    document.documentElement.classList.add("theme-transition");
+  });
 })();
 `;
-
-export function ThemeScript() {
-  return (
-    <Script id="geo-radar-theme" strategy="beforeInteractive">
-      {THEME_BOOTSTRAP}
-    </Script>
-  );
-}
