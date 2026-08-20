@@ -6,14 +6,15 @@ import { getPipelineHealth } from "@/lib/pipeline-health";
 import { errorContext, logPipelineEvent, sendPipelineAlert } from "@/lib/pipeline-observability";
 import {
   decideCatchupEntry,
+  loadCatchupRunSnapshot,
   PIPELINE_CRON_MAX_CHAIN_DEPTH,
 } from "@/lib/cron-catchup-policy";
 
 export type CronTickOptions = {
   /**
-   * Catch-up entry applies the full gate: healthy skip, active-lease skip,
-   * cold-running resume, and per-week circuit breaker. Monday `/api/cron`
-   * leaves this unset so the primary schedule always ticks.
+   * Catch-up entry applies a cheap `pipeline_runs` gate: published skip,
+   * active-lease skip, cold-running resume, and per-week circuit breaker.
+   * Monday `/api/cron` leaves this unset so the primary schedule always ticks.
    */
   skipWhenHealthy?: boolean;
 };
@@ -29,9 +30,10 @@ export async function handleCronTick(req: NextRequest, options: CronTickOptions 
 
   try {
     // Only the entry fire gates; chained ticks are mid-run by definition.
+    // Cheap: one `pipeline_runs` row. Full coverage health runs after a done tick.
     if (options.skipWhenHealthy && chainDepth === 0) {
-      const health = await getPipelineHealth(week);
-      const decision = await decideCatchupEntry(week, health);
+      const snapshot = await loadCatchupRunSnapshot(week);
+      const decision = await decideCatchupEntry(week, snapshot);
 
       if (decision.action === "skip") {
         logPipelineEvent({
@@ -47,11 +49,9 @@ export async function handleCronTick(req: NextRequest, options: CronTickOptions 
             event: "catchup_circuit_open",
             week,
             runId: decision.runId,
-            reason: health.ok ? "healthy" : health.reason,
+            reason: decision.reason,
             runsThisWeek: decision.runsThisWeek,
             maxRuns: decision.maxRuns,
-            coverage:
-              health.ok || !("coverage" in health) ? undefined : health.coverage,
           });
         }
         return NextResponse.json({

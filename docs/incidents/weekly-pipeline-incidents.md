@@ -162,3 +162,52 @@
 
 - `src/pipeline/collect.ts`：Fix 2（prompt heartbeat 回调）、Fix 3（并发 1→2）、Fix 4（重试上限）
 - `src/pipeline/run.ts`：Fix 1（tick 开头提前推进）、Fix 5（smart restart）、Fix 6（runFullPipeline）
+
+---
+
+# 2026-08-18 后处理 tick 断链（classifying 空转）
+
+**状态：** 已实施（P0/P1/P2）  
+**影响周次：** `Week of 2026-08-17`  
+**run：** `cmsy053qd000004jxcysqwp2p`
+
+## 现象
+
+采集修复部署后，run 不再死等 `collecting:deepseek`，成功进入后处理。随后长时间停在 `classifying`（心跳停在 `10:40 UTC`，约 40 分钟无更新），`classifiedCount` 仍为 null，snapshots=0。人工打 `/api/cron/catchup` 后 classifying **2.8 秒**跑完（`classifiedCount: 0`），`currentStep` 立刻变成 `scoring`。
+
+前序步骤实际已经完成：`collectedCount=218`，`extractedCount=548`，`resolvedCount=2769`。不是 classifying 算不动。
+
+## 时间线（UTC）
+
+| 时间 | 事件 |
+| --- | --- |
+| 部署后 | 新逻辑生效：满足 ≥3 完整引擎门槛后跳过 deepseek 尾巴，进入 `extracting`。 |
+| 约 09:00 | 停在 `extracting`；手动 `/api/cron` 触发后续推进。 |
+| 10:40 | consolidating 完成，`currentStep` 写成 `classifying`，心跳停在此刻。 |
+| 10:40–11:24 | 空转。`after()` 自链未续上；hourly catchup 未把这条冷 `running` 跑起来。 |
+| 11:24 | 人工 catchup：`step=classifying` → `nextStep=scoring`，HTTP 200，耗时约 2.8s。 |
+
+## 根因
+
+1. **后处理一步一 tick，续跑只靠 `after()` 自链。** consolidating 写完 `classifying` 后本应自链下一枪。Hobby 上 `after()` / 平台掐请求很常见，自链一断就干等到下一小时。
+2. **catchup 入口太重。** `/api/cron/catchup` 在 `chainDepth=0` 时先跑 `getPipelineHealth()`（扫 prompts / responses / snapshots，生产上经常 20s+），然后才 `runPipelineTick`。GitHub Actions 用 `curl --max-time 25` 短 poke；客户端先断开时，Vercel 可能把还没开始的 tick 一起掐掉。
+3. **后处理阶段没有中途心跳。** extract / classify / score 整步跑完才 `touchRun`。自链断了之后，`updated_at` 停在上一阶段结束时间，看起来像卡死；classifying 本身对 6251 个 brand 几乎全是 skip。
+
+采集侧「门槛提前推进」已经解决 deepseek 挡发布；这次暴露的是同一套步进模型在 **extract 之后** 的调度缺口。
+
+## 修复（已实施）
+
+- **P0：** catchup 入口只读最新 `pipeline_runs`（`success`+snapshots / 5min 活租约 / 冷 running 续跑 / 熔断）。完整 `getPipelineHealth()` 挪到 tick `done` 之后，避免 GHA 25s poke 卡在 20s+ coverage 扫描上、tick 还没开始就被掐。
+- **P1：** 后处理同一 tick 预算内连跑（extract → … → publish）。再开下一阶段需剩余 ≥ `PIPELINE_POST_STAGE_PACK_MIN_MS`（默认 20s）。classifying 这类秒级步骤不再单独赌 `after()`。
+- **P2：** extract 每条 response、score 每个品类走 10s 节流心跳，长阶段中途 `updated_at` 继续动，避免被当成 stale。
+
+## 改动文件
+
+- `src/lib/cron-catchup-policy.ts` / `src/lib/cron-tick.ts`：P0
+- `src/pipeline/run.ts` / `src/lib/pipeline-timeouts.ts`：P1
+- `src/pipeline/extract.ts` / `src/pipeline/score.ts`：P2
+
+## 验收
+
+- 采集门槛：已验证，不再死等 deepseek。
+- 后处理：classifying 不再单独依赖自链；catchup poke 必须在 25s 内进入 tick；extract/score 中途有心跳。

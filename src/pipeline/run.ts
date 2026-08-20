@@ -1,7 +1,6 @@
 import {
   CATEGORIES,
   COLLECTION_ENGINES,
-  MAX_CATEGORY_ENGINE_RETRIES,
   MIN_SCORING_ENGINES_FOR_OVERALL,
   PROMPTS_PER_CATEGORY,
   type Engine,
@@ -23,6 +22,7 @@ import {
   PIPELINE_RUN_STALE_TIMEOUT_MS,
   PIPELINE_STAGE_TIMEOUT_MS,
   PIPELINE_TICK_BUDGET_MS,
+  PIPELINE_POST_STAGE_PACK_MIN_MS,
 } from "@/lib/pipeline-timeouts";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
 import { verifyPublicCategoryPage } from "@/lib/pipeline-health";
@@ -64,6 +64,21 @@ async function touchRun(runId: string, data: Record<string, unknown> = {}) {
     where: { id: runId },
     data,
   });
+}
+
+function createThrottledHeartbeat(runId: string) {
+  let lastHeartbeatMs = 0;
+  let inFlight: Promise<void> | null = null;
+  return async () => {
+    const now = Date.now();
+    if (now - lastHeartbeatMs < 10_000) return;
+    if (inFlight) return;
+    lastHeartbeatMs = now;
+    inFlight = touchRun(runId, {}).finally(() => {
+      inFlight = null;
+    });
+    await inFlight;
+  };
 }
 
 /**
@@ -196,6 +211,141 @@ async function failStaleRunning(week: string) {
   return null;
 }
 
+type TickRun = { id: string };
+
+type TickResult =
+  | {
+      runId: string;
+      week: string;
+      status: "continue";
+      step: string;
+      nextStep: string;
+      done: false;
+    }
+  | {
+      runId: string;
+      week: string;
+      status: "success";
+      step: string;
+      nextStep: null;
+      done: true;
+    };
+
+async function runOnePostStage(
+  run: TickRun,
+  w: string,
+  step: string,
+  options: { publishLatest?: boolean },
+  heartbeat: () => Promise<void>
+): Promise<TickResult> {
+  if (step === "extracting") {
+    const mentionCount = await runStage("extracting", extractWeek(w, { onProgress: heartbeat }));
+    await touchRun(run.id, { extractedCount: mentionCount, currentStep: "normalizing" });
+    return tickContinue(run.id, w, step, "normalizing");
+  }
+
+  if (step === "normalizing") {
+    const resolved = await runStage("normalizing", normalizeWeek(w));
+    await touchRun(run.id, { resolvedCount: resolved, currentStep: "consolidating" });
+    return tickContinue(run.id, w, step, "consolidating");
+  }
+
+  if (step === "consolidating") {
+    await runStage("consolidating", consolidateBrands());
+    await touchRun(run.id, { currentStep: "classifying" });
+    return tickContinue(run.id, w, step, "classifying");
+  }
+
+  if (step === "classifying") {
+    const classified = await runStage("classifying", classifyAllBrands());
+    await touchRun(run.id, { classifiedCount: classified, currentStep: "scoring" });
+    return tickContinue(run.id, w, step, "scoring");
+  }
+
+  if (step === "scoring") {
+    await runStage("scoring", scoreAll(w, { onProgress: heartbeat }));
+    const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
+    await touchRun(run.id, { snapshotCount, currentStep: "publishing" });
+    return tickContinue(run.id, w, step, "publishing");
+  }
+
+  if (step === "publishing") {
+    const publication = await runStage("publishing", publishLeaderboards(w, {
+      updateLatest: options.publishLatest,
+    }));
+    if (publication.publishStatus === "success" && (options.publishLatest ?? true)) {
+      await runStage("public_smoke_check", verifyPublicCategoryPage(w));
+    }
+    const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
+    await prisma.pipelineRun.update({
+      where: { id: run.id },
+      data: {
+        status: "success",
+        currentStep: null,
+        snapshotCount,
+        manifestUrl: publication.manifestUrl,
+        latestManifestUrl: publication.latestManifestUrl,
+        publishStatus: publication.publishStatus,
+        publishError: publication.publishError?.slice(0, 4000) ?? null,
+        publishedAt: new Date(publication.publishedAt),
+        finishedAt: new Date(),
+      },
+    });
+    logPipelineEvent({ event: "run_completed", week: w, runId: run.id, snapshotCount, mode: "tick" });
+    return {
+      runId: run.id,
+      week: w,
+      status: "success" as const,
+      step,
+      nextStep: null,
+      done: true as const,
+    };
+  }
+
+  throw new Error(`Unknown pipeline step: ${step}`);
+}
+
+/**
+ * Run post-stages until the tick budget is too tight for another one.
+ * First stage always runs; additional stages need PACK_MIN remaining.
+ */
+async function runPackedPostStages(
+  run: TickRun,
+  w: string,
+  startStep: string,
+  options: { publishLatest?: boolean },
+  tickDeadline: number,
+  heartbeat: () => Promise<void>
+): Promise<TickResult> {
+  let step = startStep;
+  let packed = 0;
+  while (true) {
+    if (packed > 0 && Date.now() + PIPELINE_POST_STAGE_PACK_MIN_MS >= tickDeadline) {
+      logPipelineEvent({
+        event: "post_stages_pack_stopped",
+        week: w,
+        runId: run.id,
+        stage: step,
+        packedStages: packed,
+        remainingMs: tickDeadline - Date.now(),
+      });
+      return {
+        runId: run.id,
+        week: w,
+        status: "continue",
+        step,
+        nextStep: step,
+        done: false,
+      };
+    }
+
+    const result = await runOnePostStage(run, w, step, options, heartbeat);
+    packed++;
+    if (result.done) return result;
+    step = result.nextStep;
+  }
+}
+
 /**
  * One serverless-friendly unit of work for the weekly pipeline.
  * Cron should invoke this repeatedly (staggered schedules and/or self-chain).
@@ -232,6 +382,9 @@ export async function runPipelineTick(
     stage: step,
   });
 
+  const tickDeadline = Date.now() + PIPELINE_TICK_BUDGET_MS;
+  const heartbeat = createThrottledHeartbeat(run.id);
+
   try {
     await touchRun(run.id, { currentStep: step });
 
@@ -254,30 +407,14 @@ export async function runPipelineTick(
           nextStep: "extracting",
           earlyAdvance: true,
         });
-        return tickContinue(run.id, w, step, "extracting");
-      }
-
-      // When a specific prompt is slow (e.g. DeepSeek long-tail), we still want
-      // `pipeline_runs.updated_at` to keep moving so stale detection doesn't
-      // kill the whole run mid-category.
-      let lastHeartbeatMs = 0;
-      async function heartbeatThrottled() {
-        const now = Date.now();
-        if (now - lastHeartbeatMs < 10_000) return;
-        lastHeartbeatMs = now;
-        await touchRun(run!.id, {});
+        return runPackedPostStages(run, w, "extracting", options, tickDeadline, heartbeat);
       }
 
       // Soft budget under serverless maxDuration; unfinished engines stay on this step.
-      const deadline = Date.now() + PIPELINE_TICK_BUDGET_MS;
-      const batch = await collectEngine(w, collectEngineName, deadline, {
+      const batch = await collectEngine(w, collectEngineName, tickDeadline, {
         softDeadline: true,
-        onCategoryComplete: async () => {
-          await heartbeatThrottled();
-        },
-        onPromptComplete: async () => {
-          await heartbeatThrottled();
-        },
+        onCategoryComplete: heartbeat,
+        onPromptComplete: heartbeat,
       });
       const collectedCount = await prisma.response.count({
         where: { week: w, status: "ok" },
@@ -302,6 +439,12 @@ export async function runPipelineTick(
         engineComplete: batch.engineComplete,
         nextStep: next,
       });
+
+      const remainingMs = tickDeadline - Date.now();
+      if (next === "extracting" && remainingMs >= PIPELINE_POST_STAGE_PACK_MIN_MS) {
+        return runPackedPostStages(run, w, "extracting", options, tickDeadline, heartbeat);
+      }
+
       return {
         runId: run.id,
         week: w,
@@ -312,71 +455,7 @@ export async function runPipelineTick(
       };
     }
 
-    if (step === "extracting") {
-      const mentionCount = await runStage("extracting", extractWeek(w));
-      await touchRun(run.id, { extractedCount: mentionCount, currentStep: "normalizing" });
-      return tickContinue(run.id, w, step, "normalizing");
-    }
-
-    if (step === "normalizing") {
-      const resolved = await runStage("normalizing", normalizeWeek(w));
-      await touchRun(run.id, { resolvedCount: resolved, currentStep: "consolidating" });
-      return tickContinue(run.id, w, step, "consolidating");
-    }
-
-    if (step === "consolidating") {
-      await runStage("consolidating", consolidateBrands());
-      await touchRun(run.id, { currentStep: "classifying" });
-      return tickContinue(run.id, w, step, "classifying");
-    }
-
-    if (step === "classifying") {
-      const classified = await runStage("classifying", classifyAllBrands());
-      await touchRun(run.id, { classifiedCount: classified, currentStep: "scoring" });
-      return tickContinue(run.id, w, step, "scoring");
-    }
-
-    if (step === "scoring") {
-      await runStage("scoring", scoreAll(w));
-      const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
-      await touchRun(run.id, { snapshotCount, currentStep: "publishing" });
-      return tickContinue(run.id, w, step, "publishing");
-    }
-
-    if (step === "publishing") {
-      const publication = await runStage("publishing", publishLeaderboards(w, {
-        updateLatest: options.publishLatest,
-      }));
-      if (publication.publishStatus === "success" && (options.publishLatest ?? true)) {
-        await runStage("public_smoke_check", verifyPublicCategoryPage(w));
-      }
-      const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
-      await prisma.pipelineRun.update({
-        where: { id: run.id },
-        data: {
-          status: "success",
-          currentStep: null,
-          snapshotCount,
-          manifestUrl: publication.manifestUrl,
-          latestManifestUrl: publication.latestManifestUrl,
-          publishStatus: publication.publishStatus,
-          publishError: publication.publishError?.slice(0, 4000) ?? null,
-          publishedAt: new Date(publication.publishedAt),
-          finishedAt: new Date(),
-        },
-      });
-      logPipelineEvent({ event: "run_completed", week: w, runId: run.id, snapshotCount, mode: "tick" });
-      return {
-        runId: run.id,
-        week: w,
-        status: "success" as const,
-        step,
-        nextStep: null,
-        done: true,
-      };
-    }
-
-    throw new Error(`Unknown pipeline step: ${step}`);
+    return runPackedPostStages(run, w, step, options, tickDeadline, heartbeat);
   } catch (error) {
     const details = errorContext(error);
     await prisma.pipelineRun.update({
@@ -425,6 +504,7 @@ export async function runFullPipeline(
     data: { week: w, status: "running", currentStep: collectStepFor(COLLECTION_ENGINES[0]!) },
   });
   logPipelineEvent({ event: "run_started", week: w, runId: run.id, mode: "full" });
+  const heartbeat = createThrottledHeartbeat(run.id);
 
   const timedStage = async <T>(stage: string, work: () => Promise<T>) => {
     const startedAt = Date.now();
@@ -478,7 +558,9 @@ export async function runFullPipeline(
       attemptedCount: collectResults.length,
     });
 
-    const mentionCount = await timedStage("extracting", () => extractWeek(w));
+    const mentionCount = await timedStage("extracting", () =>
+      extractWeek(w, { onProgress: heartbeat })
+    );
     await touchRun(run.id, { extractedCount: mentionCount, currentStep: "normalizing" });
 
     const resolved = await timedStage("normalizing", () => normalizeWeek(w));
@@ -490,7 +572,7 @@ export async function runFullPipeline(
     const classified = await timedStage("classifying", () => classifyAllBrands());
     await touchRun(run.id, { classifiedCount: classified, currentStep: "scoring" });
 
-    await timedStage("scoring", () => scoreAll(w));
+    await timedStage("scoring", () => scoreAll(w, { onProgress: heartbeat }));
     const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
     await touchRun(run.id, { snapshotCount, currentStep: "publishing" });
 
