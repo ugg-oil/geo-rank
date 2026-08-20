@@ -1,6 +1,6 @@
 # GEO Radar：第五阶段 PRD
 
-> v1.5 · **已发布**。基线 [phase-4](../phase-4/PRD-phase-4.md)。实现见 [technical.md](./technical.md)。未排期 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
+> v1.5 · **已发布**。基线 [phase-4](../phase-4/PRD-phase-4.md)。实现见 [technical.md](./technical.md)。下一阶段草案 [phase-6](../phase-6/PRD-phase-6.md)。未排期 [phase-next](../PRD-phase-next.md)。品类 [category-selection](../category-selection.md)。
 
 | 字段 | 内容 |
 |------|------|
