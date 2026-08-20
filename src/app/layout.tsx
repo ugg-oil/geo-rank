@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LocaleScript } from "@/components/locale-script";
-import { ThemeScript } from "@/components/theme-script";
+import { THEME_BOOTSTRAP } from "@/components/theme-script";
 import { SITE_URL } from "@/lib/seo";
 
 import "./globals.css";
@@ -56,9 +56,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-theme="light">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+        />
+      </head>
       <body className="min-h-screen antialiased flex flex-col">
-        <ThemeScript />
         <LocaleScript />
         <SiteHeader />
         <div className="flex-1">{children}</div>
