@@ -1,6 +1,6 @@
 # GEO Radar：第三阶段 PRD
 
-> 本文档记录第三阶段已实现上线的功能（v1.3），不再作为后续需求清单。实现、门闩、重跑与流程图见 [technical.md](./technical.md)。v1.4 已发布见 [PRD-phase-4.md](../phase-4/PRD-phase-4.md)；v1.5 已发布见 [PRD-phase-5.md](../phase-5/PRD-phase-5.md)；未排期见 [PRD-phase-next.md](../PRD-phase-next.md)。
+> 本文档记录第三阶段已实现上线的功能（v1.3），不再作为后续需求清单。实现、门闩、重跑与流程图见 [technical.md](./technical.md)。v1.4 已发布见 [PRD-phase-4.md](../phase-4/PRD-phase-4.md)；v1.5 已发布见 [PRD-phase-5.md](../phase-5/PRD-phase-5.md)；v1.6 草案见 [PRD-phase-6.md](../phase-6/PRD-phase-6.md)；未排期见 [PRD-phase-next.md](../PRD-phase-next.md)。
 >
 > 最后核对：2026-08-06
 
