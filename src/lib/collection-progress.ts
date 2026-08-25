@@ -98,6 +98,20 @@ export async function weekHasPublishedSnapshots(week: string) {
   return count > 0;
 }
 
+/** True when an engine is fully collected but has no leaderboard snapshots yet. */
+export async function completeEnginesMissingSnapshots(week: string) {
+  const coverage = await loadCollectionCoverage(week);
+  const rows = await prisma.snapshot.findMany({
+    where: { week, engine: { not: null } },
+    distinct: ["engine"],
+    select: { engine: true },
+  });
+  const have = new Set(rows.map((row) => row.engine));
+  return COLLECTION_ENGINES.some(
+    (engine) => engineCompleteForAllDue(coverage, engine) && !have.has(engine)
+  );
+}
+
 export async function weekNeedsRemainingCollection(week: string) {
   return (await findNextIncompleteEngine(week)) !== null;
 }

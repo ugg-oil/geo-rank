@@ -19,6 +19,7 @@ import {
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
 import { verifyPublicCategoryPage } from "@/lib/pipeline-health";
 import {
+  completeEnginesMissingSnapshots,
   findFirstIncompleteEngine,
   findNextIncompleteEngine,
   hasSufficientCollectedForScoring,
@@ -319,7 +320,9 @@ export async function runPipelineTick(
       // After that, finish one trailing engine then extract/score/publish again.
       const published = await weekHasPublishedSnapshots(w);
       const alreadySufficient = await hasSufficientCollectedForScoring(w);
-      if (alreadySufficient && !published) {
+      const missingEngineBoards =
+        published && (await completeEnginesMissingSnapshots(w));
+      if ((alreadySufficient && !published) || missingEngineBoards) {
         const collectedCount = await prisma.response.count({ where: { week: w, status: "ok" } });
         await touchRun(run.id, { collectedCount, currentStep: "extracting" });
         logPipelineEvent({
@@ -329,6 +332,7 @@ export async function runPipelineTick(
           stage: step,
           nextStep: "extracting",
           earlyAdvance: true,
+          missingEngineBoards,
         });
         return runPackedPostStages(run, w, "extracting", options, tickDeadline, heartbeat);
       }
