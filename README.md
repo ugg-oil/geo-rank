@@ -46,7 +46,7 @@ Instead of browsing ten blue links, users increasingly ask leading AI engines fo
 4. Calculate period visibility scores
 5. Write leaderboard snapshots to PostgreSQL (optional Blob mirror)
 
-Production cron advances the pipeline in stepped ticks (collect by engine soft budget; post-process packs stages in one tick when budget allows), with daily/hourly catchup. Local `npm run pipeline` still runs end-to-end.
+Production cron advances the pipeline in stepped ticks (collect by engine soft budget; post-process packs stages in one tick when budget allows), with daily Vercel catchup and GitHub Actions every 5 minutes. Local `npm run pipeline` still runs end-to-end.
 
 ## Tech Stack
 
