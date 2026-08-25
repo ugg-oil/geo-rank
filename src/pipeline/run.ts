@@ -1,10 +1,4 @@
-import {
-  CATEGORIES,
-  COLLECTION_ENGINES,
-  MIN_SCORING_ENGINES_FOR_OVERALL,
-  PROMPTS_PER_CATEGORY,
-  type Engine,
-} from "@/lib/constants";
+import { COLLECTION_ENGINES, type Engine } from "@/lib/constants";
 import { collectEngine } from "./collect";
 import { extractWeek } from "./extract";
 import { normalizeWeek } from "./normalize";
@@ -14,8 +8,6 @@ import { scoreAll } from "./score";
 import { publishLeaderboards } from "./publish";
 import { getCurrentWeek } from "@/lib/week";
 import { prisma } from "@/lib/db";
-import { getCategoryPeriodDays } from "@/lib/category-period";
-import { shouldCollectCategoryInPeriod } from "@/lib/period";
 import {
   PipelineTimeoutError,
   PIPELINE_COLLECTION_TIMEOUT_MS,
@@ -26,6 +18,12 @@ import {
 } from "@/lib/pipeline-timeouts";
 import { errorContext, logPipelineEvent } from "@/lib/pipeline-observability";
 import { verifyPublicCategoryPage } from "@/lib/pipeline-health";
+import {
+  findFirstIncompleteEngine,
+  findNextIncompleteEngine,
+  hasSufficientCollectedForScoring,
+  weekHasPublishedSnapshots,
+} from "@/lib/collection-progress";
 
 function collectStepFor(engine: Engine) {
   return `collecting:${engine}` as const;
@@ -79,111 +77,6 @@ function createThrottledHeartbeat(runId: string) {
     });
     await inFlight;
   };
-}
-
-/**
- * Returns true when every due category already has >= MIN_SCORING_ENGINES_FOR_OVERALL
- * engines whose OK response count covers all active prompts for that category.
- * Used to skip slow trailing engines (e.g. DeepSeek) and advance to extract/score.
- */
-async function hasSufficientCollectedForScoring(week: string) {
-  const expectedCategories = CATEGORIES.filter((category) =>
-    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
-  );
-  if (expectedCategories.length === 0) return false;
-
-  const [activePrompts, okResponses] = await Promise.all([
-    prisma.prompt.findMany({
-      where: { category: { in: expectedCategories }, active: true },
-      select: { id: true, category: true },
-    }),
-    prisma.response.findMany({
-      where: {
-        week,
-        category: { in: expectedCategories },
-        engine: { in: [...COLLECTION_ENGINES] },
-        status: "ok",
-      },
-      select: { category: true, engine: true, promptId: true },
-    }),
-  ]);
-
-  const promptCounts = new Map<string, number>();
-  for (const p of activePrompts) {
-    promptCounts.set(p.category, (promptCounts.get(p.category) ?? 0) + 1);
-  }
-
-  const promptIdsByCategoryEngine = new Map<string, Set<string>>();
-  for (const r of okResponses) {
-    const key = `${r.category}\0${r.engine}`;
-    const set = promptIdsByCategoryEngine.get(key) ?? new Set<string>();
-    set.add(r.promptId);
-    promptIdsByCategoryEngine.set(key, set);
-  }
-
-  for (const category of expectedCategories) {
-    const expectedPrompts = promptCounts.get(category) ?? PROMPTS_PER_CATEGORY;
-    const completeEngines = COLLECTION_ENGINES.filter((engine) => {
-      const key = `${category}\0${engine}`;
-      return (promptIdsByCategoryEngine.get(key)?.size ?? 0) >= expectedPrompts;
-    });
-    if (completeEngines.length < MIN_SCORING_ENGINES_FOR_OVERALL) return false;
-  }
-
-  return true;
-}
-
-/**
- * Fix 5: when a stale run is killed and a new one created, start from the
- * first engine that hasn't yet collected all prompts for every due category,
- * rather than always restarting from the first engine.
- * Falls back to the first engine when everything is already complete
- * (shouldn't happen in practice, but safe).
- */
-async function findFirstIncompleteEngine(week: string): Promise<Engine> {
-  const expectedCategories = CATEGORIES.filter((category) =>
-    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
-  );
-
-  const [activePrompts, okResponses] = await Promise.all([
-    prisma.prompt.findMany({
-      where: { category: { in: expectedCategories }, active: true },
-      select: { id: true, category: true },
-    }),
-    prisma.response.findMany({
-      where: {
-        week,
-        category: { in: expectedCategories },
-        engine: { in: [...COLLECTION_ENGINES] },
-        status: "ok",
-      },
-      select: { category: true, engine: true, promptId: true },
-    }),
-  ]);
-
-  const promptCounts = new Map<string, number>();
-  for (const p of activePrompts) {
-    promptCounts.set(p.category, (promptCounts.get(p.category) ?? 0) + 1);
-  }
-
-  const promptIdsByCategoryEngine = new Map<string, Set<string>>();
-  for (const r of okResponses) {
-    const key = `${r.category}\0${r.engine}`;
-    const set = promptIdsByCategoryEngine.get(key) ?? new Set<string>();
-    set.add(r.promptId);
-    promptIdsByCategoryEngine.set(key, set);
-  }
-
-  for (const engine of COLLECTION_ENGINES) {
-    const engineComplete = expectedCategories.every((category) => {
-      const expectedPrompts = promptCounts.get(category) ?? PROMPTS_PER_CATEGORY;
-      const key = `${category}\0${engine}`;
-      return (promptIdsByCategoryEngine.get(key)?.size ?? 0) >= expectedPrompts;
-    });
-    if (!engineComplete) return engine;
-  }
-
-  return COLLECTION_ENGINES[0]!;
 }
 
 async function failStaleRunning(week: string) {
@@ -263,7 +156,11 @@ async function runOnePostStage(
   }
 
   if (step === "scoring") {
-    await runStage("scoring", scoreAll(w, { onProgress: heartbeat }));
+    const existingSnapshots = await prisma.snapshot.count({ where: { week: w } });
+    await runStage(
+      "scoring",
+      scoreAll(w, { force: existingSnapshots > 0, onProgress: heartbeat })
+    );
     const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
     await touchRun(run.id, { snapshotCount, currentStep: "publishing" });
     return tickContinue(run.id, w, step, "publishing");
@@ -277,6 +174,33 @@ async function runOnePostStage(
       await runStage("public_smoke_check", verifyPublicCategoryPage(w));
     }
     const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
+    const remainingEngine = await findNextIncompleteEngine(w);
+    if (remainingEngine) {
+      const nextStep = collectStepFor(remainingEngine);
+      await prisma.pipelineRun.update({
+        where: { id: run.id },
+        data: {
+          status: "running",
+          currentStep: nextStep,
+          snapshotCount,
+          manifestUrl: publication.manifestUrl,
+          latestManifestUrl: publication.latestManifestUrl,
+          publishStatus: publication.publishStatus,
+          publishError: publication.publishError?.slice(0, 4000) ?? null,
+          publishedAt: new Date(publication.publishedAt),
+          finishedAt: null,
+        },
+      });
+      logPipelineEvent({
+        event: "tail_collection_started",
+        week: w,
+        runId: run.id,
+        snapshotCount,
+        nextStep,
+      });
+      return tickContinue(run.id, w, step, nextStep);
+    }
+
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: {
@@ -342,6 +266,7 @@ async function runPackedPostStages(
     const result = await runOnePostStage(run, w, step, options, heartbeat);
     packed++;
     if (result.done) return result;
+    if (parseCollectEngine(result.nextStep)) return result;
     step = result.nextStep;
   }
 }
@@ -390,13 +315,11 @@ export async function runPipelineTick(
 
     const collectEngineName = parseCollectEngine(step);
     if (collectEngineName) {
-      // Fix 1: check the scoring threshold BEFORE doing any collection work.
-      // If we already have enough complete engines for every due category,
-      // skip the rest of collection and advance to extracting immediately.
-      // This prevents slow trailing engines (DeepSeek) from blocking the
-      // entire pipeline when the threshold is already satisfied.
+      // First publish: skip remaining engines until overall boards are live.
+      // After snapshots exist, keep collecting trailing engines (Perplexity/Claude/DeepSeek).
+      const published = await weekHasPublishedSnapshots(w);
       const alreadySufficient = await hasSufficientCollectedForScoring(w);
-      if (alreadySufficient) {
+      if (alreadySufficient && !published) {
         const collectedCount = await prisma.response.count({ where: { week: w, status: "ok" } });
         await touchRun(run.id, { collectedCount, currentStep: "extracting" });
         logPipelineEvent({
@@ -420,13 +343,14 @@ export async function runPipelineTick(
         where: { week: w, status: "ok" },
       });
 
-      // Re-check after this engine's tick: maybe it pushed us over the threshold.
-      const shouldAdvance = await hasSufficientCollectedForScoring(w);
-      const next = shouldAdvance
-        ? "extracting"
-        : batch.engineComplete
-          ? nextStepAfterCollect(collectEngineName)
-          : collectStepFor(collectEngineName);
+      const sufficient = await hasSufficientCollectedForScoring(w);
+      const nextIncomplete = await findNextIncompleteEngine(w);
+      const next =
+        sufficient && !published
+          ? "extracting"
+          : batch.engineComplete
+            ? (nextIncomplete ? collectStepFor(nextIncomplete) : "extracting")
+            : collectStepFor(collectEngineName);
 
       await touchRun(run.id, { collectedCount, currentStep: next });
       logPipelineEvent({
@@ -521,43 +445,22 @@ export async function runFullPipeline(
     return result;
   };
 
-  try {
-    const collectResults: string[] = [];
-    for (const engine of COLLECTION_ENGINES) {
-      // Fix 6: same early-advance logic as tick mode — skip slow trailing
-      // engines once scoring threshold is already met.
-      const sufficient = await hasSufficientCollectedForScoring(w);
-      if (sufficient) {
-        logPipelineEvent({ event: "stage_skipped", week: w, runId: run.id, stage: `collecting:${engine}`, reason: "threshold_met" });
-        break;
-      }
-
-      const batch = await timedStage(`collecting:${engine}`, () => {
-        const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
-        return collectEngine(w, engine, deadline).then((r) => r.results);
-      });
-      collectResults.push(...batch);
-      const collectedCount = await prisma.response.count({
-        where: { week: w, status: "ok" },
-      });
-      await touchRun(run.id, {
-        collectedCount,
-        currentStep: nextStepAfterCollect(engine),
-      });
-    }
-
+  const collectOneEngine = async (engine: Engine) => {
+    const batch = await timedStage(`collecting:${engine}`, () => {
+      const deadline = Date.now() + PIPELINE_COLLECTION_TIMEOUT_MS;
+      return collectEngine(w, engine, deadline).then((r) => r.results);
+    });
     const collectedCount = await prisma.response.count({
       where: { week: w, status: "ok" },
     });
-    await touchRun(run.id, { collectedCount, currentStep: "extracting" });
-    logPipelineEvent({
-      event: "collection_summary",
-      week: w,
-      runId: run.id,
+    await touchRun(run.id, {
       collectedCount,
-      attemptedCount: collectResults.length,
+      currentStep: nextStepAfterCollect(engine),
     });
+    return batch;
+  };
 
+  const runPostStages = async (forceScore: boolean) => {
     const mentionCount = await timedStage("extracting", () =>
       extractWeek(w, { onProgress: heartbeat })
     );
@@ -572,7 +475,7 @@ export async function runFullPipeline(
     const classified = await timedStage("classifying", () => classifyAllBrands());
     await touchRun(run.id, { classifiedCount: classified, currentStep: "scoring" });
 
-    await timedStage("scoring", () => scoreAll(w, { onProgress: heartbeat }));
+    await timedStage("scoring", () => scoreAll(w, { force: forceScore, onProgress: heartbeat }));
     const snapshotCount = await prisma.snapshot.count({ where: { week: w } });
     await touchRun(run.id, { snapshotCount, currentStep: "publishing" });
 
@@ -591,12 +494,65 @@ export async function runFullPipeline(
     if (publication.publishStatus === "success" && (options.publishLatest ?? true)) {
       await timedStage("public_smoke_check", () => verifyPublicCategoryPage(w));
     }
+    return { publication, snapshotCount };
+  };
+
+  try {
+    const collectResults: string[] = [];
+    for (const engine of COLLECTION_ENGINES) {
+      const published = await weekHasPublishedSnapshots(w);
+      const sufficient = await hasSufficientCollectedForScoring(w);
+      if (sufficient && !published) {
+        logPipelineEvent({
+          event: "stage_skipped",
+          week: w,
+          runId: run.id,
+          stage: `collecting:${engine}`,
+          reason: "threshold_met_first_publish",
+        });
+        break;
+      }
+      const batch = await collectOneEngine(engine);
+      collectResults.push(...batch);
+    }
+
+    const collectedCount = await prisma.response.count({
+      where: { week: w, status: "ok" },
+    });
+    await touchRun(run.id, { collectedCount, currentStep: "extracting" });
+    logPipelineEvent({
+      event: "collection_summary",
+      week: w,
+      runId: run.id,
+      collectedCount,
+      attemptedCount: collectResults.length,
+    });
+
+    let { publication, snapshotCount } = await runPostStages(false);
+
+    let remainingEngine = await findNextIncompleteEngine(w);
+    if (remainingEngine) {
+      logPipelineEvent({
+        event: "tail_collection_started",
+        week: w,
+        runId: run.id,
+        nextStep: collectStepFor(remainingEngine),
+      });
+      while (remainingEngine) {
+        collectResults.push(...(await collectOneEngine(remainingEngine)));
+        remainingEngine = await findNextIncompleteEngine(w);
+      }
+      const tail = await runPostStages(true);
+      publication = tail.publication;
+      snapshotCount = tail.snapshotCount;
+    }
 
     await prisma.pipelineRun.update({
       where: { id: run.id },
       data: {
         status: "success",
         currentStep: null,
+        snapshotCount,
         manifestUrl: publication.manifestUrl,
         latestManifestUrl: publication.latestManifestUrl,
         publishStatus: publication.publishStatus,

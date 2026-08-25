@@ -71,8 +71,14 @@ export async function getPipelineHealth(week: string) {
     manifestUrl: true, latestManifestUrl: true, publishStatus: true, publishedAt: true, publishError: true, errorMessage: true,
   }});
   if (!run) return { ok: false as const, week, reason: "no pipeline run found", run: null };
-  if (run.status !== "success") return { ok: false as const, week, reason: `run status is ${run.status}`, run };
-  if (!run.snapshotCount || run.snapshotCount <= 0) return { ok: false as const, week, reason: "snapshot count is zero", run };
+  const weekSnapshotCount = await prisma.snapshot.count({ where: { week } });
+  if (run.status !== "success") {
+    if (!(run.status === "running" && weekSnapshotCount > 0)) {
+      return { ok: false as const, week, reason: `run status is ${run.status}`, run };
+    }
+  } else if (weekSnapshotCount <= 0 && (!run.snapshotCount || run.snapshotCount <= 0)) {
+    return { ok: false as const, week, reason: "snapshot count is zero", run };
+  }
 
   const expectedCategories = CATEGORIES.filter((category) =>
     shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
@@ -142,6 +148,9 @@ export async function getPipelineHealth(week: string) {
   }
 
   const warnings: string[] = [];
+  if (run.status === "running") {
+    warnings.push("tail_collection_in_progress");
+  }
   if (!run.manifestUrl || !run.latestManifestUrl) {
     warnings.push("blob_mirror_missing");
   }

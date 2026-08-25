@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { PIPELINE_RUN_STALE_TIMEOUT_MS } from "@/lib/pipeline-timeouts";
+import { weekHasIdleCollectionEngines } from "@/lib/collection-progress";
 
 /**
  * Catch-up policy for `/api/cron/catchup`.
@@ -12,6 +13,8 @@ import { PIPELINE_RUN_STALE_TIMEOUT_MS } from "@/lib/pipeline-timeouts";
  * - Keep Monday `/api/cron` as the primary schedule (no circuit there).
  * - Entry gate must be cheap: GHA pokes with `curl --max-time 25`. Full
  *   `getPipelineHealth()` (prompts/responses/snapshots) stays after the tick.
+ * - `success` + snapshots still resumes remaining engines (Perplexity/Claude/DeepSeek)
+ *   after the first overall publish.
  */
 
 /** Self-chain ceiling. 6 engines + ~6 post stages needs headroom when `after()` holds. */
@@ -86,6 +89,25 @@ export async function decideCatchupEntry(
   run: CatchupRunSnapshot
 ): Promise<CatchupDecision> {
   if (run?.status === "success" && (run.snapshotCount ?? 0) > 0) {
+    if (await weekHasIdleCollectionEngines(week)) {
+      const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
+      if (runsThisWeek >= CATCHUP_MAX_RUNS_PER_WEEK) {
+        return {
+          action: "skip",
+          reason: "circuit_open",
+          runId: run.id,
+          runsThisWeek,
+          maxRuns: CATCHUP_MAX_RUNS_PER_WEEK,
+        };
+      }
+      return {
+        action: "run",
+        reason: "remaining_engines",
+        mode: "start",
+        runId: run.id,
+        runsThisWeek,
+      };
+    }
     return {
       action: "skip",
       reason: "already_published",
