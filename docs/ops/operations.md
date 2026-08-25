@@ -18,7 +18,7 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 **补跑兜底（`/api/cron/catchup`）：** 周一主窗口只有 2.5h；DB/平台故障盖住窗口时不能干等到下周一。Hobby 套餐 Vercel Cron **不能按小时调度**（会直接让部署失败），因此拆成两层：
 
 - **Vercel**：每天 UTC `06:00` 打一次 catchup（Hobby 合规的日级兜底）
-- **GitHub Actions**（`.github/workflows/pipeline-catchup.yml`）：每小时 UTC `:07` **短请求触发**同一路由（`curl --max-time 25`，不等待 tick 跑完；504/超时也算触发成功）。仓库需配置 secret `CRON_SECRET`（与 Vercel 相同），可选 variable `SITE_URL`（默认 `https://georadar.website`）
+- **GitHub Actions**（`.github/workflows/pipeline-catchup.yml`）：每 **5 分钟** **短请求触发**同一路由（`curl --max-time 25`，不等待 tick 跑完；504/超时也算触发成功）。这是续跑的主调度；`after()` 自链在 Hobby 上只是尽力而为。仓库需配置 secret `CRON_SECRET`（与 Vercel 相同），可选 variable `SITE_URL`（默认 `https://georadar.website`）
 
 入口策略见 `src/lib/cron-catchup-policy.ts`（入口只读最新 `pipeline_runs` 一行，不扫 prompts/responses/snapshots）：
 
@@ -91,7 +91,7 @@ curl "https://georadar.website/api/cron" \
 ### Cron 补跑（catchup）
 
 - Vercel：每天 UTC `06:00`
-- GitHub Actions：每小时 UTC `:07`（`Pipeline catchup` workflow；可在 Actions 页手动 `workflow_dispatch`）。workflow **只负责触发**（25s curl 上限），不等待 Vercel 跑完；平台 504 不算配置失败。
+- GitHub Actions：每 5 分钟（`Pipeline catchup` workflow；可在 Actions 页手动 `workflow_dispatch`）。workflow **只负责触发**（25s curl 上限），不等待 Vercel 跑完；平台 504 不算配置失败。活租约 5 分钟内会 skip，避免和正在跑的 tick 打架。
 
 策略摘要：健康 / 5 分钟内活租约 → no-op；冷 `running` → 续跑；将新建且本周 run ≥ 6 → `circuit_open`；否则等同 `/api/cron` tick + 自链。手动跑法：
 

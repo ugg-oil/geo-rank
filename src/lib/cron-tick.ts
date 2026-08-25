@@ -80,22 +80,31 @@ export async function handleCronTick(req: NextRequest, options: CronTickOptions 
     if (!result.done && chainDepth < PIPELINE_CRON_MAX_CHAIN_DEPTH) {
       const continueUrl = new URL(req.url);
       const auth = authHeader!;
+      // Return the poke promise so waitUntil keeps the isolate alive long enough
+      // to *send* the next tick. Abort at 8s: do not wait for the next 240s run.
+      // Hobby still drops after() often; GHA every 5m is the real scheduler.
       after(() => {
-        void fetch(continueUrl, {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8_000);
+        return fetch(continueUrl, {
           headers: {
             authorization: auth,
             "x-pipeline-chain-depth": String(chainDepth + 1),
           },
           cache: "no-store",
-        }).catch((error) => {
-          logPipelineEvent({
-            event: "cron_chain_failed",
-            week,
-            runId: result.runId,
-            error: errorContext(error),
-            chainDepth,
-          });
-        });
+          signal: controller.signal,
+        })
+          .catch((error) => {
+            if (error instanceof Error && error.name === "AbortError") return;
+            logPipelineEvent({
+              event: "cron_chain_failed",
+              week,
+              runId: result.runId,
+              error: errorContext(error),
+              chainDepth,
+            });
+          })
+          .finally(() => clearTimeout(timer));
       });
     }
 

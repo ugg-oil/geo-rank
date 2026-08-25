@@ -6,12 +6,12 @@ import { weekHasIdleCollectionEngines } from "@/lib/collection-progress";
  * Catch-up policy for `/api/cron/catchup`.
  *
  * Design goals (one package, not one-off patches):
- * - Recover within ~1h after infra blips without waiting until next Monday.
+ * - Recover within ~5–10m after infra blips (GHA every 5m), not next Monday.
  * - Never fight an actively chaining worker (short lease).
  * - Resume cold `running` rows instead of sitting until the 90m stale timeout.
  * - Cap remounts so structural gaps cannot burn API forever.
  * - Keep Monday `/api/cron` as the primary schedule (no circuit there).
- * - Entry gate must be cheap: GHA pokes with `curl --max-time 25`. Full
+ * - Entry gate must be cheap: GHA pokes every 5m with `curl --max-time 25`. Full
  *   `getPipelineHealth()` (prompts/responses/snapshots) stays after the tick.
  * - `success` + snapshots still resumes remaining engines (Perplexity/Claude/DeepSeek)
  *   after the first overall publish.
