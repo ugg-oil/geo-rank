@@ -1,6 +1,6 @@
 # Hobby Vercel only allows one cron fire per day. Frequent recovery lives here.
 # after() self-chain is best-effort on Hobby; this is the real scheduler.
-name: Pipeline catchup
+name: Pipeline catchup 5m
 
 on:
   schedule:
