@@ -30,8 +30,11 @@ Return format:
 
 const EXTRACTION_CONCURRENCY = Math.max(
   1,
-  Math.floor(Number(process.env.PIPELINE_EXTRACTION_CONCURRENCY) || 1)
+  Math.floor(Number(process.env.PIPELINE_EXTRACTION_CONCURRENCY) || 4)
 );
+
+/** Empty row so a response is not retried forever when the model mentions nothing. */
+const EMPTY_EXTRACTION_BRAND = "";
 
 export async function extractResponse(responseId: string) {
   const response = await prisma.response.findUnique({
@@ -45,18 +48,21 @@ export async function extractResponse(responseId: string) {
   if (existing) return [];
 
   try {
-    const completion = await getOpenRouter().chat.completions.create({
-      model: EXTRACTION_MODEL,
-      messages: [
-        { role: "system", content: EXTRACTION_PROMPT },
-        {
-          role: "user",
-          content: `AI engine: ${response.engine}\n\nResponse:\n${response.rawText}`,
-        },
-      ],
-      temperature: 0,
-      response_format: { type: "json_object" },
-    });
+    const completion = await getOpenRouter().chat.completions.create(
+      {
+        model: EXTRACTION_MODEL,
+        messages: [
+          { role: "system", content: EXTRACTION_PROMPT },
+          {
+            role: "user",
+            content: `AI engine: ${response.engine}\n\nResponse:\n${response.rawText}`,
+          },
+        ],
+        temperature: 0,
+        response_format: { type: "json_object" },
+      },
+      { timeout: 30_000, maxRetries: 0 }
+    );
 
     const raw = completion.choices[0]?.message?.content ?? "{}";
     const parsed = MentionsSchema.parse(JSON.parse(raw));
@@ -65,6 +71,13 @@ export async function extractResponse(responseId: string) {
       console.warn(
         `Extraction mentions truncated for response ${responseId}: ${parsed.mentions.length} -> ${MAX_MENTIONS_PER_RESPONSE}`
       );
+    }
+
+    if (mentions.length === 0) {
+      await prisma.extractedMention.create({
+        data: { responseId, rawBrand: EMPTY_EXTRACTION_BRAND, position: 0 },
+      });
+      return [];
     }
 
     const created = await Promise.all(
@@ -88,31 +101,49 @@ export async function extractResponse(responseId: string) {
 
 export async function extractWeek(
   week: string,
-  options?: { onProgress?: () => Promise<void> | void }
+  options?: { onProgress?: () => Promise<void> | void; deadline?: number }
 ) {
   const responses = await prisma.response.findMany({
-    where: { week, status: "ok" },
+    where: {
+      week,
+      status: "ok",
+      extractedMentions: { none: {} },
+    },
     select: { id: true },
   });
 
-  const deadline = Date.now() + PIPELINE_EXTRACTION_TIMEOUT_MS;
+  const deadline = options?.deadline ?? Date.now() + PIPELINE_EXTRACTION_TIMEOUT_MS;
+  const soft = Boolean(options?.deadline);
   let cursor = 0;
   let count = 0;
   async function worker() {
     while (true) {
+      if (Date.now() >= deadline) {
+        if (soft) return;
+        assertBeforeDeadline("extraction", deadline, PIPELINE_EXTRACTION_TIMEOUT_MS);
+      }
       const index = cursor++;
       if (index >= responses.length) return;
-      assertBeforeDeadline("extraction", deadline, PIPELINE_EXTRACTION_TIMEOUT_MS);
-      const mentions = await extractResponse(responses[index].id);
+      const mentions = await extractResponse(responses[index]!.id);
       count += mentions.length;
       await options?.onProgress?.();
     }
   }
-  await Promise.all(
-    Array.from(
-      { length: Math.min(EXTRACTION_CONCURRENCY, responses.length) },
-      () => worker()
-    )
-  );
-  return count;
+  if (responses.length > 0) {
+    await Promise.all(
+      Array.from(
+        { length: Math.min(EXTRACTION_CONCURRENCY, responses.length) },
+        () => worker()
+      )
+    );
+  }
+
+  const remaining = await prisma.response.count({
+    where: {
+      week,
+      status: "ok",
+      extractedMentions: { none: {} },
+    },
+  });
+  return { mentionCount: count, remaining };
 }
