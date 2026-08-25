@@ -11,15 +11,29 @@ import {
   assertBeforeDeadline,
   PipelineTimeoutError,
   PIPELINE_COLLECTION_TIMEOUT_MS,
+  PIPELINE_REQUEST_TIMEOUT_MS,
 } from "@/lib/pipeline-timeouts";
 
-// Fix 3: default concurrency raised from 1 to 2 so slow engines (DeepSeek)
-// run two prompts at once per tick, doubling throughput within a category.
-// Override with PIPELINE_COLLECTION_CONCURRENCY env var if needed.
-const COLLECTION_CONCURRENCY = Math.max(
-  1,
-  Math.floor(Number(process.env.PIPELINE_COLLECTION_CONCURRENCY) || 2)
-);
+function readConcurrency(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+/** Default 2. DeepSeek is 1–2 min/call, so run more in flight per tick. */
+function collectionConcurrency(engine?: Engine) {
+  if (engine === "deepseek") {
+    return readConcurrency("PIPELINE_DEEPSEEK_CONCURRENCY", 4);
+  }
+  return readConcurrency("PIPELINE_COLLECTION_CONCURRENCY", 2);
+}
+
+/** DeepSeek successes already take ~60–120s; don't retry or a hung call becomes 3 minutes. */
+function requestOptions(engine: Engine) {
+  if (engine === "deepseek") {
+    return { timeout: 120_000, maxRetries: 0 as const };
+  }
+  return { timeout: PIPELINE_REQUEST_TIMEOUT_MS, maxRetries: 1 as const };
+}
 
 function completionText(message: { content?: unknown } | undefined) {
   const content = message?.content;
@@ -69,11 +83,14 @@ async function collectOne(
   }
 
   try {
-    const completion = await getOpenRouter().chat.completions.create({
-      model: ENGINE_MODEL_SLUGS[job.engine],
-      messages: [{ role: "user", content: job.promptText }],
-      temperature: 0.7,
-    });
+    const completion = await getOpenRouter().chat.completions.create(
+      {
+        model: ENGINE_MODEL_SLUGS[job.engine],
+        messages: [{ role: "user", content: job.promptText }],
+        temperature: 0.7,
+      },
+      requestOptions(job.engine)
+    );
 
     const rawText = completionText(completion.choices[0]?.message);
     const tokenCost =
@@ -133,7 +150,7 @@ export type CollectOptions = {
    * Default false — cron still uses shouldCollectCategoryInPeriod.
    */
   forceCategories?: boolean;
-  /** Soft stop: return between categories instead of throwing when budget is spent. */
+  /** Soft stop: return instead of throwing when the tick budget is spent. */
   softDeadline?: boolean;
   /** Heartbeat after each category (serverless stale detection). */
   onCategoryComplete?: (category: string) => Promise<void> | void;
@@ -184,9 +201,48 @@ export async function collectCategory(
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(COLLECTION_CONCURRENCY, jobs.length) }, () => worker())
+    Array.from(
+      { length: Math.min(collectionConcurrency(onlyEngine), jobs.length) },
+      () => worker()
+    )
   );
   return results;
+}
+
+async function runCollectionJobs(
+  jobs: CollectionJob[],
+  week: string,
+  engine: Engine,
+  deadline: number | undefined,
+  options: CollectOptions
+) {
+  const results: string[] = [];
+  let cursor = 0;
+  let stoppedEarly = false;
+  const soft = options.softDeadline === true;
+
+  async function worker() {
+    while (true) {
+      if (deadline && Date.now() >= deadline) {
+        if (soft) {
+          stoppedEarly = true;
+          return;
+        }
+        assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
+      }
+      const index = cursor++;
+      if (index >= jobs.length) return;
+      results[index] = await collectOne(jobs[index]!, week, options.onPromptComplete);
+    }
+  }
+
+  if (jobs.length === 0) return { results, stoppedEarly: false };
+  await Promise.all(
+    Array.from({ length: Math.min(collectionConcurrency(engine), jobs.length) }, () =>
+      worker()
+    )
+  );
+  return { results, stoppedEarly };
 }
 
 export async function collectEngine(
@@ -199,7 +255,8 @@ export async function collectEngine(
   const { getCategoryPeriodDays } = await import("@/lib/category-period");
   const { shouldCollectCategoryInPeriod } = await import("@/lib/period");
   const categories = options.categories ?? CATEGORIES;
-  const allResults: string[] = [];
+  const suffix = options.promptSuffix ?? "";
+  const jobs: CollectionJob[] = [];
   const categoriesAttempted: string[] = [];
   const soft = options.softDeadline === true;
 
@@ -210,26 +267,52 @@ export async function collectEngine(
     ) {
       continue;
     }
-
-    if (deadline && Date.now() >= deadline) {
-      if (soft) {
-        return { results: allResults, engineComplete: false, categoriesAttempted };
-      }
-      assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
-    }
-
-    try {
-      categoriesAttempted.push(category);
-      allResults.push(...(await collectCategory(category, week, deadline, engine, options)));
-      await options.onCategoryComplete?.(category);
-    } catch (error) {
-      if (soft && error instanceof PipelineTimeoutError) {
-        return { results: allResults, engineComplete: false, categoriesAttempted };
-      }
-      throw error;
+    categoriesAttempted.push(category);
+    const prompts = await prisma.prompt.findMany({
+      where: { category, active: true },
+    });
+    for (const prompt of prompts) {
+      jobs.push({
+        category,
+        engine,
+        promptId: prompt.id,
+        promptText: `${prompt.promptText}${suffix}`,
+      });
     }
   }
-  return { results: allResults, engineComplete: true, categoriesAttempted };
+
+  if (deadline && Date.now() >= deadline) {
+    if (soft) {
+      return { results: [], engineComplete: false, categoriesAttempted };
+    }
+    assertBeforeDeadline("collection", deadline, PIPELINE_COLLECTION_TIMEOUT_MS);
+  }
+
+  try {
+    const { results, stoppedEarly } = await runCollectionJobs(
+      jobs,
+      week,
+      engine,
+      deadline,
+      options
+    );
+    const attempted = new Set(
+      jobs.filter((_, index) => results[index] !== undefined).map((job) => job.category)
+    );
+    for (const category of attempted) {
+      await options.onCategoryComplete?.(category);
+    }
+    return {
+      results,
+      engineComplete: !stoppedEarly && jobs.every((_, index) => results[index] !== undefined),
+      categoriesAttempted,
+    };
+  } catch (error) {
+    if (soft && error instanceof PipelineTimeoutError) {
+      return { results: [], engineComplete: false, categoriesAttempted };
+    }
+    throw error;
+  }
 }
 
 export async function collectAll(week?: string, options: CollectOptions = {}) {
