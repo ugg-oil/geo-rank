@@ -13,7 +13,7 @@ Pipeline 完成后默认**不**写 Vercel Blob。仅当显式设置 `PUBLISH_BLO
 
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进错误发布。
 
-**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次推进一个单位。采集阶段按**品类软截止**：单个 tick 预算默认 240s（`PIPELINE_TICK_BUDGET_MS`，低于路由 `maxDuration=300`），超时后留在同一 `collecting:<engine>`，下一枪/自链继续，而不是把整次 run 标 failed。后处理（extract→publish）在同一 tick 预算内能跑几步跑几步（再开下一阶段需剩余 ≥ `PIPELINE_POST_STAGE_PACK_MIN_MS`，默认 20s），减少对 `after()` 自链的依赖。写回 `current_step`；采集按 prompt、extract 按 response、score 按品类刷新 `updated_at` 心跳（10s 节流）。同一请求可用 `after()` 自链式续跑（深度上限 24）；`vercel.json` 周一 UTC 02:00–04:30 错峰再触发。本地 `npm run pipeline` 仍是一次性跑完全流程（采集用 20 分钟硬超时）。
+**生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次推进一个单位。采集阶段按**品类软截止**：单个 tick 预算默认 240s（`PIPELINE_TICK_BUDGET_MS`，低于路由 `maxDuration=300`），超时后留在同一 `collecting:<engine>`，下一枪/自链继续，而不是把整次 run 标 failed。每品类凑够 ≥3 个完整引擎后**先 extract/score 发综合榜**，然后同一条 run（或 catchup 新开的尾部 run）继续采剩下的引擎，再强制重打分把分榜补上。后处理（extract→publish）在同一 tick 预算内能跑几步跑几步（再开下一阶段需剩余 ≥ `PIPELINE_POST_STAGE_PACK_MIN_MS`，默认 20s），减少对 `after()` 自链的依赖。写回 `current_step`；采集按 prompt、extract 按 response、score 按品类刷新 `updated_at` 心跳（10s 节流）。同一请求可用 `after()` 自链式续跑（深度上限 24）；`vercel.json` 周一 UTC 02:00–04:30 错峰再触发。本地 `npm run pipeline` 仍是一次性跑完全流程（采集用 20 分钟硬超时）。
 
 **补跑兜底（`/api/cron/catchup`）：** 周一主窗口只有 2.5h；DB/平台故障盖住窗口时不能干等到下周一。Hobby 套餐 Vercel Cron **不能按小时调度**（会直接让部署失败），因此拆成两层：
 
@@ -22,7 +22,7 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 
 入口策略见 `src/lib/cron-catchup-policy.ts`（入口只读最新 `pipeline_runs` 一行，不扫 prompts/responses/snapshots）：
 
-1. 最新 run `success` 且 `snapshotCount > 0` → `already_published`
+1. 最新 run `success` 且 `snapshotCount > 0`，且 6 个采集引擎都采完 → `already_published`。综合榜已发但 Perplexity/Claude/DeepSeek 还没采完 → **继续采尾部引擎**，再 extract/score/publish 一趟。
 2. 最新 run 心跳 < 5 分钟 → `already_running`（不与活自链打架）
 3. 心跳 5 分钟–90 分钟的 `running` → **续跑**（避免干等到 90 分钟才 stale）
 4. 将新建/重挂 run 时，若本周 `pipeline_runs` 已 ≥ 6 → `circuit_open`，发告警后停手（防结构性缺口无限烧 API）
@@ -30,7 +30,7 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 
 完整 `getPipelineHealth`（coverage 扫描）只在 tick 报告 `done` 之后跑，避免 GHA `curl --max-time 25` 在闸门上把还没开始的 tick 掐掉。
 
-健康门禁：最新 run `success`、`snapshotCount > 0`、本周期应跑品类均有 Overall Top20，且每品类至少 3 个引擎完成全部 active prompts；Blob 缺失只 warning。周一 `/api/cron` **不走**熔断（主跑优先）。自链 `x-pipeline-chain-depth > 0` 跳过入口闸门。周中 period 与周一等价；`collectOne` 对已 `ok` response skip。
+健康门禁：本周期已有 snapshots、应跑品类均有 Overall Top20、每品类至少 3 个引擎完成全部 active prompts。最新 run 仍在采尾部引擎时 health 仍 ok，带 `tail_collection_in_progress` warning。Blob 缺失只 warning。周一 `/api/cron` **不走**熔断（主跑优先）。自链 `x-pipeline-chain-depth > 0` 跳过入口闸门。周中 period 与周一等价；`collectOne` 对已 `ok` response skip。
 
 陈旧 `running` 判定看 **心跳**（`updated_at`），默认 **90 分钟**无更新即标 failed（可用 `PIPELINE_RUN_STALE_TIMEOUT_MS` 覆盖；不再用 30 小时）。
 每次运行和发布都会写出一行 JSON 日志，可按 `runId`、`week`、`stage` 在 Vercel Logs 中检索。生产 Cron 在完成后还会检查快照数量与运行状态；缺 Blob manifest 记为 warning，不以之为硬失败。若配置完整的 Resend 邮件变量，会直发告警邮件；可选 webhook 是邮件不可用时的备用通道。
