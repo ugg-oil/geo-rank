@@ -316,7 +316,7 @@ export async function runPipelineTick(
     const collectEngineName = parseCollectEngine(step);
     if (collectEngineName) {
       // First publish: skip remaining engines until overall boards are live.
-      // After snapshots exist, keep collecting trailing engines (Perplexity/Claude/DeepSeek).
+      // After that, finish one trailing engine then extract/score/publish again.
       const published = await weekHasPublishedSnapshots(w);
       const alreadySufficient = await hasSufficientCollectedForScoring(w);
       if (alreadySufficient && !published) {
@@ -345,8 +345,10 @@ export async function runPipelineTick(
 
       const sufficient = await hasSufficientCollectedForScoring(w);
       const nextIncomplete = await findNextIncompleteEngine(w);
+      // Unpublished + 3 engines: first overall publish.
+      // Published + this engine done: score that engine's board before collecting the next.
       const next =
-        sufficient && !published
+        batch.engineComplete && (published || sufficient)
           ? "extracting"
           : batch.engineComplete
             ? (nextIncomplete ? collectStepFor(nextIncomplete) : "extracting")
@@ -540,11 +542,11 @@ export async function runFullPipeline(
       });
       while (remainingEngine) {
         collectResults.push(...(await collectOneEngine(remainingEngine)));
+        const tail = await runPostStages(true);
+        publication = tail.publication;
+        snapshotCount = tail.snapshotCount;
         remainingEngine = await findNextIncompleteEngine(w);
       }
-      const tail = await runPostStages(true);
-      publication = tail.publication;
-      snapshotCount = tail.snapshotCount;
     }
 
     await prisma.pipelineRun.update({
