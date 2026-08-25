@@ -45,6 +45,7 @@ export async function normalizeWeek(week: string) {
   }> = [];
 
   for (const mention of mentions) {
+    if (!mention.rawBrand.trim()) continue;
     const key = `${mention.response.id}\u0000${mention.rawBrand}`;
     if (resolvedKeys.has(key)) continue;
 

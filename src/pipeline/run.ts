@@ -130,12 +130,20 @@ async function runOnePostStage(
   w: string,
   step: string,
   options: { publishLatest?: boolean },
+  tickDeadline: number,
   heartbeat: () => Promise<void>
 ): Promise<TickResult> {
   if (step === "extracting") {
-    const mentionCount = await runStage("extracting", extractWeek(w, { onProgress: heartbeat }));
-    await touchRun(run.id, { extractedCount: mentionCount, currentStep: "normalizing" });
-    return tickContinue(run.id, w, step, "normalizing");
+    const extracted = await runStage(
+      "extracting",
+      extractWeek(w, {
+        onProgress: heartbeat,
+        deadline: tickDeadline - 10_000,
+      })
+    );
+    const nextStep = extracted.remaining > 0 ? "extracting" : "normalizing";
+    await touchRun(run.id, { extractedCount: extracted.mentionCount, currentStep: nextStep });
+    return tickContinue(run.id, w, step, nextStep);
   }
 
   if (step === "normalizing") {
@@ -264,7 +272,7 @@ async function runPackedPostStages(
       };
     }
 
-    const result = await runOnePostStage(run, w, step, options, heartbeat);
+    const result = await runOnePostStage(run, w, step, options, tickDeadline, heartbeat);
     packed++;
     if (result.done) return result;
     if (parseCollectEngine(result.nextStep)) return result;
@@ -467,10 +475,10 @@ export async function runFullPipeline(
   };
 
   const runPostStages = async (forceScore: boolean) => {
-    const mentionCount = await timedStage("extracting", () =>
+    const extracted = await timedStage("extracting", () =>
       extractWeek(w, { onProgress: heartbeat })
     );
-    await touchRun(run.id, { extractedCount: mentionCount, currentStep: "normalizing" });
+    await touchRun(run.id, { extractedCount: extracted.mentionCount, currentStep: "normalizing" });
 
     const resolved = await timedStage("normalizing", () => normalizeWeek(w));
     await touchRun(run.id, { resolvedCount: resolved, currentStep: "consolidating" });
