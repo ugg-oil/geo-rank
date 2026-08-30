@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "seed": "npx tsx src/scripts/seed-prompts.ts",
+    "seed:brand-websites": "npx tsx src/scripts/seed-brand-websites.ts",
     "pipeline": "npx tsx src/scripts/run-pipeline.ts",
     "pipeline:health": "npx tsx src/scripts/check-pipeline-health.ts",
     "pipeline:fixtures": "npx tsx src/scripts/verify-pipeline-fixtures.ts",

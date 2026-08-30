@@ -8,11 +8,13 @@ export type BrandSlugRef = {
   id: string;
   canonicalName: string;
   parentCanonicalName: string | null;
+  website: string | null;
 };
 
 type BrandCandidate = {
   id: string;
   canonicalName: string;
+  website: string | null;
   parentBrand: { canonicalName: string } | null;
 };
 
@@ -25,6 +27,7 @@ function toRef(brand: BrandCandidate): BrandSlugRef {
     id: brand.id,
     canonicalName: brand.canonicalName,
     parentCanonicalName: brand.parentBrand?.canonicalName ?? null,
+    website: brand.website,
   };
 }
 
@@ -63,7 +66,7 @@ async function pickBestSlugMatch(candidates: BrandCandidate[]): Promise<BrandSlu
 
 async function lookupBrandBySlug(slug: string): Promise<BrandSlugRef | null> {
   const brands = await prisma.brand.findMany({
-    select: { id: true, canonicalName: true, parentBrand: { select: { canonicalName: true } } },
+    select: { id: true, canonicalName: true, website: true, parentBrand: { select: { canonicalName: true } } },
   });
   return pickBestSlugMatch(brands.filter((brand) => matchesSlug(brand.canonicalName, slug)));
 }
@@ -71,7 +74,7 @@ async function lookupBrandBySlug(slug: string): Promise<BrandSlugRef | null> {
 /** Request-deduped + 60s per-slug cache. */
 export const resolveBrandBySlug = cache(async (slug: string): Promise<BrandSlugRef | null> => {
   // v3: always slug-scan; never trust a single equals hit under collisions.
-  return ttlCache(`brand-slug:v3:${slug}`, 60_000, () => lookupBrandBySlug(slug));
+  return ttlCache(`brand-slug:v4:${slug}`, 60_000, () => lookupBrandBySlug(slug));
 });
 
 export const resolveBrandIdBySlug = cache(async (slug: string): Promise<string | null> => {

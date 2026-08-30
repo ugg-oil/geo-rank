@@ -44,6 +44,8 @@ export interface BrandPageData {
   slug: string;
   name: string;
   parentCompany: string | null;
+  /** Official product site. Omit / null = no 官网 link. */
+  website?: string | null;
   updatedAt: string;
   collectedEngines?: string[];
   categories: BrandPageCategoryEntry[];

@@ -26,6 +26,7 @@ type BrandBuildInfo = {
   canonicalName: string;
   parentCompany: string | null;
   aliases: string[];
+  website: string | null;
   categories: { category: string; rank: number; score: number; appearanceRate: number }[];
 };
 
@@ -80,6 +81,7 @@ export async function buildBrandPages(week: string): Promise<{
       brand: {
         select: {
           canonicalName: true,
+          website: true,
           parentBrand: { select: { canonicalName: true } },
           aliases: { select: { alias: true } },
         },
@@ -118,6 +120,7 @@ export async function buildBrandPages(week: string): Promise<{
         canonicalName: s.brand.canonicalName,
         parentCompany,
         aliases: s.brand.aliases.map((a) => a.alias),
+        website: s.brand.website,
         categories: [],
       });
     }
@@ -224,6 +227,7 @@ export async function buildBrandPages(week: string): Promise<{
       slug,
       name: displayName,
       parentCompany: info.parentCompany,
+      website: info.website,
       updatedAt: new Date().toISOString().split("T")[0]!,
       collectedEngines: [...COLLECTION_ENGINES],
       categories,
@@ -275,6 +279,7 @@ function toBrandPage(
     slug,
     name: displayName,
     parentCompany: info.parentCompany,
+    website: info.website,
     updatedAt: new Date().toISOString().split("T")[0]!,
     collectedEngines: [...COLLECTION_ENGINES],
     categories,
@@ -296,6 +301,7 @@ export async function buildBrandPageForSlug(
       where: { id: brandId },
       select: {
         canonicalName: true,
+        website: true,
         parentBrand: { select: { canonicalName: true } },
       },
     }),
@@ -321,6 +327,7 @@ export async function buildBrandPageForSlug(
       brand.parentBrand?.canonicalName
     ),
     aliases: [],
+    website: brand.website,
     categories: overalls.map((s) => ({
       category: s.category,
       rank: s.rank,
@@ -417,6 +424,7 @@ export async function loadBrandPageBundle(
     canonicalName: ref.canonicalName,
     parentCompany: getCompanyColumnName(ref.canonicalName, ref.parentCanonicalName),
     aliases: [],
+    website: ref.website,
     categories: overalls.map((row) => ({
       category: row.category,
       rank: row.rank,

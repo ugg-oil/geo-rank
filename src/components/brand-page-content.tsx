@@ -558,7 +558,19 @@ export function BrandPageContent({
 
       <div className="space-y-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{data.name}</h1>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{data.name}</h1>
+            {data.website ? (
+              <a
+                href={data.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-normal text-[var(--text-muted)] underline underline-offset-2 transition-colors hover:text-[var(--text-secondary)]"
+              >
+                {m.brand.website}
+              </a>
+            ) : null}
+          </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
             {parentSlug && parentLabel && (
               <>

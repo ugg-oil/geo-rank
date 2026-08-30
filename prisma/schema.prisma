@@ -54,6 +54,7 @@ model Brand {
   parentBrandId    String?           @map("parent_brand_id")
   rankingEnabled   Boolean           @default(true) @map("ranking_enabled")
   entityTypeSource String            @default("rule") @map("entity_type_source")
+  website          String?
   aliases          BrandAlias[]
   parentBrand      Brand?            @relation("BrandHierarchy", fields: [parentBrandId], references: [id])
   childBrands      Brand[]           @relation("BrandHierarchy")

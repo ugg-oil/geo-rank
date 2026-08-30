@@ -11,6 +11,8 @@ npm run review:auto -- --apply
 
 Pipeline 完成后默认**不**写 Vercel Blob。仅当显式设置 `PUBLISH_BLOB_MIRROR=1`（且具备 `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID`）时，才将榜单镜像到 Blob（`leaderboards/*`、`brands/*`、`companies/*`）。**前台主读 PostgreSQL `snapshots`（DB-first）**；Blob 为可选镜像，跳过或失败不否定该周对前台可读。
 
+发榜后只扫**本周期新进 Top20 / Also mentioned** 的品牌，再跑 `classifyEntity`：该关则 `rankingEnabled=false`、进 Review Queue，并 **只 force rescore 该品类本周期**。不要全库周扫，不要全库 force rescore。人工只看 Queue；规则不够就补 `entity-audit` / `classifyEntity`。未挂进 cron 前，成功后仍可 `npm run review:auto -- --apply`。
+
 Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，采集和抽取阶段默认各 20 分钟，规范化、分类、计分和发布等阶段默认各 20 分钟。超时后当前运行会标记为 `failed`，不会推进错误发布。
 
 **生产 Cron 为步进式（防 Vercel 单次请求被掐死）：** `/api/cron` 每次推进一个单位。采集阶段按**品类软截止**：单个 tick 预算默认 240s（`PIPELINE_TICK_BUDGET_MS`，低于路由 `maxDuration=300`），超时后留在同一 `collecting:<engine>`，下一枪/自链继续，而不是把整次 run 标 failed。每品类凑够 ≥3 个完整引擎后**先 extract/score 发综合榜**，然后同一条 run（或 catchup 新开的尾部 run）继续采剩下的引擎；**每采完一家就强制重打分发榜**，Perplexity/Claude 不必等 DeepSeek。extract 只处理还没有 mentions 的 response，tick 预算用尽就停在 `extracting`，下一枪续跑，不再一把梭被 300s 掐死。后处理（extract→publish）在同一 tick 预算内能跑几步跑几步（再开下一阶段需剩余 ≥ `PIPELINE_POST_STAGE_PACK_MIN_MS`，默认 20s），减少对 `after()` 自链的依赖。写回 `current_step`；采集按 prompt、extract 按 response、score 按品类刷新 `updated_at` 心跳（10s 节流）。同一请求可用 `after()` 自链式续跑（深度上限 24）；`vercel.json` 周一 UTC 02:00–04:30 错峰再触发。本地 `npm run pipeline` 仍是一次性跑完全流程（采集用 20 分钟硬超时）。

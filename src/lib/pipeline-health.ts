@@ -9,6 +9,7 @@ import {
 } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { shouldCollectCategoryInPeriod } from "@/lib/period";
+import { mapLatestPublishedPeriods } from "@/lib/period-sequence";
 import { getSiteUrl } from "@/lib/seo";
 
 type ManifestLike = { week?: string; boards?: Record<string, string> };
@@ -80,8 +81,13 @@ export async function getPipelineHealth(week: string) {
     return { ok: false as const, week, reason: "snapshot count is zero", run };
   }
 
+  const latestByCategory = await mapLatestPublishedPeriods(CATEGORIES);
   const expectedCategories = CATEGORIES.filter((category) =>
-    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+    shouldCollectCategoryInPeriod(
+      getCategoryPeriodDays(category),
+      week,
+      latestByCategory.get(category) ?? null
+    )
   );
   const [activePrompts, okResponses, overallBoards] = await Promise.all([
     prisma.prompt.findMany({

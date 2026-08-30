@@ -8,6 +8,7 @@ import {
 import { prisma } from "@/lib/db";
 import { getCategoryPeriodDays } from "@/lib/category-period";
 import { shouldCollectCategoryInPeriod } from "@/lib/period";
+import { mapLatestPublishedPeriods } from "@/lib/period-sequence";
 
 type CollectionCoverage = {
   expectedCategories: string[];
@@ -16,8 +17,13 @@ type CollectionCoverage = {
 };
 
 async function loadCollectionCoverage(week: string): Promise<CollectionCoverage> {
+  const latestByCategory = await mapLatestPublishedPeriods(CATEGORIES);
   const expectedCategories = CATEGORIES.filter((category) =>
-    shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+    shouldCollectCategoryInPeriod(
+      getCategoryPeriodDays(category),
+      week,
+      latestByCategory.get(category) ?? null
+    )
   );
 
   const [activePrompts, okResponses] = await Promise.all([

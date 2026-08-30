@@ -500,4 +500,4 @@ P6  实体质量 / 榜单可信度（全品类）
 ### 不做（本块范围外）
 
 - 不重采引擎原始 response（只修解析 / 归并 / 计分 / 门槛）。
-- 不把 GEO Audit / 邮件监控混进本块（见 [PRD-phase-next](../PRD-phase-next.md) N1–N3）。
+- 不把 GEO Audit / 邮件监控混进本块（Watch / Audit 见 [phase-6](../phase-6/PRD-phase-6.md) / [PRD-phase-next](../PRD-phase-next.md) N3）。
