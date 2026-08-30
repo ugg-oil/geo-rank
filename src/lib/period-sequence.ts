@@ -29,6 +29,27 @@ export async function listPublishedOverallWeeks(category: string): Promise<strin
   });
 }
 
+/** Newest published overall period key for a category, or null if none. */
+export async function getLatestPublishedPeriod(
+  category: string
+): Promise<string | null> {
+  const weeks = await listPublishedOverallWeeks(category);
+  return weeks[0] ?? null;
+}
+
+/** Batch latest published overall period per category (newest-first list[0]). */
+export async function mapLatestPublishedPeriods(
+  categories: readonly string[]
+): Promise<Map<string, string | null>> {
+  const entries = await Promise.all(
+    categories.map(async (category) => {
+      const latest = await getLatestPublishedPeriod(category);
+      return [category, latest] as const;
+    })
+  );
+  return new Map(entries);
+}
+
 /**
  * Previous period in the category's published snapshot sequence (not calendar -N days).
  * Each historical week key remains one point (P0-8).

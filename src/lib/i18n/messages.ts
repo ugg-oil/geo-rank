@@ -470,6 +470,7 @@ const en = {
     ctaDesc: "Period updates on how this brand appears across AI engines.",
     ctaButton: "Monitor visibility",
     comingSoon: "Coming soon",
+    website: "Visit website",
   },
   lead: {
     title: "Monitor this brand's AI visibility",
@@ -604,7 +605,7 @@ const en = {
       {
         title: "Update Frequency",
         paragraphs: [
-          'Rankings are updated on each category\'s collection period (7 or 14 days). Data is labeled by the period start date (e.g., "2026-07-27").',
+          'Rankings are updated on each category\'s collection period. Data is labeled by the period start date (e.g., "2026-07-27").',
         ],
       },
       {
@@ -1072,6 +1073,7 @@ const zh = {
     ctaDesc: "按采集周期了解该品牌在各 AI 引擎中的出现情况。",
     ctaButton: "监测可见度",
     comingSoon: "即将推出",
+    website: "进入官网",
   },
   lead: {
     title: "监测该品牌可见度",
@@ -1202,7 +1204,7 @@ const zh = {
       {
         title: "更新频率",
         paragraphs: [
-          "榜单按各品类采集周期更新（7 或 14 天）。数据按周期起始日标注（例如「2026-07-27」）。",
+          "榜单按各品类采集周期更新。数据按周期起始日标注（例如「2026-07-27」）。",
         ],
       },
       {

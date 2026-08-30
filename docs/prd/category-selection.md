@@ -2,11 +2,13 @@
 
 > 入选标准、全量清单、周期、exclude。Prompt 正文见 [`src/scripts/seed-prompts.ts`](../../src/scripts/seed-prompts.ts)（每品类 ×8）；回填时追加 ` as of {periodStartDate}`，不改 seed。
 >
-> 已发布阶段：[phase-4](./phase-4/PRD-phase-4.md)（v1.4）、[phase-5](./phase-5/PRD-phase-5.md)（v1.5 · [technical §8–9](./phase-5/technical.md)）；草案：[phase-6](./phase-6/PRD-phase-6.md)；未排期：[PRD-phase-next](./PRD-phase-next.md)。
+> 已发布阶段：[phase-4](./phase-4/PRD-phase-4.md)（v1.4）、[phase-5](./phase-5/PRD-phase-5.md)（v1.5 · [technical §8–9](./phase-5/technical.md)）；定稿：[phase-6](./phase-6/PRD-phase-6.md)；未排期：[PRD-phase-next](./PRD-phase-next.md)。
 >
-> **合计 24 品类 · 全部已发布。** 采集按天/周期（默认 7 或 14）；标签用起始日 `YYYY-MM-DD`。exclude = `entity-audit` 的 `excludedCategories`（仅列出品类）；同品牌可多榜。Company 列见 `parent-company.ts`。
+> **合计 24 品类 · 全部已发布。** 采集周期见「天」列（phase-6：原 7→14、原 14→21；未知品类默认仍 7）。标签用起始日 `YYYY-MM-DD`。exclude = `entity-audit` 的 `excludedCategories`（仅列出品类）；同品牌可多榜。Company 列见 `parent-company.ts`。
 >
 > P5（11）：临近 4 档 `08-10` · `07-27` · `07-13` · `06-29`，6 引擎含 DeepSeek；launch-gate 2026-08-16 全绿。
+>
+> **未发布：** 各品类「已有最新起点 + 天」连推 4 档（以 DB 最新 **2026-08-24** 计：14 天 → **09-07…**；21 天 → **09-14…**）。发完后挪进「已有周期」并重推。
 
 ## 一票否决（任一不过则淘汰）
 
@@ -47,34 +49,35 @@
 
 ## 品类总表（24）
 
-> **已有周期** = DB overall snapshot 起始日（近→远）。与品类页周期下拉里一致。
+> **已有周期** = DB overall snapshot 起始日（近→远）。与品类页周期下拉里一致（2026-08-30 对库）。  
+> **未发布** = 已有最新起点按「天」连推 4 档（近→远）；发布后挪入「已有周期」并重推。
 
-| # | 批次 | 品类 | 中文名 | slug | 天 | 已有周期 | 口径 | Exclude / Watchlist |
-|---|------|------|--------|------|----|----------|------|---------------------|
-| 1 | 既有 | AI Tools | AI 工具 | `ai-tools` | 7 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 通用 AI 工具 | — |
-| 2 | 既有 | SaaS Software | SaaS 软件 | `saas-software` | 14 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | B2B / 订阅制软件 | — |
-| 3 | 既有 | AI Image / Video Tools | AI 图像 / 视频 | `ai-image-video-tools` | 7 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | AI 图像与视频生成 | — |
-| 4 | 既有 | Developer Tools | 开发者工具 | `developer-tools` | 14 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 开发与工程工具链 | — |
-| 5 | 既有 | Marketing Tools | 营销工具 | `marketing-tools` | 7 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 营销与增长工具 | — |
-| 6 | 既有 | VPN Services | VPN 服务 | `vpn-services` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 · 2026-06-01 | VPN 服务品牌 | Watch：Opera VPN、iCloud Private Relay、Tor、住宅代理、Cisco AnyConnect、Zscaler；Norton/McAfee 母名（无独立 VPN 时） |
-| 7 | 既有 | E-commerce Platforms | 电商平台 | `ecommerce-platforms` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 · 2026-06-01 | 开店电商；不含纯建站器 | **Exclude：** Wix、Squarespace、Webflow、WordPress、WordPress.com |
-| 8 | 既有 | Online Course Platforms | 在线课程平台 | `online-course-platforms` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | MOOC / cohort | 允许与 Language 双上榜 |
-| 9 | 既有 | Language Learning Apps | 语言学习 App | `language-learning-apps` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | 语言学习 App | 允许与 Course 双上榜 |
-| 10 | 既有 | Password Managers | 密码管理器 | `password-managers` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | 密码管理器 | Watch：浏览器自带密码、Apple Keychain、Authenticator；Norton/McAfee 母名 |
-| 11 | 既有 | AI Meeting Assistants | AI 会议助手 | `ai-meeting-assistants` | 7 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 | 会议记录/摘要；不含视频会议 | **Exclude：** Zoom、Google Meet、Microsoft Teams、Cisco Webex、GoTo Meeting |
-| 12 | 既有 | AI Cybersecurity Tools | AI 安全工具 | `ai-cybersecurity-tools` | 7 | 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 | AI 威胁检测；不含传统杀毒 | **Exclude：** Norton、McAfee、Kaspersky、Bitdefender、Avast、AVG |
-| 13 | 既有 | Recruiting Tools | 招聘工具 | `recruiting-tools` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | ATS / 招聘获客；不含泛 HRIS | **Exclude：** Workday、BambooHR、ADP、SAP SuccessFactors、UKG |
-| 14 | P5 | Project Management Tools | 项目管理工具 | `project-management-tools` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 项目/任务协作 | Watch：Miro、Mural、FigJam、Lucidspark、Google Docs、Word；Notion 可与笔记双上榜 |
-| 15 | P5 | CRM Platforms | 客户关系管理 | `crm-platforms` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | CRM / 销售管道 | 允许与 Marketing / Support 双上榜 |
-| 16 | P5 | Customer Support / Helpdesk | 客服与工单系统 | `customer-support-helpdesk` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 客服工单 / 收件箱 | 允许与 CRM 双上榜 |
-| 17 | P5 | Accounting & Invoicing Software | 会计与发票软件 | `accounting-invoicing-software` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | SMB 会计/发票 | Watch：银行 App、SAP/Oracle 等泛 ERP（无独立 SMB 会计产品时） |
-| 18 | P5 | SEO / Content Tools | SEO 与内容工具 | `seo-content-tools` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | SEO 研究/审计/排名 | Watch：HubSpot / Mailchimp 等泛营销母名（无独立 SEO 产品时） |
-| 19 | P5 | Cloud Storage | 云存储 | `cloud-storage` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 云盘 / 文件同步分享 | Watch：大厂是否长期锁 Top |
-| 20 | P5 | Design & Prototyping Tools | 设计与原型工具 | `design-prototyping-tools` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | UI/平面/原型 | Watch：Midjourney / Runway 等纯 AI 图视频生成器（归 AI Image/Video） |
-| 21 | P5 | Note-taking & Knowledge Base | 笔记与知识库 | `note-taking-knowledge-base` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 笔记 / 知识库 | Notion 可与 PM 双上榜 |
-| 22 | P5 | Email Marketing Tools | 邮件营销工具 | `email-marketing-tools` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 邮件/生命周期营销 | 钉邮件口径，避免飘回 Marketing Tools |
-| 23 | P5 | HR Software | HR 软件 | `hr-software` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | HRIS / 人事主数据 | **Exclude：** Greenhouse、Lever、Ashby、Workable、Jobvite、SmartRecruiters、iCIMS（与 Recruiting 互斥） |
-| 24 | P5 | Workflow Automation | 工作流自动化 | `workflow-automation` | 14 | 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 无代码自动化（Zapier/Make/n8n） | 与 Developer Tools 重叠可控 |
+| # | 批次 | 品类 | 中文名 | slug | 天 | 已有周期 | 未发布 | 口径 | Exclude / Watchlist |
+|---|------|------|--------|------|----|----------|--------|------|---------------------|
+| 1 | 既有 | AI Tools | AI 工具 | `ai-tools` | 14 | 2026-08-24 · 2026-08-17 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 2026-09-07 · 2026-09-21 · 2026-10-05 · 2026-10-19 | 通用 AI 工具 | — |
+| 2 | 既有 | SaaS Software | SaaS 软件 | `saas-software` | 21 | 2026-08-24 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | B2B / 订阅制软件 | — |
+| 3 | 既有 | AI Image / Video Tools | AI 图像 / 视频 | `ai-image-video-tools` | 14 | 2026-08-24 · 2026-08-17 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 2026-09-07 · 2026-09-21 · 2026-10-05 · 2026-10-19 | AI 图像与视频生成 | — |
+| 4 | 既有 | Developer Tools | 开发者工具 | `developer-tools` | 21 | 2026-08-24 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 开发与工程工具链 | — |
+| 5 | 既有 | Marketing Tools | 营销工具 | `marketing-tools` | 14 | 2026-08-24 · 2026-08-17 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 · 2026-07-06 | 2026-09-07 · 2026-09-21 · 2026-10-05 · 2026-10-19 | 营销与增长工具 | — |
+| 6 | 既有 | VPN Services | VPN 服务 | `vpn-services` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 · 2026-06-01 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | VPN 服务品牌 | Watch：Opera VPN、iCloud Private Relay、Tor、住宅代理、Cisco AnyConnect、Zscaler；Norton/McAfee 母名（无独立 VPN 时） |
+| 7 | 既有 | E-commerce Platforms | 电商平台 | `ecommerce-platforms` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 · 2026-06-01 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 开店电商；不含纯建站器 | **Exclude：** Wix、Squarespace、Webflow、WordPress、WordPress.com |
+| 8 | 既有 | Online Course Platforms | 在线课程平台 | `online-course-platforms` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | MOOC / cohort | 允许与 Language 双上榜 |
+| 9 | 既有 | Language Learning Apps | 语言学习 App | `language-learning-apps` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 语言学习 App | 允许与 Course 双上榜 |
+| 10 | 既有 | Password Managers | 密码管理器 | `password-managers` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 密码管理器 | Watch：浏览器自带密码、Apple Keychain、Authenticator；Norton/McAfee 母名 |
+| 11 | 既有 | AI Meeting Assistants | AI 会议助手 | `ai-meeting-assistants` | 14 | 2026-08-24 · 2026-08-17 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 | 2026-09-07 · 2026-09-21 · 2026-10-05 · 2026-10-19 | 会议记录/摘要；不含视频会议 | **Exclude：** Zoom、Google Meet、Microsoft Teams、Cisco Webex、GoTo Meeting |
+| 12 | 既有 | AI Cybersecurity Tools | AI 安全工具 | `ai-cybersecurity-tools` | 14 | 2026-08-24 · 2026-08-17 · 2026-08-10 · 2026-08-03 · 2026-07-27 · 2026-07-20 · 2026-07-13 | 2026-09-07 · 2026-09-21 · 2026-10-05 · 2026-10-19 | AI 威胁检测；不含传统杀毒 | **Exclude：** Norton、McAfee、Kaspersky、Bitdefender、Avast、AVG |
+| 13 | 既有 | Recruiting Tools | 招聘工具 | `recruiting-tools` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 · 2026-06-15 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | ATS / 招聘获客；不含泛 HRIS | **Exclude：** Workday、BambooHR、ADP、SAP SuccessFactors、UKG |
+| 14 | P5 | Project Management Tools | 项目管理工具 | `project-management-tools` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 项目/任务协作 | Watch：Miro、Mural、FigJam、Lucidspark、Google Docs、Word；Notion 可与笔记双上榜 |
+| 15 | P5 | CRM Platforms | 客户关系管理 | `crm-platforms` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | CRM / 销售管道 | 允许与 Marketing / Support 双上榜 |
+| 16 | P5 | Customer Support / Helpdesk | 客服与工单系统 | `customer-support-helpdesk` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 客服工单 / 收件箱 | 允许与 CRM 双上榜 |
+| 17 | P5 | Accounting & Invoicing Software | 会计与发票软件 | `accounting-invoicing-software` | 21 | 2026-08-24 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | SMB 会计/发票 | Watch：银行 App、SAP/Oracle 等泛 ERP（无独立 SMB 会计产品时） |
+| 18 | P5 | SEO / Content Tools | SEO 与内容工具 | `seo-content-tools` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | SEO 研究/审计/排名 | Watch：HubSpot / Mailchimp 等泛营销母名（无独立 SEO 产品时） |
+| 19 | P5 | Cloud Storage | 云存储 | `cloud-storage` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 云盘 / 文件同步分享 | Watch：大厂是否长期锁 Top |
+| 20 | P5 | Design & Prototyping Tools | 设计与原型工具 | `design-prototyping-tools` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | UI/平面/原型 | Watch：Midjourney / Runway 等纯 AI 图视频生成器（归 AI Image/Video） |
+| 21 | P5 | Note-taking & Knowledge Base | 笔记与知识库 | `note-taking-knowledge-base` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 笔记 / 知识库 | Notion 可与 PM 双上榜 |
+| 22 | P5 | Email Marketing Tools | 邮件营销工具 | `email-marketing-tools` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 邮件/生命周期营销 | 钉邮件口径，避免飘回 Marketing Tools |
+| 23 | P5 | HR Software | HR 软件 | `hr-software` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | HRIS / 人事主数据 | **Exclude：** Greenhouse、Lever、Ashby、Workable、Jobvite、SmartRecruiters、iCIMS（与 Recruiting 互斥） |
+| 24 | P5 | Workflow Automation | 工作流自动化 | `workflow-automation` | 21 | 2026-08-24 · 2026-08-10 · 2026-07-27 · 2026-07-13 · 2026-06-29 | 2026-09-14 · 2026-10-05 · 2026-10-26 · 2026-11-16 | 无代码自动化（Zapier/Make/n8n） | 与 Developer Tools 重叠可控 |
 
 ### 维护约定
 

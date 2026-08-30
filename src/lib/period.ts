@@ -102,14 +102,20 @@ export function getPreviousPeriodKey(week: string, periodDays = 7): string {
   return getPreviousWeek(week, periodDays);
 }
 
-/** True when this run's period start is a valid collection boundary for the category cadence. */
+/**
+ * True when this run should collect the category.
+ * Next due = last published overall period start + categoryPeriodDays (PRD phase-6).
+ * No publish history → due (bootstrap). Retries of the same Monday stay due until published.
+ */
 export function shouldCollectCategoryInPeriod(
   categoryPeriodDays: number,
-  runPeriodKey: string
+  runPeriodKey: string,
+  lastPublishedPeriodKey: string | null = null
 ): boolean {
   const runDate = normalizePeriodDate(runPeriodKey);
-  const expected = getPeriodStartDate(categoryPeriodDays, parseLocalDate(runDate));
-  return runDate === expected;
+  if (lastPublishedPeriodKey == null) return true;
+  const lastDate = normalizePeriodDate(lastPublishedPeriodKey);
+  return runDate === addDays(lastDate, categoryPeriodDays);
 }
 
 /** Prompt suffix for historical backfill (P5): ` as of YYYY-MM-DD`. */

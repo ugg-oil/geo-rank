@@ -3,7 +3,6 @@ import {
   addDays,
   backfillPromptSuffix,
   formatPeriodDate,
-  getPeriodStartDate,
   getPreviousWeek,
   normalizePeriodDate,
   shouldCollectCategoryInPeriod,
@@ -18,29 +17,66 @@ assert.equal(toStoragePeriodKey("2026-07-27"), "Week of 2026-07-27");
 assert.equal(formatPeriodDate("Week of 2026-07-27"), "2026-07-27");
 assert.equal(getPreviousWeek("Week of 2026-07-27"), "Week of 2026-07-20");
 assert.equal(getPreviousWeek("Week of 2026-07-27", 14), "Week of 2026-07-13");
+assert.equal(getPreviousWeek("Week of 2026-08-24", 21), "Week of 2026-08-03");
 assert.equal(addDays("2026-07-27", -7), "2026-07-20");
 assert.equal(backfillPromptSuffix("Week of 2026-07-27"), " as of 2026-07-27");
 assert.equal(backfillPromptSuffix("2026-07-27"), " as of 2026-07-27");
 
-assert.equal(getCategoryPeriodDays("AI Tools"), 7);
-assert.equal(getCategoryPeriodDays("SaaS Software"), 14);
-assert.equal(getCategoryPeriodDays("VPN Services"), 14);
-assert.equal(getCategoryPeriodDays("AI Meeting Assistants"), 7);
+// phase-6 cadence: former 7 → 14, former 14 → 21; unknown stays 7.
+assert.equal(getCategoryPeriodDays("AI Tools"), 14);
+assert.equal(getCategoryPeriodDays("AI Image / Video Tools"), 14);
+assert.equal(getCategoryPeriodDays("Marketing Tools"), 14);
+assert.equal(getCategoryPeriodDays("AI Meeting Assistants"), 14);
+assert.equal(getCategoryPeriodDays("AI Cybersecurity Tools"), 14);
+assert.equal(getCategoryPeriodDays("SaaS Software"), 21);
+assert.equal(getCategoryPeriodDays("VPN Services"), 21);
+assert.equal(getCategoryPeriodDays("HR Software"), 21);
 assert.equal(getCategoryPeriodDays("Unknown"), 7);
 
-// 7-day categories always collect on the current Monday key.
-const mondayKey = toStoragePeriodKey(getPeriodStartDate(7));
-assert.equal(shouldCollectCategoryInPeriod(7, mondayKey), true);
+// Due = last published start + periodDays (exact Monday). No history → due.
+assert.equal(shouldCollectCategoryInPeriod(7, "Week of 2026-08-31", null), true);
+assert.equal(
+  shouldCollectCategoryInPeriod(7, "Week of 2026-08-31", "Week of 2026-08-24"),
+  true
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(7, "Week of 2026-08-31", "Week of 2026-08-17"),
+  false
+);
 
-// Historical Monday must also be collectable for 7-day (backfill).
-assert.equal(shouldCollectCategoryInPeriod(7, "Week of 2026-06-01"), true);
+// SaaS-style: latest 08-10, 21-day → due 08-31 (not epoch lattice 09-14).
+assert.equal(
+  shouldCollectCategoryInPeriod(21, "Week of 2026-08-31", "Week of 2026-08-10"),
+  true
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(21, "Week of 2026-09-14", "Week of 2026-08-10"),
+  false
+);
 
-// 14-day: only when run key equals aligned 14-day bucket start.
-const fourteenStart = getPeriodStartDate(14);
-assert.equal(shouldCollectCategoryInPeriod(14, toStoragePeriodKey(fourteenStart)), true);
-if (fourteenStart !== normalizePeriodDate(mondayKey)) {
-  assert.equal(shouldCollectCategoryInPeriod(14, mondayKey), false);
-}
+// Shared latest 08-24: 14 → 09-07; 21 → 09-14.
+assert.equal(
+  shouldCollectCategoryInPeriod(14, "Week of 2026-09-07", "Week of 2026-08-24"),
+  true
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(21, "Week of 2026-09-14", "Week of 2026-08-24"),
+  true
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(14, "Week of 2026-09-14", "Week of 2026-08-24"),
+  false
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(21, "Week of 2026-09-07", "Week of 2026-08-24"),
+  false
+);
+
+// Same-Monday retry before publish: still due.
+assert.equal(
+  shouldCollectCategoryInPeriod(21, "Week of 2026-08-31", "Week of 2026-08-10"),
+  true
+);
 
 const backfill7 = getDefaultBackfillPeriodKeys(7, 4, "2026-08-04");
 assert.deepEqual(backfill7, [

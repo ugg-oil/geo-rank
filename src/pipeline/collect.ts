@@ -147,7 +147,7 @@ export type CollectOptions = {
   categories?: readonly string[];
   /**
    * When true, skip period-cadence gating (explicit category backfill for a period key).
-   * Default false — cron still uses shouldCollectCategoryInPeriod.
+   * Default false — cron uses last-published + category period days.
    */
   forceCategories?: boolean;
   /** Soft stop: return instead of throwing when the tick budget is spent. */
@@ -254,16 +254,24 @@ export async function collectEngine(
   const { CATEGORIES } = await import("@/lib/constants");
   const { getCategoryPeriodDays } = await import("@/lib/category-period");
   const { shouldCollectCategoryInPeriod } = await import("@/lib/period");
+  const { mapLatestPublishedPeriods } = await import("@/lib/period-sequence");
   const categories = options.categories ?? CATEGORIES;
   const suffix = options.promptSuffix ?? "";
   const jobs: CollectionJob[] = [];
   const categoriesAttempted: string[] = [];
   const soft = options.softDeadline === true;
+  const latestByCategory = options.forceCategories
+    ? null
+    : await mapLatestPublishedPeriods(categories);
 
   for (const category of categories) {
     if (
       !options.forceCategories &&
-      !shouldCollectCategoryInPeriod(getCategoryPeriodDays(category), week)
+      !shouldCollectCategoryInPeriod(
+        getCategoryPeriodDays(category),
+        week,
+        latestByCategory!.get(category) ?? null
+      )
     ) {
       continue;
     }
