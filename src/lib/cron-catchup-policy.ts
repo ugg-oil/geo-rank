@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { PIPELINE_RUN_STALE_TIMEOUT_MS } from "@/lib/pipeline-timeouts";
-import { weekHasIdleCollectionEngines } from "@/lib/collection-progress";
+import { listDueCategories, weekHasIdleCollectionEngines } from "@/lib/collection-progress";
 
 /**
  * Catch-up policy for `/api/cron/catchup`.
@@ -45,7 +45,11 @@ export type CatchupRunSnapshot = {
 export type CatchupDecision =
   | {
       action: "skip";
-      reason: "already_published" | "already_running" | "circuit_open";
+      reason:
+        | "already_published"
+        | "already_running"
+        | "circuit_open"
+        | "no_categories_due";
       runId?: string;
       currentStep?: string | null;
       runsThisWeek?: number;
@@ -88,6 +92,26 @@ export async function decideCatchupEntry(
   week: string,
   run: CatchupRunSnapshot
 ): Promise<CatchupDecision> {
+  const dueCategories = await listDueCategories(week);
+  if (dueCategories.length === 0) {
+    if (run?.status === "running" && (run.snapshotCount ?? 0) === 0) {
+      const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
+      return {
+        action: "run",
+        reason: "cleanup_empty_running",
+        mode: "continue",
+        runId: run.id,
+        runsThisWeek,
+      };
+    }
+    return {
+      action: "skip",
+      reason: "no_categories_due",
+      runId: run?.id,
+      currentStep: run?.currentStep,
+    };
+  }
+
   if (run?.status === "success" && (run.snapshotCount ?? 0) > 0) {
     if (await weekHasIdleCollectionEngines(week)) {
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });

@@ -67,10 +67,27 @@ export async function recordPublicationFailure(week: string, error: string) {
  * Blob manifests remain optional warnings only.
  */
 export async function getPipelineHealth(week: string) {
+  const latestByCategory = await mapLatestPublishedPeriods(CATEGORIES);
+  const expectedCategories = CATEGORIES.filter((category) =>
+    shouldCollectCategoryInPeriod(
+      getCategoryPeriodDays(category),
+      week,
+      latestByCategory.get(category) ?? null
+    )
+  );
   const run = await prisma.pipelineRun.findFirst({ where: { week }, orderBy: { startedAt: "desc" }, select: {
     id: true, status: true, currentStep: true, startedAt: true, updatedAt: true, finishedAt: true, snapshotCount: true,
     manifestUrl: true, latestManifestUrl: true, publishStatus: true, publishedAt: true, publishError: true, errorMessage: true,
   }});
+  if (expectedCategories.length === 0) {
+    return {
+      ok: true as const,
+      week,
+      reason: "no_categories_due",
+      run,
+      warnings: [],
+    };
+  }
   if (!run) return { ok: false as const, week, reason: "no pipeline run found", run: null };
   const weekSnapshotCount = await prisma.snapshot.count({ where: { week } });
   if (run.status !== "success") {
@@ -81,14 +98,6 @@ export async function getPipelineHealth(week: string) {
     return { ok: false as const, week, reason: "snapshot count is zero", run };
   }
 
-  const latestByCategory = await mapLatestPublishedPeriods(CATEGORIES);
-  const expectedCategories = CATEGORIES.filter((category) =>
-    shouldCollectCategoryInPeriod(
-      getCategoryPeriodDays(category),
-      week,
-      latestByCategory.get(category) ?? null
-    )
-  );
   const [activePrompts, okResponses, overallBoards] = await Promise.all([
     prisma.prompt.findMany({
       where: { category: { in: [...expectedCategories] }, active: true },

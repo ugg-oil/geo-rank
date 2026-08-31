@@ -121,7 +121,7 @@ export async function handleCronTick(req: NextRequest, options: CronTickOptions 
         });
         return NextResponse.json({ ok: false, ...result, health }, { status: 500 });
       }
-      logPipelineEvent({ event: "cron_health_check_passed", week, runId: health.run.id });
+      logPipelineEvent({ event: "cron_health_check_passed", week, runId: health.run?.id });
       return NextResponse.json({ ok: true, ...result, health });
     }
 
