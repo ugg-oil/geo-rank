@@ -24,6 +24,7 @@ import {
   findNextIncompleteEngine,
   hasSufficientCollectedForScoring,
   weekHasPublishedSnapshots,
+  weekNeedsPipelineTick,
 } from "@/lib/collection-progress";
 
 function collectStepFor(engine: Engine) {
@@ -103,6 +104,34 @@ async function failStaleRunning(week: string) {
     },
   });
   return null;
+}
+
+async function finishSkippedNoDueWeek(week: string, runId: string | null): Promise<TickResult> {
+  if (runId) {
+    await prisma.pipelineRun.update({
+      where: { id: runId },
+      data: {
+        status: "success",
+        currentStep: null,
+        finishedAt: new Date(),
+        publishStatus: "skipped",
+        errorMessage: null,
+      },
+    });
+  }
+  logPipelineEvent({
+    event: "pipeline_skipped_no_due_categories",
+    week,
+    runId: runId ?? undefined,
+  });
+  return {
+    runId: runId ?? "skipped",
+    week,
+    status: "success",
+    step: "skipped",
+    nextStep: null,
+    done: true,
+  };
 }
 
 type TickRun = { id: string };
@@ -289,7 +318,35 @@ export async function runPipelineTick(
   options: { publishLatest?: boolean } = {}
 ) {
   const w = week ?? getCurrentWeek();
+  const needsWork = await weekNeedsPipelineTick(w);
   let run = await failStaleRunning(w);
+
+  if (!needsWork) {
+    if (run?.status === "running") {
+      return finishSkippedNoDueWeek(w, run.id);
+    }
+    const latest =
+      run ??
+      (await prisma.pipelineRun.findFirst({
+        where: { week: w },
+        orderBy: { startedAt: "desc" },
+        select: { id: true, status: true, currentStep: true },
+      }));
+    if (latest?.status === "success") {
+      return {
+        runId: latest.id,
+        week: w,
+        status: "success",
+        step: latest.currentStep ?? "skipped",
+        nextStep: null,
+        done: true,
+      };
+    }
+    if (latest?.status === "failed") {
+      return finishSkippedNoDueWeek(w, latest.id);
+    }
+    return finishSkippedNoDueWeek(w, null);
+  }
 
   if (run && run.status === "running") {
     // continue existing

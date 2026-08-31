@@ -58,11 +58,28 @@ async function loadCollectionCoverage(week: string): Promise<CollectionCoverage>
   return { expectedCategories, promptCounts, promptIdsByCategoryEngine };
 }
 
+/** Categories due for collection on this pipeline week (period start date). */
+export async function listDueCategories(week: string): Promise<string[]> {
+  const coverage = await loadCollectionCoverage(week);
+  return coverage.expectedCategories;
+}
+
+/** True when this week needs pipeline work: due categories or in-flight responses/snapshots. */
+export async function weekNeedsPipelineTick(week: string): Promise<boolean> {
+  const due = await listDueCategories(week);
+  if (due.length > 0) return true;
+  const [responses, snapshots] = await Promise.all([
+    prisma.response.count({ where: { week } }),
+    prisma.snapshot.count({ where: { week } }),
+  ]);
+  return responses > 0 || snapshots > 0;
+}
+
 function engineCompleteForAllDue(
   coverage: CollectionCoverage,
   engine: Engine
 ): boolean {
-  if (coverage.expectedCategories.length === 0) return true;
+  if (coverage.expectedCategories.length === 0) return false;
   return coverage.expectedCategories.every((category) => {
     const expectedPrompts = coverage.promptCounts.get(category) ?? PROMPTS_PER_CATEGORY;
     const key = `${category}\0${engine}`;
