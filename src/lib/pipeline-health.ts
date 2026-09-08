@@ -1,15 +1,16 @@
 import { CATEGORY_TO_SLUG } from "@/lib/categories";
-import { getCategoryPeriodDays } from "@/lib/category-period";
 import {
-  CATEGORIES,
   COLLECTION_ENGINES,
   MIN_SCORING_ENGINES_FOR_OVERALL,
   PROMPTS_PER_CATEGORY,
   TOP_N,
 } from "@/lib/constants";
+import {
+  listCollectCategories,
+  listDueCategories,
+  weekHasIdleCollectionEngines,
+} from "@/lib/collection-progress";
 import { prisma } from "@/lib/db";
-import { shouldCollectCategoryInPeriod } from "@/lib/period";
-import { mapLatestPublishedPeriods } from "@/lib/period-sequence";
 import { getSiteUrl } from "@/lib/seo";
 
 type ManifestLike = { week?: string; boards?: Record<string, string> };
@@ -62,19 +63,14 @@ export async function recordPublicationFailure(week: string, error: string) {
 
 /**
  * Health = current-period publish readiness for catch-up / monitoring.
- * Requires successful run, non-zero snapshots, overall Top20 for every
- * category due this period, and ≥ MIN_SCORING_ENGINES complete engines each.
- * Blob manifests remain optional warnings only.
+ * Requires successful (or published-while-running) run, non-zero snapshots,
+ * overall Top20 for every collect category this week (due ∪ in-flight),
+ * and ≥ MIN_SCORING_ENGINES complete engines each.
+ * Blob manifests / trailing idle engines remain optional warnings.
  */
 export async function getPipelineHealth(week: string) {
-  const latestByCategory = await mapLatestPublishedPeriods(CATEGORIES);
-  const expectedCategories = CATEGORIES.filter((category) =>
-    shouldCollectCategoryInPeriod(
-      getCategoryPeriodDays(category),
-      week,
-      latestByCategory.get(category) ?? null
-    )
-  );
+  const dueCategories = await listDueCategories(week);
+  const expectedCategories = await listCollectCategories(week);
   const run = await prisma.pipelineRun.findFirst({ where: { week }, orderBy: { startedAt: "desc" }, select: {
     id: true, status: true, currentStep: true, startedAt: true, updatedAt: true, finishedAt: true, snapshotCount: true,
     manifestUrl: true, latestManifestUrl: true, publishStatus: true, publishedAt: true, publishError: true, errorMessage: true,
@@ -156,6 +152,7 @@ export async function getPipelineHealth(week: string) {
       run,
       coverage: {
         expectedCategories: expectedCategories.length,
+        dueCategories: dueCategories.length,
         missingBoards,
         undercoveredCategories,
       },
@@ -164,6 +161,9 @@ export async function getPipelineHealth(week: string) {
 
   const warnings: string[] = [];
   if (run.status === "running") {
+    warnings.push("tail_collection_in_progress");
+  }
+  if (await weekHasIdleCollectionEngines(week)) {
     warnings.push("tail_collection_in_progress");
   }
   if (!run.manifestUrl || !run.latestManifestUrl) {
@@ -177,7 +177,7 @@ export async function getPipelineHealth(week: string) {
     ok: true as const,
     week,
     run,
-    ...(warnings.length > 0 ? { warnings } : {}),
+    ...(warnings.length > 0 ? { warnings: [...new Set(warnings)] } : {}),
   };
 }
 
