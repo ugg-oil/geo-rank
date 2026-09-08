@@ -8,7 +8,7 @@ import {
 import {
   listCollectCategories,
   listDueCategories,
-  weekHasIdleCollectionEngines,
+  weekNeedsRemainingCollection,
 } from "@/lib/collection-progress";
 import { prisma } from "@/lib/db";
 import { getSiteUrl } from "@/lib/seo";
@@ -163,7 +163,7 @@ export async function getPipelineHealth(week: string) {
   if (run.status === "running") {
     warnings.push("tail_collection_in_progress");
   }
-  if (await weekHasIdleCollectionEngines(week)) {
+  if (await weekNeedsRemainingCollection(week)) {
     warnings.push("tail_collection_in_progress");
   }
   if (!run.manifestUrl || !run.latestManifestUrl) {
