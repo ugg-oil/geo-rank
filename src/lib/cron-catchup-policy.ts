@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { PIPELINE_RUN_STALE_TIMEOUT_MS } from "@/lib/pipeline-timeouts";
-import { listDueCategories, weekHasIdleCollectionEngines } from "@/lib/collection-progress";
+import { listDueCategories, weekNeedsRemainingCollection } from "@/lib/collection-progress";
 
 /**
  * Catch-up policy for `/api/cron/catchup`.
@@ -11,10 +11,10 @@ import { listDueCategories, weekHasIdleCollectionEngines } from "@/lib/collectio
  * - Resume cold `running` rows instead of sitting until the 90m stale timeout.
  * - Cap remounts so structural gaps cannot burn API forever.
  * - Keep Monday `/api/cron` as the primary schedule (no circuit there).
- * - Entry gate must be cheap: GHA pokes every 5m with `curl --max-time 25`. Full
- *   `getPipelineHealth()` (prompts/responses/snapshots) stays after the tick.
- * - After Overall publishes, due categories go empty — still resume when collection
- *   engines remain idle (Perplexity/Claude/DeepSeek).
+ * - Entry gate: due list + remaining-engine coverage (needed after Overall clears due).
+ *   Full `getPipelineHealth()` still stays after the tick.
+ * - After Overall publishes, due categories go empty — still resume until every
+ *   in-flight category has all collection engines complete (not just zero-OK idle).
  * - `success` + snapshots still resumes remaining engines after the first overall publish.
  */
 
@@ -94,11 +94,12 @@ export async function decideCatchupEntry(
   run: CatchupRunSnapshot
 ): Promise<CatchupDecision> {
   const dueCategories = await listDueCategories(week);
-  const idleEngines = await weekHasIdleCollectionEngines(week);
+  // Idle (= zero OK rows) misses partial engines (e.g. DeepSeek 39/40). Use full coverage.
+  const needsRemaining = await weekNeedsRemainingCollection(week);
 
-  // After Overall publishes, due becomes empty — but Perplexity/Claude/DeepSeek
-  // may still be idle. Do not skip those tails as "no_categories_due".
-  if (dueCategories.length === 0 && !idleEngines) {
+  // After Overall publishes, due becomes empty — still resume until every collect
+  // category has all six engines complete.
+  if (dueCategories.length === 0 && !needsRemaining) {
     if (run?.status === "running" && (run.snapshotCount ?? 0) === 0) {
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
       return {
@@ -118,7 +119,7 @@ export async function decideCatchupEntry(
   }
 
   if (run?.status === "success" && (run.snapshotCount ?? 0) > 0) {
-    if (idleEngines) {
+    if (needsRemaining) {
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
       if (runsThisWeek >= CATCHUP_MAX_RUNS_PER_WEEK) {
         return {
