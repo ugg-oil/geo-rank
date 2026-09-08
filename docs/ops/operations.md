@@ -22,13 +22,16 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 - **Vercel**：每天 UTC `06:00` 打一次 catchup（Hobby 合规的日级兜底）
 - **GitHub Actions**（`.github/workflows/pipeline-catchup-5m.yml`）：每 **5 分钟** **短请求触发**同一路由（`curl --max-time 25`，不等待 tick 跑完；504/超时也算触发成功）。这是续跑的主调度；`after()` 自链在 Hobby 上只是尽力而为。仓库需配置 secret `CRON_SECRET`（与 Vercel 相同），可选 variable `SITE_URL`（默认 `https://georadar.website`）
 
-入口策略见 `src/lib/cron-catchup-policy.ts`（入口只读最新 `pipeline_runs` 一行，不扫 prompts/responses/snapshots）：
+入口策略见 `src/lib/cron-catchup-policy.ts`（入口先看 due / 是否还有 idle 引擎，再读最新 `pipeline_runs`）：
 
-1. 最新 run `success` 且 `snapshotCount > 0`，且 6 个采集引擎都采完 → `already_published`。综合榜已发但还有引擎没采完 → **继续采下一家**，采完就 extract/score/publish，再采下一家。
-2. 最新 run 心跳 < 5 分钟 → `already_running`（不与活自链打架）
-3. 心跳 5 分钟–90 分钟的 `running` → **续跑**（避免干等到 90 分钟才 stale）
-4. 将新建/重挂 run 时，若本周 `pipeline_runs` 已 ≥ 6 → `circuit_open`，发告警后停手（防结构性缺口无限烧 API）
-5. 否则 tick + 自链
+1. **无 due 且无 idle 引擎** → `no_categories_due`（空周一不空转）。综合榜已发但 Perplexity/Claude/DeepSeek 仍 idle → **不算** no_categories_due，继续采尾巴。
+2. 最新 run `success` 且 `snapshotCount > 0`，且 6 个采集引擎都采完 → `already_published`。综合榜已发但还有引擎没采完 → **继续采下一家**，采完就 extract/score/publish，再采下一家。
+3. 最新 run 心跳 < 5 分钟 → `already_running`（不与活自链打架）
+4. 心跳 5 分钟–90 分钟的 `running` → **续跑**（避免干等到 90 分钟才 stale）
+5. 将新建/重挂 run 时，若本周 `pipeline_runs` 已 ≥ 6 → `circuit_open`，发告警后停手（防结构性缺口无限烧 API）
+6. 否则 tick + 自链
+
+采集覆盖集 = **due ∪ 本周已有 response/snapshot 的品类**。Overall 发榜后 due 变空，尾巴仍按 in-flight 品类继续采，避免 `collectEngine` 空转、`findNextIncompleteEngine` 卡死在 chatgpt。
 
 完整 `getPipelineHealth`（coverage 扫描）只在 tick 报告 `done` 之后跑，避免 GHA `curl --max-time 25` 在闸门上把还没开始的 tick 掐掉。
 

@@ -251,30 +251,19 @@ export async function collectEngine(
   deadline?: number,
   options: CollectOptions = {}
 ): Promise<CollectEngineResult> {
+  const { listCollectCategories } = await import("@/lib/collection-progress");
   const { CATEGORIES } = await import("@/lib/constants");
-  const { getCategoryPeriodDays } = await import("@/lib/category-period");
-  const { shouldCollectCategoryInPeriod } = await import("@/lib/period");
-  const { mapLatestPublishedPeriods } = await import("@/lib/period-sequence");
-  const categories = options.categories ?? CATEGORIES;
+  // Explicit list wins. forceCategories (backfill) ⇒ all categories when unset.
+  // Default cron path ⇒ due ∪ already in-flight this week.
+  const categories =
+    options.categories ??
+    (options.forceCategories ? CATEGORIES : await listCollectCategories(week));
   const suffix = options.promptSuffix ?? "";
   const jobs: CollectionJob[] = [];
   const categoriesAttempted: string[] = [];
   const soft = options.softDeadline === true;
-  const latestByCategory = options.forceCategories
-    ? null
-    : await mapLatestPublishedPeriods(categories);
 
   for (const category of categories) {
-    if (
-      !options.forceCategories &&
-      !shouldCollectCategoryInPeriod(
-        getCategoryPeriodDays(category),
-        week,
-        latestByCategory!.get(category) ?? null
-      )
-    ) {
-      continue;
-    }
     categoriesAttempted.push(category);
     const prompts = await prisma.prompt.findMany({
       where: { category, active: true },

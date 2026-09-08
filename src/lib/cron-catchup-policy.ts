@@ -13,8 +13,9 @@ import { listDueCategories, weekHasIdleCollectionEngines } from "@/lib/collectio
  * - Keep Monday `/api/cron` as the primary schedule (no circuit there).
  * - Entry gate must be cheap: GHA pokes every 5m with `curl --max-time 25`. Full
  *   `getPipelineHealth()` (prompts/responses/snapshots) stays after the tick.
- * - `success` + snapshots still resumes remaining engines (Perplexity/Claude/DeepSeek)
- *   after the first overall publish.
+ * - After Overall publishes, due categories go empty — still resume when collection
+ *   engines remain idle (Perplexity/Claude/DeepSeek).
+ * - `success` + snapshots still resumes remaining engines after the first overall publish.
  */
 
 /** Self-chain ceiling. 6 engines + ~6 post stages needs headroom when `after()` holds. */
@@ -93,7 +94,11 @@ export async function decideCatchupEntry(
   run: CatchupRunSnapshot
 ): Promise<CatchupDecision> {
   const dueCategories = await listDueCategories(week);
-  if (dueCategories.length === 0) {
+  const idleEngines = await weekHasIdleCollectionEngines(week);
+
+  // After Overall publishes, due becomes empty — but Perplexity/Claude/DeepSeek
+  // may still be idle. Do not skip those tails as "no_categories_due".
+  if (dueCategories.length === 0 && !idleEngines) {
     if (run?.status === "running" && (run.snapshotCount ?? 0) === 0) {
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
       return {
@@ -113,7 +118,7 @@ export async function decideCatchupEntry(
   }
 
   if (run?.status === "success" && (run.snapshotCount ?? 0) > 0) {
-    if (await weekHasIdleCollectionEngines(week)) {
+    if (idleEngines) {
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
       if (runsThisWeek >= CATCHUP_MAX_RUNS_PER_WEEK) {
         return {
