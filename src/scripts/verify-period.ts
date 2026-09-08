@@ -22,16 +22,16 @@ assert.equal(addDays("2026-07-27", -7), "2026-07-20");
 assert.equal(backfillPromptSuffix("Week of 2026-07-27"), " as of 2026-07-27");
 assert.equal(backfillPromptSuffix("2026-07-27"), " as of 2026-07-27");
 
-// phase-6 cadence: former 7 → 14, former 14 → 21; unknown stays 7.
-assert.equal(getCategoryPeriodDays("AI Tools"), 14);
-assert.equal(getCategoryPeriodDays("AI Image / Video Tools"), 14);
-assert.equal(getCategoryPeriodDays("Marketing Tools"), 14);
-assert.equal(getCategoryPeriodDays("AI Meeting Assistants"), 14);
-assert.equal(getCategoryPeriodDays("AI Cybersecurity Tools"), 14);
-assert.equal(getCategoryPeriodDays("SaaS Software"), 21);
-assert.equal(getCategoryPeriodDays("VPN Services"), 21);
-assert.equal(getCategoryPeriodDays("HR Software"), 21);
-assert.equal(getCategoryPeriodDays("Unknown"), 7);
+// All published categories: 28-day cadence; unknown defaults to 28.
+assert.equal(getCategoryPeriodDays("AI Tools"), 28);
+assert.equal(getCategoryPeriodDays("AI Image / Video Tools"), 28);
+assert.equal(getCategoryPeriodDays("Marketing Tools"), 28);
+assert.equal(getCategoryPeriodDays("AI Meeting Assistants"), 28);
+assert.equal(getCategoryPeriodDays("AI Cybersecurity Tools"), 28);
+assert.equal(getCategoryPeriodDays("SaaS Software"), 28);
+assert.equal(getCategoryPeriodDays("VPN Services"), 28);
+assert.equal(getCategoryPeriodDays("HR Software"), 28);
+assert.equal(getCategoryPeriodDays("Unknown"), 28);
 
 // Due = last published start + periodDays (exact Monday). No history → due.
 assert.equal(shouldCollectCategoryInPeriod(7, "Week of 2026-08-31", null), true);
@@ -69,6 +69,19 @@ assert.equal(
 );
 assert.equal(
   shouldCollectCategoryInPeriod(21, "Week of 2026-09-07", "Week of 2026-08-24"),
+  false
+);
+
+assert.equal(
+  shouldCollectCategoryInPeriod(28, "Week of 2026-10-05", "Week of 2026-09-07"),
+  true
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(28, "Week of 2026-09-21", "Week of 2026-08-24"),
+  true
+);
+assert.equal(
+  shouldCollectCategoryInPeriod(28, "Week of 2026-09-14", "Week of 2026-08-24"),
   false
 );
 
