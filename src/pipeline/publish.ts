@@ -46,7 +46,7 @@ async function readLatestBoards(): Promise<Record<string, string>> {
  * Ensure DB boards exist for the week, then optionally mirror to Blob.
  * Blob mirror is opt-in (`PUBLISH_BLOB_MIRROR=1`); default skips puts.
  * Blob unavailable / put failure → soft-fail (DB remains SoT); does not throw.
- * Throws only when no category snapshots exist for `week`.
+ * No category snapshots for `week` → soft skip (`publishStatus: "skipped"`).
  */
 export async function publishLeaderboards(
   week: string,
@@ -79,7 +79,19 @@ export async function publishLeaderboards(
   }
 
   if (Object.keys(boardsBySlug).length === 0) {
-    throw new Error(`No category boards to publish for ${week}`);
+    // Empty weeks / premature publish steps should skip, not 500 the cron.
+    console.log(`[publish] No category boards for ${week}; skipping`);
+    logPipelineEvent({
+      event: "publication_skip_empty_week",
+      week,
+      reason: "no_category_boards",
+    });
+    return {
+      manifestUrl: null,
+      latestManifestUrl: null,
+      publishedAt,
+      publishStatus: "skipped",
+    };
   }
 
   const skipReason = blobMirrorSkipReason();

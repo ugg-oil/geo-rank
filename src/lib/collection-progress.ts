@@ -181,13 +181,18 @@ export async function weekNeedsRemainingCollection(week: string) {
   return (await findNextIncompleteEngine(week)) !== null;
 }
 
-/** Cheap catchup gate: any collection engine with zero OK responses. */
+/**
+ * Cheap catchup gate: an in-flight week is missing at least one engine entirely.
+ * A virgin empty week (zero OK responses) is *not* idle — that would make every
+ * engine look missing and keep Monday/catchup spinning empty runs into publish.
+ */
 export async function weekHasIdleCollectionEngines(week: string) {
   const rows = await prisma.response.findMany({
     where: { week, status: "ok" },
     distinct: ["engine"],
     select: { engine: true },
   });
+  if (rows.length === 0) return false;
   const present = new Set(rows.map((row) => row.engine));
   return COLLECTION_ENGINES.some((engine) => !present.has(engine));
 }
