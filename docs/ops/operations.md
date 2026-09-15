@@ -24,7 +24,7 @@ Pipeline 具有明确的超时边界：单次 OpenRouter 请求默认 45 秒，�
 
 入口策略见 `src/lib/cron-catchup-policy.ts`（入口先看 due / 是否还有剩余采集，再读最新 `pipeline_runs`）：
 
-1. **无 due 且无剩余采集** → `no_categories_due`（空周一不空转；零 OK response 不算 idle）。已有空 `running` → `finish_empty_running` 进 tick 标 skipped。综合榜已发但仍有引擎未采完 → **不算** no_categories_due，继续采尾巴。
+1. **无 due 且无剩余采集** → `no_categories_due`（空周一不空转；零 OK response 不算 idle；无 in-flight 品类时 `weekNeedsPipelineTick` 直接 false，不因 vacuous complete 走进 publish）。已有空 `running` → `finish_empty_running` 进 tick 标 skipped。综合榜已发但仍有引擎未采完 → **不算** no_categories_due，继续采尾巴。
 2. 最新 run `success` 且 `snapshotCount > 0`，且 6 个采集引擎都采完 → `already_published`。综合榜已发但还有引擎没采完 → **继续采下一家**，采完就 extract/score/publish，再采下一家。
 3. 最新 run 心跳 < 5 分钟 → `already_running`（不与活自链打架）
 4. 心跳 5 分钟–90 分钟的 `running` → **续跑**（避免干等到 90 分钟才 stale）
