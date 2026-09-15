@@ -110,6 +110,10 @@ export async function listDueCategories(week: string): Promise<string[]> {
 export async function weekNeedsPipelineTick(week: string): Promise<boolean> {
   const due = await listDueCategories(week);
   if (due.length > 0) return true;
+  // No due and nothing in-flight ⇒ virgin / idle empty week. Do not consult
+  // coverage helpers that treat "zero categories" as vacuously complete.
+  const collect = await listCollectCategories(week);
+  if (collect.length === 0) return false;
   if (await weekHasIdleCollectionEngines(week)) return true;
   if (await weekNeedsRemainingCollection(week)) return true;
   if (await completeEnginesMissingSnapshots(week)) return true;
@@ -166,6 +170,8 @@ export async function weekHasPublishedSnapshots(week: string) {
 /** True when an engine is fully collected but has no leaderboard snapshots yet. */
 export async function completeEnginesMissingSnapshots(week: string) {
   const coverage = await loadCollectionCoverage(week);
+  // Vacuous complete + no snapshots must not mean "needs scoring" on empty weeks.
+  if (coverage.expectedCategories.length === 0) return false;
   const rows = await prisma.snapshot.findMany({
     where: { week, engine: { not: null } },
     distinct: ["engine"],
