@@ -14,7 +14,8 @@ import { listDueCategories, weekNeedsRemainingCollection } from "@/lib/collectio
  * - Entry gate: due list + remaining-engine coverage (needed after Overall clears due).
  *   Full `getPipelineHealth()` still stays after the tick.
  * - After Overall publishes, due categories go empty — still resume until every
- *   in-flight category has all collection engines complete (not just zero-OK idle).
+ *   in-flight category has all collection engines complete.
+ * - Empty week with a stray `running` row: finish via tick skip (not stage advance).
  * - `success` + snapshots still resumes remaining engines after the first overall publish.
  */
 
@@ -99,12 +100,14 @@ export async function decideCatchupEntry(
 
   // After Overall publishes, due becomes empty — still resume until every collect
   // category has all six engines complete.
+  // Empty running + nothing due: enter tick once so `finishSkippedNoDueWeek` can
+  // close it. Do not treat a virgin Monday as "idle engines still to collect".
   if (dueCategories.length === 0 && !needsRemaining) {
     if (run?.status === "running" && (run.snapshotCount ?? 0) === 0) {
       const runsThisWeek = await prisma.pipelineRun.count({ where: { week } });
       return {
         action: "run",
-        reason: "cleanup_empty_running",
+        reason: "finish_empty_running",
         mode: "continue",
         runId: run.id,
         runsThisWeek,
